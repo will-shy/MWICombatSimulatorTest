@@ -52,6 +52,7 @@ class CombatSimulator extends EventTarget {
         }
 
         this.simResult.simulatedTime = this.simulationTime;
+        this.simResult.setDropRateMultipliers(this.players[0]);
 
         return this.simResult;
     }
