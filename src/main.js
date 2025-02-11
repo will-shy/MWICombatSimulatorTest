@@ -1915,11 +1915,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });  
     }
 
+    function updatePlayersCheckbox(isCheck) {
+        const boxes = playerContainer.querySelectorAll('.player-checkbox');
+        boxes.forEach((checkBox) => {checkBox.checked = isCheck});
+    }
+
     simDungeonToggle.addEventListener('change', function() {
         if (simDungeonToggle.checked) {
             addPlayers();
+            updatePlayersCheckbox(true);
         } else {
             removePlayers();
+            updatePlayersCheckbox(false);
         }
         updatePlayerNames();
     });
