@@ -1060,9 +1060,9 @@ function getDropProfit(simResult, playerToDisplay) {
         expenses += price * amount;
     }
 
-    simResult["noRngRevenue"] = (noRngTotal).toLocaleString();
-    simResult["expenses"] = (expenses).toLocaleString();
-    simResult["noRngProfit"] = (noRngTotal - expenses).toLocaleString();
+    simResult["noRngRevenue"] = (noRngTotal).toLocaleString('en-US', {minimumFractionDigits: 2,maximumFractionDigits: 2});
+    simResult["expenses"] = (expenses).toLocaleString('en-US', {minimumFractionDigits: 2,maximumFractionDigits: 2});
+    simResult["noRngProfit"] = (noRngTotal - expenses).toLocaleString('en-US', {minimumFractionDigits: 2,maximumFractionDigits: 2});
 }
 
 function updateAllSimsModal(data) {
@@ -1092,7 +1092,7 @@ function updateAllSimsModal(data) {
       // 找到最大值及其单元格
       for (let row = 1; row < rows.length; row++) {
         const cell = rows[row].cells[col];
-        const value = parseFloat(cell.textContent);
+        const value = parseFloat(cell.textContent.replace(/,/g, ''));
         if (value > max) {
           max = value;
           maxCell = cell;
