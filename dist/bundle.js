@@ -1684,7 +1684,9 @@ const ONE_HOUR = 60 * 60 * ONE_SECOND;
 let buttonStartSimulation = document.getElementById("buttonStartSimulation");
 let progressbar = document.getElementById("simulationProgressBar");
 
-let worker = new Worker(new URL(/* worker import */ __webpack_require__.p + __webpack_require__.u("src_worker_js"), __webpack_require__.b));
+let worker = new Worker(new URL(/* worker import */ __webpack_require__.p + __webpack_require__.u(0), __webpack_require__.b));
+let multiWorker = new Worker(new URL(/* worker import */ __webpack_require__.p + __webpack_require__.u("src_multiWorker_js"), __webpack_require__.b));
+
 
 let player = new _combatsimulator_player_js__WEBPACK_IMPORTED_MODULE_1__["default"]();
 let selectedPlayers = [];
@@ -1730,6 +1732,11 @@ worker.onmessage = function (event) {
         case "simulation_error":
             showErrorModal(event.data.error.toString());
             break;
+    }
+};
+
+multiWorker.onmessage = function (event) {
+    switch (event.data.type) {
         case "simulation_result_allZones":
             progressbar.style.width = "100%";
             progressbar.innerHTML = "100%";
@@ -1737,6 +1744,14 @@ worker.onmessage = function (event) {
             updateContent();
             buttonStartSimulation.disabled = false;
             document.getElementById('buttonShowAllSimData').style.display = 'block';
+            break;
+        case "simulation_progress":
+            let progress = Math.floor(100 * event.data.progress);
+            progressbar.style.width = progress + "%";
+            progressbar.innerHTML = progress + "%";
+            break;
+        case "simulation_error":
+            showErrorModal(event.data.error.toString());
             break;
     }
 };
@@ -3478,6 +3493,19 @@ function showManapointsGained(simResult, playerToDisplay) {
     ranOutOfManaRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.ranOutOfMana");
     ranOutOfManaRow.lastElementChild.setAttribute("data-i18n", "common:simulationResults." + ranOutOfManaText);
     newChildren.push(ranOutOfManaRow);
+    
+    if (simResult.playerRanOutOfMana[playerToDisplay]) {
+        let ranOutOfManaStat = simResult.playerRanOutOfManaTime[playerToDisplay];
+        let ranOutOfManaStatRow = createRow(
+            ["col-md-6", "col-md-6 text-end"],
+            [
+                "Run Out Ratio",
+                (ranOutOfManaStat[0]/(ranOutOfManaStat[1]+ranOutOfManaStat[0]) * 100).toFixed(2) + "%"
+            ]
+        );
+        ranOutOfManaStatRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.ranOutOfManaRatio");
+        newChildren.push(ranOutOfManaStatRow);
+    }
 
     resultDiv.replaceChildren(...newChildren);
 }
@@ -3914,7 +3942,7 @@ function startSimulation(selectedPlayers) {
             zones: zoneHrids,
             simulationTimeLimit: simulationTimeLimit,
         };
-        worker.postMessage(workerMessage);
+        multiWorker.postMessage(workerMessage);
     }
 }
 

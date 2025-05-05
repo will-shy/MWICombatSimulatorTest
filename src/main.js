@@ -23,6 +23,8 @@ let buttonStartSimulation = document.getElementById("buttonStartSimulation");
 let progressbar = document.getElementById("simulationProgressBar");
 
 let worker = new Worker(new URL("worker.js", import.meta.url));
+let multiWorker = new Worker(new URL("multiWorker.js", import.meta.url));
+
 
 let player = new Player();
 let selectedPlayers = [];
@@ -68,6 +70,11 @@ worker.onmessage = function (event) {
         case "simulation_error":
             showErrorModal(event.data.error.toString());
             break;
+    }
+};
+
+multiWorker.onmessage = function (event) {
+    switch (event.data.type) {
         case "simulation_result_allZones":
             progressbar.style.width = "100%";
             progressbar.innerHTML = "100%";
@@ -75,6 +82,14 @@ worker.onmessage = function (event) {
             updateContent();
             buttonStartSimulation.disabled = false;
             document.getElementById('buttonShowAllSimData').style.display = 'block';
+            break;
+        case "simulation_progress":
+            let progress = Math.floor(100 * event.data.progress);
+            progressbar.style.width = progress + "%";
+            progressbar.innerHTML = progress + "%";
+            break;
+        case "simulation_error":
+            showErrorModal(event.data.error.toString());
             break;
     }
 };
@@ -1816,6 +1831,19 @@ function showManapointsGained(simResult, playerToDisplay) {
     ranOutOfManaRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.ranOutOfMana");
     ranOutOfManaRow.lastElementChild.setAttribute("data-i18n", "common:simulationResults." + ranOutOfManaText);
     newChildren.push(ranOutOfManaRow);
+    
+    if (simResult.playerRanOutOfMana[playerToDisplay]) {
+        let ranOutOfManaStat = simResult.playerRanOutOfManaTime[playerToDisplay];
+        let ranOutOfManaStatRow = createRow(
+            ["col-md-6", "col-md-6 text-end"],
+            [
+                "Run Out Ratio",
+                (ranOutOfManaStat[0]/(ranOutOfManaStat[1]+ranOutOfManaStat[0]) * 100).toFixed(2) + "%"
+            ]
+        );
+        ranOutOfManaStatRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.ranOutOfManaRatio");
+        newChildren.push(ranOutOfManaStatRow);
+    }
 
     resultDiv.replaceChildren(...newChildren);
 }
@@ -2252,7 +2280,7 @@ function startSimulation(selectedPlayers) {
             zones: zoneHrids,
             simulationTimeLimit: simulationTimeLimit,
         };
-        worker.postMessage(workerMessage);
+        multiWorker.postMessage(workerMessage);
     }
 }
 

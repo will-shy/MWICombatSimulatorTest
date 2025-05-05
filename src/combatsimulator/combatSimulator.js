@@ -57,7 +57,10 @@ class CombatSimulator extends EventTarget {
             if (ticks == 1000) {
                 ticks = 0;
                 let progressEvent = new CustomEvent("progress", {
-                    detail: Math.min(this.simulationTime / simulationTimeLimit, 1),
+                    detail: {
+                        zone: this.zone.hrid,
+                        progress: Math.min(this.simulationTime / simulationTimeLimit, 1)
+                    },
                 });
                 this.dispatchEvent(progressEvent);
             }
@@ -855,9 +858,12 @@ class CombatSimulator extends EventTarget {
 
         if (source.combatDetails.currentManapoints < ability.manaCost) {
             if (source.isPlayer && oomCheck) {
-                this.simResult.playerRanOutOfMana[source.hrid] = true;
+                this.simResult.addRanOutOfManaCount(source, true);
             }
             return false;
+        }
+        if (source.isPlayer && oomCheck) {
+            this.simResult.addRanOutOfManaCount(source, false);
         }
         return true;
     }
