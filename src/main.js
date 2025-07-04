@@ -859,9 +859,17 @@ function initZones() {
         .sort((a, b) => a.sortIndex - b.sortIndex);
 
     for (const zone of Object.values(gameZones)) {
-        let opt = new Option(zone.name, zone.hrid);
-        opt.setAttribute("data-i18n", "actionNames." + zone.hrid);
-        zoneSelect.add(opt);
+        for(let i = 0; i <= zone.maxDifficulty; i++) {
+            let opt = new Option("", zone.hrid + "#" + i);
+            let dungeonName = createElement("span", "dungeonName");
+            dungeonName.setAttribute("data-i18n", "actionNames." + zone.hrid);
+            opt.appendChild(dungeonName);
+
+            let dungeonTier = createElement("span", "dungeonTier");
+            dungeonTier.textContent = '#T' + i;
+            opt.appendChild(dungeonTier);
+            zoneSelect.add(opt);
+        }
     }
 }
 
@@ -873,9 +881,17 @@ function initDungeons() {
         .sort((a, b) => a.sortIndex - b.sortIndex);
 
     for (const dungeon of Object.values(gameDungeons)) {
-        let opt = new Option(dungeon.name, dungeon.hrid);
-        opt.setAttribute("data-i18n", "actionNames." + dungeon.hrid);
-        dungeonSelect.add(opt);
+        for(let i = 0; i <= dungeon.maxDifficulty; i++) {
+            let opt = new Option("", dungeon.hrid+'#'+i);
+            let dungeonName = createElement("span", "dungeonName");
+            dungeonName.setAttribute("data-i18n", "actionNames." + dungeon.hrid);
+            opt.appendChild(dungeonName);
+
+            let dungeonTier = createElement("span", "dungeonTier");
+            dungeonTier.textContent = '#T' + i;
+            opt.appendChild(dungeonTier);
+            dungeonSelect.add(opt);
+        }
     }
 }
 
@@ -1023,6 +1039,7 @@ function manipulateSimResultsDataForDisplay(simResults) {
             let simResult = simResults[i];
             let hoursSimulated = simResult.simulatedTime / ONE_HOUR;
             let zoneName = simResult.zoneName;
+            let difficultyTier = simResult.difficultyTier;
             let encountersPerHour = (simResult.encounters / hoursSimulated).toFixed(1);
             let playerDeaths = simResult.deaths[playerToDisplay] ?? 0;
             let deathsPerHour = (playerDeaths / hoursSimulated).toFixed(2);
@@ -1047,7 +1064,7 @@ function manipulateSimResultsDataForDisplay(simResults) {
             let expenses = simResult["expenses"];
 
             let displaySimRow = {
-                "ZoneName": zoneName, "Player": playerToDisplay, "Encounters": encountersPerHour, "Deaths": deathsPerHour,
+                "ZoneName": zoneName, "DifficultyTier": difficultyTier, "Player": playerToDisplay, "Encounters": encountersPerHour, "Deaths": deathsPerHour,
                 "TotalExperience": totalExperiencePerHour, "Stamina": experiencePerHour["Stamina"],
                 "Intelligence": experiencePerHour["Intelligence"], "Attack": experiencePerHour["Attack"],
                 "Magic": experiencePerHour["Magic"], "Ranged": experiencePerHour["Ranged"],
@@ -1077,7 +1094,7 @@ function getDropProfit(simResult, playerToDisplay) {
         const rareDropMap = new Map();
         if (combatMonsterDetailMap[monster].dropTable) {
             for (const drop of combatMonsterDetailMap[monster].dropTable) {
-                if (drop.minEliteTier > simResult.eliteTier) {
+                if (drop.minDifficultyTier > simResult.difficultyTier) {
                     continue;
                 }
                 const existingDrop = dropMap.get(drop.itemHrid);
@@ -1091,7 +1108,7 @@ function getDropProfit(simResult, playerToDisplay) {
             }
             if (combatMonsterDetailMap[monster].rareDropTable)
                 for (const drop of combatMonsterDetailMap[monster].rareDropTable) {
-                    if (drop.minEliteTier > simResult.eliteTier) {
+                    if (drop.minDifficultyTier > simResult.difficultyTier) {
                         continue;
                     }
                     const existingRareDrop = rareDropMap.get(drop.itemHrid);
@@ -1246,7 +1263,7 @@ function updateAllSimsModal(data) {
     const numCols = rows[0].cells.length;
 
     // 遍历每一列
-    for (let col = 4; col < numCols; col++) {
+    for (let col = 5; col < numCols; col++) {
         let max = -Infinity;
         let maxCell = null;
 
@@ -1303,6 +1320,7 @@ function updateSortIndicators(tableId, columnIndex, direction) {
 document.querySelectorAll('#allZonesData th').forEach((header, index) => {
     if (index === 0) return;
     if (index === 1) return;
+    if (index === 2) return;
 
     header.addEventListener('click', () => {
         if (currentSortColumn === index) {
@@ -1400,7 +1418,7 @@ function showKills(simResult, playerToDisplay) {
         const rareDropMap = new Map();
         if (combatMonsterDetailMap[monster].dropTable)
             for (const drop of combatMonsterDetailMap[monster].dropTable) {
-                if (drop.minEliteTier > simResult.eliteTier) {
+                if (drop.minDifficultyTier > simResult.difficultyTier) {
                     continue;
                 }
                 const existingDrop = dropMap.get(drop.itemHrid);
@@ -1414,7 +1432,7 @@ function showKills(simResult, playerToDisplay) {
             }
         if (combatMonsterDetailMap[monster].rareDropTable)
             for (const drop of combatMonsterDetailMap[monster].rareDropTable) {
-                if (drop.minEliteTier > simResult.eliteTier) {
+                if (drop.minDifficultyTier > simResult.difficultyTier) {
                     continue;
                 }
                 const existingRareDrop = rareDropMap.get(drop.itemHrid);
@@ -2290,14 +2308,16 @@ function startSimulation(selectedPlayers) {
     let simulationTimeInput = document.getElementById("inputSimulationTime");
     let simulationTimeLimit = Number(simulationTimeInput.value) * ONE_HOUR;
     if (!simAllZonesToggle.checked) {
-        let zoneHrid = zoneSelect.value;
+        let zoneHrid = zoneSelect.value.split('#')[0];
+        let difficultyTier = Number(zoneSelect.value.split('#')[1]);
         if (simDungeonToggle.checked) {
-            zoneHrid = dungeonSelect.value;
+            zoneHrid = dungeonSelect.value.split('#')[0];
+            difficultyTier = Number(dungeonSelect.split('#')[1]);
         }
         let workerMessage = {
             type: "start_simulation",
             players: playersToSim,
-            zoneHrid: zoneHrid,
+            zone: {zoneHrid:zoneHrid, difficultyTier:difficultyTier},
             simulationTimeLimit: simulationTimeLimit,
         };
         worker.postMessage(workerMessage);
@@ -2305,7 +2325,15 @@ function startSimulation(selectedPlayers) {
         let zoneHrids = Object.values(actionDetailMap)
             .filter((action) => action.type == "/action_types/combat" && action.category != "/action_categories/combat/dungeons" && action.combatZoneInfo.fightInfo.randomSpawnInfo.maxSpawnCount > 1)
             .sort((a, b) => a.sortIndex - b.sortIndex)
-            .map(action => action.hrid);
+            .map(action => {
+                let result = [];
+                for(let difficultyTier = 0; difficultyTier <= action.maxDifficulty; difficultyTier++) {
+                    result.push({ zoneHrid: action.hrid, difficultyTier: difficultyTier });
+                }
+                return result;
+            })
+            .flat();
+
         let workerMessage = {
             type: "start_simulation_all_zones",
             players: playersToSim,
