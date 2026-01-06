@@ -74,6 +74,10 @@ function onWorkerMessage(event) {
             let progress = Math.floor(100 * event.data.progress);
             progressbar.style.width = progress + "%";
             progressbar.innerHTML = progress + "% (" + ((Date.now() - simStartTime) / 1000).toFixed(2) + "s)";
+            // 实时更新图表
+            if (event.data.timeSeriesData && document.getElementById('hpMpVisualizationToggle').checked) {
+                updateChartsRealtime(event.data.timeSeriesData);
+            }
             break;
         case "simulation_error":
             showErrorModal(event.data.error.toString());
@@ -1280,12 +1284,344 @@ function showSimulationResult(simResult) {
     window.noRngProfit = window.noRngRevenue - window.expenses;
     document.getElementById('noRngProfitSpan').innerText = window.noRngProfit.toLocaleString();
     document.getElementById('noRngProfitPreview').innerText = window.noRngProfit.toLocaleString();
+    
+    // 显示战斗图表
+    if (document.getElementById('hpMpVisualizationToggle').checked) {
+        renderCombatCharts(simResult);
+    }
 }
 
 function showAllSimulationResults(simResults) {
     let displaySimResults = manipulateSimResultsDataForDisplay(simResults);
     updateAllSimsModal(displaySimResults);
 }
+
+// #region 战斗图表功能
+
+let combatCharts = {
+    hpChart: null,
+    mpChart: null
+};
+
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 1000; // 每秒更新一次图表
+
+// 实时更新图表
+function updateChartsRealtime(timeSeriesData) {
+    // 节流：避免过于频繁的更新
+    const now = Date.now();
+    if (now - lastUpdateTime < UPDATE_INTERVAL) {
+        return;
+    }
+    lastUpdateTime = now;
+    
+    if (!timeSeriesData || !timeSeriesData.timestamps || timeSeriesData.timestamps.length === 0) {
+        return;
+    }
+    
+    // 显示图表容器
+    const container = document.getElementById('combatChartsContainer');
+    if (container) {
+        container.classList.remove('d-none');
+    }
+    
+    // 如果图表不存在，先创建
+    if (!combatCharts.hpChart || !combatCharts.mpChart) {
+        initializeRealtimeCharts();
+        // 等待下一次更新周期再更新数据
+        return;
+    }
+    
+    const timeLabels = timeSeriesData.timestamps.map(t => (t / ONE_SECOND).toFixed(1));
+    const playerIds = Object.keys(timeSeriesData.players);
+    
+    // 生成颜色方案
+    const colors = [
+        { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
+        { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
+        { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+        { border: 'rgb(255, 206, 86)', bg: 'rgba(255, 206, 86, 0.2)' },
+        { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' }
+    ];
+    
+    // 重建datasets以确保完整更新
+    const hpDatasets = playerIds.map((playerId, index) => {
+        const playerData = timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' HP',
+            data: playerData.hp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    const mpDatasets = playerIds.map((playerId, index) => {
+        const playerData = timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' MP',
+            data: playerData.mp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    // 更新HP图表
+    combatCharts.hpChart.data.labels = timeLabels;
+    combatCharts.hpChart.data.datasets = hpDatasets;
+    combatCharts.hpChart.options.plugins.legend.display = true;
+    combatCharts.hpChart.options.plugins.title.text = i18next.t('common:Experiment.hpOverTime');
+    combatCharts.hpChart.update('none');
+    
+    // 更新MP图表
+    combatCharts.mpChart.data.labels = timeLabels;
+    combatCharts.mpChart.data.datasets = mpDatasets;
+    combatCharts.mpChart.options.plugins.legend.display = true;
+    combatCharts.mpChart.options.plugins.title.text = i18next.t('common:Experiment.mpOverTime');
+    combatCharts.mpChart.update('none');
+}
+
+function renderCombatCharts(simResult) {
+    // 显示图表容器
+    const container = document.getElementById('combatChartsContainer');
+    if (container) {
+        container.classList.remove('d-none');
+    }
+    
+    if (!simResult.timeSeriesData || !simResult.timeSeriesData.timestamps || simResult.timeSeriesData.timestamps.length === 0) {
+        // 显示空状态
+        showEmptyCharts();
+        return;
+    }
+    
+    const timeLabels = simResult.timeSeriesData.timestamps.map(t => (t / ONE_SECOND).toFixed(1));
+    
+    // 获取所有玩家
+    const playerIds = Object.keys(simResult.timeSeriesData.players);
+    
+    // 生成颜色方案
+    const colors = [
+        { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
+        { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
+        { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+        { border: 'rgb(255, 206, 86)', bg: 'rgba(255, 206, 86, 0.2)' },
+        { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' }
+    ];
+    
+    // HP图表
+    destroyChart('hpChart');
+    const hpDatasets = playerIds.map((playerId, index) => {
+        const playerData = simResult.timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' HP',
+            data: playerData.hp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    combatCharts.hpChart = new Chart(document.getElementById('hpChart'), {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: hpDatasets
+        },
+        options: getChartOptions(i18next.t('common:Experiment.hpOverTime'), i18next.t('common:Experiment.timeInSeconds'), 'HP')
+    });
+    
+    // MP图表
+    destroyChart('mpChart');
+    const mpDatasets = playerIds.map((playerId, index) => {
+        const playerData = simResult.timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' MP',
+            data: playerData.mp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    combatCharts.mpChart = new Chart(document.getElementById('mpChart'), {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: mpDatasets
+        },
+        options: getChartOptions(i18next.t('common:Experiment.mpOverTime'), i18next.t('common:Experiment.timeInSeconds'), 'MP')
+    });
+}
+
+function destroyChart(chartName) {
+    if (combatCharts[chartName]) {
+        combatCharts[chartName].destroy();
+        combatCharts[chartName] = null;
+    }
+}
+
+function getChartOptions(title, xLabel, yLabel) {
+    return {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    color: '#eee',
+                    font: {
+                        size: 11
+                    }
+                }
+            },
+            title: {
+                display: true,
+                text: title,
+                color: '#eee',
+                font: {
+                    size: 14
+                }
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                title: {
+                    display: true,
+                    text: xLabel,
+                    color: '#eee'
+                },
+                ticks: {
+                    color: '#ccc',
+                    maxTicksLimit: 10
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            },
+            y: {
+                display: true,
+                title: {
+                    display: true,
+                    text: yLabel,
+                    color: '#eee'
+                },
+                ticks: {
+                    color: '#ccc'
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
+        }
+    };
+}
+
+// 初始化实时图表（用于模拟过程中更新）
+function initializeRealtimeCharts() {
+    // 销毁现有图表
+    destroyChart('hpChart');
+    destroyChart('mpChart');
+    
+    const hpCanvas = document.getElementById('hpChart');
+    const mpCanvas = document.getElementById('mpChart');
+    
+    if (!hpCanvas || !mpCanvas) {
+        console.warn('图表canvas元素未找到');
+        return;
+    }
+    
+    // 显示等待状态
+    const emptyOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            title: {
+                display: true,
+                text: i18next.t('common:Experiment.waitingForData'),
+                color: '#888',
+                font: { size: 14 }
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                ticks: { color: '#555' },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            },
+            y: {
+                display: true,
+                ticks: { color: '#555' },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            }
+        }
+    };
+    
+    try {
+        combatCharts.hpChart = new Chart(hpCanvas, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: emptyOptions
+        });
+        
+        combatCharts.mpChart = new Chart(mpCanvas, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: emptyOptions
+        });
+    } catch (e) {
+        console.error('创建图表时出错:', e);
+    }
+}
+
+// 显示空图表状态
+function showEmptyCharts() {
+    initializeRealtimeCharts();
+}
+
+// 初始化HP/MP可视化开关事件
+function initHpMpVisualization() {
+    const toggle = document.getElementById('hpMpVisualizationToggle');
+    const container = document.getElementById('combatChartsContainer');
+
+    const enableHpMpVisualization = localStorage.getItem('enableHpMpVisualization');
+    if (enableHpMpVisualization === 'true') {
+        toggle.checked = true;
+        container.classList.remove('d-none');
+        showEmptyCharts();
+    }
+    
+    if (toggle && container) {
+        toggle.addEventListener('change', function() {
+            if (this.checked) {
+                container.classList.remove('d-none');
+                showEmptyCharts();
+            } else {
+                container.classList.add('d-none');
+                destroyChart('hpChart');
+                destroyChart('mpChart');
+            }
+            localStorage.setItem('enableHpMpVisualization', this.checked);
+        });
+    }
+}
+
+// #endregion
 
 function manipulateSimResultsDataForDisplay(simResults) {
     let displaySimResults = [];
@@ -2592,6 +2928,7 @@ function startSimulation(selectedPlayers) {
     if (document.getElementById("comDropToggle").checked) {
         extra.comDrop = Number(document.getElementById("comDropInput").value);
     }
+    extra.enableHpMpVisualization = document.getElementById("hpMpVisualizationToggle").checked;
 
     let simAllZonesToggle = document.getElementById("simAllZoneToggle");
     let simAllSoloToggle = document.getElementById("simAllSoloToggle");
@@ -4270,6 +4607,7 @@ initImportExportModal();
 initDamageDoneTaken();
 initPatchNotes();
 initExtraBuffSection();
+initHpMpVisualization();
 
 updateState();
 updateUI();

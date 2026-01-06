@@ -532,7 +532,11 @@ class CombatUnit {
             }
         });
 
-        this.combatDetails.defensiveMaxDamage = (10 + this.combatDetails.defenseLevel) * (1 + this.combatDetails.combatStats.defensiveDamage);
+        this.combatDetails.defensiveMaxDamage = 
+            (10 + this.combatDetails.defenseLevel) * 
+            (1 + this.combatDetails.combatStats.defensiveDamage) *
+            (1 + damageRatioBoost) *
+            (1 + damageRatioBoostFromFury);
 
         // when equiped bulwark
         if (this.equipment?.['/equipment_types/two_hand']?.hrid.includes("bulwark")) {
@@ -585,6 +589,7 @@ class CombatUnit {
         this.combatDetails.combatStats.waterAmplify += this.getBuffBoost("/buff_types/water_amplify").flatBoost;
         this.combatDetails.combatStats.natureAmplify += this.getBuffBoost("/buff_types/nature_amplify").flatBoost;
         this.combatDetails.combatStats.fireAmplify += this.getBuffBoost("/buff_types/fire_amplify").flatBoost;
+        this.combatDetails.combatStats.healingAmplify += this.getBuffBoost("/buff_types/healing_amplify").flatBoost;
 
         this.combatDetails.combatStats.attackInterval /= (1 + (this.combatDetails.attackLevel / 2000));
 
@@ -1466,7 +1471,7 @@ class Trigger {
   \************************/
 /***/ ((module) => {
 
-module.exports = /*#__PURE__*/JSON.parse('{"2025年12月30日":["地下城增加最短完成时间记录"],"2025年12月24日":["修复技能释放选择的缺陷，之前可能存在异常缺蓝等情况"],"2025年12月18日":["支持成就系统及对应buff效果","地下城怪物的掉落不再生效"],"2025年12月6日":["修复游戏更新后技能在无trigger情况下由[]变为null时造成的异常"],"2025年11月7日":["兼容支持从CN镜像站调用API获取价格"],"2025年10月14日":["修复怪物攻击间隔数值未能适配攻击等级的问题"],"2025年9月17日":["修复暴击光环的trigger缺陷"],"2025年9月9日":["复活时不再错误的清空所有buff","团灭日志增加反伤、荆棘和DOT伤害记录"],"2025年8月21日":["增加单挑战斗批量模拟和对应怪物选项","增加MooPass和社区buff的选项及对应功能","精炼装备数值加强","秘法主教属性削弱","init_client_info_v1.20250819.0.json游戏数据更新"],"2025年8月20日":["修复经验和掉落计算在极端情况下的可能异常"],"2025年8月19日":["合并Test和Temp分支的rework内容","init_client_info_v1.20250818.0.json游戏数据更新"],"2025年8月18日":["修复贯穿技能可能对相同目标造成重复伤害的问题","修复团灭日志在黑夜模式下的显示异常","战斗等级公式更新","钟乳石魔像的荆棘数值调整","init_client_info_v1.20250626.0_0817.json游戏数据更新"],"2025年8月16日":["增加停止模拟按钮 by BKN46","增加技能顺序调整按钮 by BKN46","增加团灭日志 by TruthLight","怪物属性更新","奥术反射更名为报应","init_client_info_v1.20250626.0_0815.json游戏数据更新"],"2025年8月14日":["怪物属性更新","远程和法师装备属性调整","反伤计算上限调整","修复战斗间隔释放技能的异常","修复技能释放判断逻辑的异常","法力值耗尽比例更加准确","调整远程经验的15%和魔法经验的12%映射到攻击经验","init_client_info_v1.20250626.0_0813.json游戏数据更新"],"2025年8月11日":["怪物属性更新","近战和物理技能施法时间更新","盾击和重锤数值调整","双手盾防御经验加成调整","init_client_info_v1.20250626.0_0811.json游戏数据更新"],"2025年8月8日":["实现组队等级差过大时对掉落和经验的惩罚","实现怪物经验随狂暴进度百分比增加","暴击光环数值调整","增加战斗等级数值显示","增加等级差距惩罚数值显示","init_client_info_v1.20250626.0_0807.json游戏数据更新"],"2025年8月7日":["修复组队战斗时一些重复物品掉落数量异常的缺陷 by contr4l","init_client_info_v1.20250626.0_0806.json游戏数据更新"],"2025年8月3日":["怪物狂暴机制及对应trigger生效","精炼装备更新，护符数值调整，守护光环增加闪避率","init_client_info_v1.20250626.0_0802.json游戏数据更新","狂怒层数修正为5层","招架结算机制调整"],"2025年7月31日":["物品数据和怪物属性更新","尖刺外壳和奥术反射重做","强化数值更新","删除异常trigger","狮鹫盾的虚弱重做","君王剑招架对队友生效","狂怒特效最大层数修正为6层","涟漪特效增加10MP恢复","反伤正确显示其命中率","反伤机制调整","同步双手盾属性和反伤荆棘技能数值的调整"],"2025年7月22日":["暴击光环受远程等级加成","光环基础数值和等级加成调整"],"2025年7月17日":["批量模拟支持勾选星球","经验分配比例调整至30%+70%","光环及对应trigger，并按对应技能等级百分比加成","水火自然默认调整为元素光环","init_client_info_v1.20250626.0_0717.json游戏数据更新"],"2025年7月11日":["怪物经验和技能等级公式更新","闪避和抗性计算公式更新","力量更替为近战以及对应的兼容","init_client_info_v1.20250626.0_0711.json游戏数据更新"],"2025年7月10日":["修复贯穿技能由敌人释放时可能多次击中相同目标的缺陷"],"2025年7月9日":["掉落和掉率调整","经验调整","疫病射击和破甲之刺调整","怪物自动恢复移除","疫病射击trigger调整","获取价格使用官方API"],"2025年7月7日":["怪物属性缩放和地图多难度","法师技能调整和装备上\'技能伤害\'词缀生效","攻击等级和房屋等级对施法速度的影响生效","物品调整","精准重做以攻击等级计算","TEST 远程魔法经验的10%映射到攻击经验！","经验重做和护符装备"]}');
+module.exports = /*#__PURE__*/JSON.parse('{"2025年12月31日":["实验性功能新增HP/MP可视化图表 by wangchyan","修复防御伤害未正确受damge加成的异常 by wangchyan","修复守护光环的治疗加成效果未生效的异常 by wangchyan","修复快速治疗等技能未正确选择最低%生命为目标的错误 by wangchyan"],"2025年12月30日":["地下城增加最短完成时间记录"],"2025年12月24日":["修复技能释放选择的缺陷，之前可能存在异常缺蓝等情况"],"2025年12月18日":["支持成就系统及对应buff效果","地下城怪物的掉落不再生效"],"2025年12月6日":["修复游戏更新后技能在无trigger情况下由[]变为null时造成的异常"],"2025年11月7日":["兼容支持从CN镜像站调用API获取价格"],"2025年10月14日":["修复怪物攻击间隔数值未能适配攻击等级的问题"],"2025年9月17日":["修复暴击光环的trigger缺陷"],"2025年9月9日":["复活时不再错误的清空所有buff","团灭日志增加反伤、荆棘和DOT伤害记录"],"2025年8月21日":["增加单挑战斗批量模拟和对应怪物选项","增加MooPass和社区buff的选项及对应功能","精炼装备数值加强","秘法主教属性削弱","init_client_info_v1.20250819.0.json游戏数据更新"],"2025年8月20日":["修复经验和掉落计算在极端情况下的可能异常"],"2025年8月19日":["合并Test和Temp分支的rework内容","init_client_info_v1.20250818.0.json游戏数据更新"],"2025年8月18日":["修复贯穿技能可能对相同目标造成重复伤害的问题","修复团灭日志在黑夜模式下的显示异常","战斗等级公式更新","钟乳石魔像的荆棘数值调整","init_client_info_v1.20250626.0_0817.json游戏数据更新"],"2025年8月16日":["增加停止模拟按钮 by BKN46","增加技能顺序调整按钮 by BKN46","增加团灭日志 by TruthLight","怪物属性更新","奥术反射更名为报应","init_client_info_v1.20250626.0_0815.json游戏数据更新"],"2025年8月14日":["怪物属性更新","远程和法师装备属性调整","反伤计算上限调整","修复战斗间隔释放技能的异常","修复技能释放判断逻辑的异常","法力值耗尽比例更加准确","调整远程经验的15%和魔法经验的12%映射到攻击经验","init_client_info_v1.20250626.0_0813.json游戏数据更新"],"2025年8月11日":["怪物属性更新","近战和物理技能施法时间更新","盾击和重锤数值调整","双手盾防御经验加成调整","init_client_info_v1.20250626.0_0811.json游戏数据更新"],"2025年8月8日":["实现组队等级差过大时对掉落和经验的惩罚","实现怪物经验随狂暴进度百分比增加","暴击光环数值调整","增加战斗等级数值显示","增加等级差距惩罚数值显示","init_client_info_v1.20250626.0_0807.json游戏数据更新"],"2025年8月7日":["修复组队战斗时一些重复物品掉落数量异常的缺陷 by contr4l","init_client_info_v1.20250626.0_0806.json游戏数据更新"],"2025年8月3日":["怪物狂暴机制及对应trigger生效","精炼装备更新，护符数值调整，守护光环增加闪避率","init_client_info_v1.20250626.0_0802.json游戏数据更新","狂怒层数修正为5层","招架结算机制调整"],"2025年7月31日":["物品数据和怪物属性更新","尖刺外壳和奥术反射重做","强化数值更新","删除异常trigger","狮鹫盾的虚弱重做","君王剑招架对队友生效","狂怒特效最大层数修正为6层","涟漪特效增加10MP恢复","反伤正确显示其命中率","反伤机制调整","同步双手盾属性和反伤荆棘技能数值的调整"],"2025年7月22日":["暴击光环受远程等级加成","光环基础数值和等级加成调整"],"2025年7月17日":["批量模拟支持勾选星球","经验分配比例调整至30%+70%","光环及对应trigger，并按对应技能等级百分比加成","水火自然默认调整为元素光环","init_client_info_v1.20250626.0_0717.json游戏数据更新"],"2025年7月11日":["怪物经验和技能等级公式更新","闪避和抗性计算公式更新","力量更替为近战以及对应的兼容","init_client_info_v1.20250626.0_0711.json游戏数据更新"],"2025年7月10日":["修复贯穿技能由敌人释放时可能多次击中相同目标的缺陷"],"2025年7月9日":["掉落和掉率调整","经验调整","疫病射击和破甲之刺调整","怪物自动恢复移除","疫病射击trigger调整","获取价格使用官方API"],"2025年7月7日":["怪物属性缩放和地图多难度","法师技能调整和装备上\'技能伤害\'词缀生效","攻击等级和房屋等级对施法速度的影响生效","物品调整","精准重做以攻击等级计算","TEST 远程魔法经验的10%映射到攻击经验！","经验重做和护符装备"]}');
 
 /***/ }),
 
@@ -1850,6 +1855,10 @@ function onWorkerMessage(event) {
             let progress = Math.floor(100 * event.data.progress);
             progressbar.style.width = progress + "%";
             progressbar.innerHTML = progress + "% (" + ((Date.now() - simStartTime) / 1000).toFixed(2) + "s)";
+            // 实时更新图表
+            if (event.data.timeSeriesData && document.getElementById('hpMpVisualizationToggle').checked) {
+                updateChartsRealtime(event.data.timeSeriesData);
+            }
             break;
         case "simulation_error":
             showErrorModal(event.data.error.toString());
@@ -3056,12 +3065,344 @@ function showSimulationResult(simResult) {
     window.noRngProfit = window.noRngRevenue - window.expenses;
     document.getElementById('noRngProfitSpan').innerText = window.noRngProfit.toLocaleString();
     document.getElementById('noRngProfitPreview').innerText = window.noRngProfit.toLocaleString();
+    
+    // 显示战斗图表
+    if (document.getElementById('hpMpVisualizationToggle').checked) {
+        renderCombatCharts(simResult);
+    }
 }
 
 function showAllSimulationResults(simResults) {
     let displaySimResults = manipulateSimResultsDataForDisplay(simResults);
     updateAllSimsModal(displaySimResults);
 }
+
+// #region 战斗图表功能
+
+let combatCharts = {
+    hpChart: null,
+    mpChart: null
+};
+
+let lastUpdateTime = 0;
+const UPDATE_INTERVAL = 1000; // 每秒更新一次图表
+
+// 实时更新图表
+function updateChartsRealtime(timeSeriesData) {
+    // 节流：避免过于频繁的更新
+    const now = Date.now();
+    if (now - lastUpdateTime < UPDATE_INTERVAL) {
+        return;
+    }
+    lastUpdateTime = now;
+    
+    if (!timeSeriesData || !timeSeriesData.timestamps || timeSeriesData.timestamps.length === 0) {
+        return;
+    }
+    
+    // 显示图表容器
+    const container = document.getElementById('combatChartsContainer');
+    if (container) {
+        container.classList.remove('d-none');
+    }
+    
+    // 如果图表不存在，先创建
+    if (!combatCharts.hpChart || !combatCharts.mpChart) {
+        initializeRealtimeCharts();
+        // 等待下一次更新周期再更新数据
+        return;
+    }
+    
+    const timeLabels = timeSeriesData.timestamps.map(t => (t / ONE_SECOND).toFixed(1));
+    const playerIds = Object.keys(timeSeriesData.players);
+    
+    // 生成颜色方案
+    const colors = [
+        { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
+        { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
+        { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+        { border: 'rgb(255, 206, 86)', bg: 'rgba(255, 206, 86, 0.2)' },
+        { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' }
+    ];
+    
+    // 重建datasets以确保完整更新
+    const hpDatasets = playerIds.map((playerId, index) => {
+        const playerData = timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' HP',
+            data: playerData.hp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    const mpDatasets = playerIds.map((playerId, index) => {
+        const playerData = timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' MP',
+            data: playerData.mp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    // 更新HP图表
+    combatCharts.hpChart.data.labels = timeLabels;
+    combatCharts.hpChart.data.datasets = hpDatasets;
+    combatCharts.hpChart.options.plugins.legend.display = true;
+    combatCharts.hpChart.options.plugins.title.text = i18next.t('common:Experiment.hpOverTime');
+    combatCharts.hpChart.update('none');
+    
+    // 更新MP图表
+    combatCharts.mpChart.data.labels = timeLabels;
+    combatCharts.mpChart.data.datasets = mpDatasets;
+    combatCharts.mpChart.options.plugins.legend.display = true;
+    combatCharts.mpChart.options.plugins.title.text = i18next.t('common:Experiment.mpOverTime');
+    combatCharts.mpChart.update('none');
+}
+
+function renderCombatCharts(simResult) {
+    // 显示图表容器
+    const container = document.getElementById('combatChartsContainer');
+    if (container) {
+        container.classList.remove('d-none');
+    }
+    
+    if (!simResult.timeSeriesData || !simResult.timeSeriesData.timestamps || simResult.timeSeriesData.timestamps.length === 0) {
+        // 显示空状态
+        showEmptyCharts();
+        return;
+    }
+    
+    const timeLabels = simResult.timeSeriesData.timestamps.map(t => (t / ONE_SECOND).toFixed(1));
+    
+    // 获取所有玩家
+    const playerIds = Object.keys(simResult.timeSeriesData.players);
+    
+    // 生成颜色方案
+    const colors = [
+        { border: 'rgb(75, 192, 192)', bg: 'rgba(75, 192, 192, 0.2)' },
+        { border: 'rgb(255, 99, 132)', bg: 'rgba(255, 99, 132, 0.2)' },
+        { border: 'rgb(54, 162, 235)', bg: 'rgba(54, 162, 235, 0.2)' },
+        { border: 'rgb(255, 206, 86)', bg: 'rgba(255, 206, 86, 0.2)' },
+        { border: 'rgb(153, 102, 255)', bg: 'rgba(153, 102, 255, 0.2)' }
+    ];
+    
+    // HP图表
+    destroyChart('hpChart');
+    const hpDatasets = playerIds.map((playerId, index) => {
+        const playerData = simResult.timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' HP',
+            data: playerData.hp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    combatCharts.hpChart = new Chart(document.getElementById('hpChart'), {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: hpDatasets
+        },
+        options: getChartOptions(i18next.t('common:Experiment.hpOverTime'), i18next.t('common:Experiment.timeInSeconds'), 'HP')
+    });
+    
+    // MP图表
+    destroyChart('mpChart');
+    const mpDatasets = playerIds.map((playerId, index) => {
+        const playerData = simResult.timeSeriesData.players[playerId];
+        return {
+            label: playerId + ' MP',
+            data: playerData.mp,
+            borderColor: colors[index % colors.length].border,
+            backgroundColor: colors[index % colors.length].bg,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.1
+        };
+    });
+    
+    combatCharts.mpChart = new Chart(document.getElementById('mpChart'), {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: mpDatasets
+        },
+        options: getChartOptions(i18next.t('common:Experiment.mpOverTime'), i18next.t('common:Experiment.timeInSeconds'), 'MP')
+    });
+}
+
+function destroyChart(chartName) {
+    if (combatCharts[chartName]) {
+        combatCharts[chartName].destroy();
+        combatCharts[chartName] = null;
+    }
+}
+
+function getChartOptions(title, xLabel, yLabel) {
+    return {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top',
+                labels: {
+                    color: '#eee',
+                    font: {
+                        size: 11
+                    }
+                }
+            },
+            title: {
+                display: true,
+                text: title,
+                color: '#eee',
+                font: {
+                    size: 14
+                }
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                title: {
+                    display: true,
+                    text: xLabel,
+                    color: '#eee'
+                },
+                ticks: {
+                    color: '#ccc',
+                    maxTicksLimit: 10
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            },
+            y: {
+                display: true,
+                title: {
+                    display: true,
+                    text: yLabel,
+                    color: '#eee'
+                },
+                ticks: {
+                    color: '#ccc'
+                },
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                }
+            }
+        },
+        interaction: {
+            intersect: false,
+            mode: 'index'
+        }
+    };
+}
+
+// 初始化实时图表（用于模拟过程中更新）
+function initializeRealtimeCharts() {
+    // 销毁现有图表
+    destroyChart('hpChart');
+    destroyChart('mpChart');
+    
+    const hpCanvas = document.getElementById('hpChart');
+    const mpCanvas = document.getElementById('mpChart');
+    
+    if (!hpCanvas || !mpCanvas) {
+        console.warn('图表canvas元素未找到');
+        return;
+    }
+    
+    // 显示等待状态
+    const emptyOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            title: {
+                display: true,
+                text: i18next.t('common:Experiment.waitingForData'),
+                color: '#888',
+                font: { size: 14 }
+            }
+        },
+        scales: {
+            x: {
+                display: true,
+                ticks: { color: '#555' },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            },
+            y: {
+                display: true,
+                ticks: { color: '#555' },
+                grid: { color: 'rgba(255, 255, 255, 0.05)' }
+            }
+        }
+    };
+    
+    try {
+        combatCharts.hpChart = new Chart(hpCanvas, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: emptyOptions
+        });
+        
+        combatCharts.mpChart = new Chart(mpCanvas, {
+            type: 'line',
+            data: { labels: [], datasets: [] },
+            options: emptyOptions
+        });
+    } catch (e) {
+        console.error('创建图表时出错:', e);
+    }
+}
+
+// 显示空图表状态
+function showEmptyCharts() {
+    initializeRealtimeCharts();
+}
+
+// 初始化HP/MP可视化开关事件
+function initHpMpVisualization() {
+    const toggle = document.getElementById('hpMpVisualizationToggle');
+    const container = document.getElementById('combatChartsContainer');
+
+    const enableHpMpVisualization = localStorage.getItem('enableHpMpVisualization');
+    if (enableHpMpVisualization === 'true') {
+        toggle.checked = true;
+        container.classList.remove('d-none');
+        showEmptyCharts();
+    }
+    
+    if (toggle && container) {
+        toggle.addEventListener('change', function() {
+            if (this.checked) {
+                container.classList.remove('d-none');
+                showEmptyCharts();
+            } else {
+                container.classList.add('d-none');
+                destroyChart('hpChart');
+                destroyChart('mpChart');
+            }
+            localStorage.setItem('enableHpMpVisualization', this.checked);
+        });
+    }
+}
+
+// #endregion
 
 function manipulateSimResultsDataForDisplay(simResults) {
     let displaySimResults = [];
@@ -4368,6 +4709,7 @@ function startSimulation(selectedPlayers) {
     if (document.getElementById("comDropToggle").checked) {
         extra.comDrop = Number(document.getElementById("comDropInput").value);
     }
+    extra.enableHpMpVisualization = document.getElementById("hpMpVisualizationToggle").checked;
 
     let simAllZonesToggle = document.getElementById("simAllZoneToggle");
     let simAllSoloToggle = document.getElementById("simAllSoloToggle");
@@ -6046,6 +6388,7 @@ initImportExportModal();
 initDamageDoneTaken();
 initPatchNotes();
 initExtraBuffSection();
+initHpMpVisualization();
 
 updateState();
 updateUI();

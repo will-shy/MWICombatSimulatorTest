@@ -374,13 +374,14 @@ const RESTART_INTERVAL = 15 * ONE_SECOND;
 const ENRAGE_TICK_INTERVAL = 60 * ONE_SECOND;
 
 class CombatSimulator extends EventTarget {
-    constructor(players, zone) {
+    constructor(players, zone, options = {}) {
         super();
         this.players = players;
         this.zone = zone;
         this.eventQueue = new _events_eventQueue__WEBPACK_IMPORTED_MODULE_8__["default"]();
         this.simResult = new _simResult__WEBPACK_IMPORTED_MODULE_18__["default"](zone, players.length);
         this.allPlayersDead = false;
+        this.enableHpMpVisualization = options.enableHpMpVisualization || false;
 
         this.wipeLogs = {
             buffer: new Array(200),
@@ -525,11 +526,16 @@ class CombatSimulator extends EventTarget {
             ticks++;
             if (ticks == 1000) {
                 ticks = 0;
+                // 收集HP/MP时序数据
+                if (this.enableHpMpVisualization) {
+                    this.simResult.addTimeSeriesSnapshot(this.simulationTime, this.players);
+                }
                 let progressEvent = new CustomEvent("progress", {
                     detail: {
                         zone: this.zone.hrid,
                         difficultyTier: this.zone.difficultyTier,
-                        progress: Math.min(this.simulationTime / simulationTimeLimit, 1)
+                        progress: Math.min(this.simulationTime / simulationTimeLimit, 1),
+                        timeSeriesData: this.enableHpMpVisualization ? this.simResult.timeSeriesData : null
                     },
                 });
                 this.dispatchEvent(progressEvent);
@@ -1871,7 +1877,10 @@ class CombatSimulator extends EventTarget {
                     healTarget = target;
                     continue;
                 }
-                if (target.combatDetails.currentHitpoints < healTarget.combatDetails.currentHitpoints) {
+                // 按HP百分比比较，选择百分比最低的目标
+                const targetHpPercent = target.combatDetails.currentHitpoints / target.combatDetails.maxHitpoints;
+                const healTargetHpPercent = healTarget.combatDetails.currentHitpoints / healTarget.combatDetails.maxHitpoints;
+                if (targetHpPercent < healTargetHpPercent) {
                     healTarget = target;
                 }
             }
@@ -2167,7 +2176,11 @@ class CombatUnit {
             }
         });
 
-        this.combatDetails.defensiveMaxDamage = (10 + this.combatDetails.defenseLevel) * (1 + this.combatDetails.combatStats.defensiveDamage);
+        this.combatDetails.defensiveMaxDamage = 
+            (10 + this.combatDetails.defenseLevel) * 
+            (1 + this.combatDetails.combatStats.defensiveDamage) *
+            (1 + damageRatioBoost) *
+            (1 + damageRatioBoostFromFury);
 
         // when equiped bulwark
         if (this.equipment?.['/equipment_types/two_hand']?.hrid.includes("bulwark")) {
@@ -2220,6 +2233,7 @@ class CombatUnit {
         this.combatDetails.combatStats.waterAmplify += this.getBuffBoost("/buff_types/water_amplify").flatBoost;
         this.combatDetails.combatStats.natureAmplify += this.getBuffBoost("/buff_types/nature_amplify").flatBoost;
         this.combatDetails.combatStats.fireAmplify += this.getBuffBoost("/buff_types/fire_amplify").flatBoost;
+        this.combatDetails.combatStats.healingAmplify += this.getBuffBoost("/buff_types/healing_amplify").flatBoost;
 
         this.combatDetails.combatStats.attackInterval /= (1 + (this.combatDetails.attackLevel / 2000));
 
@@ -4115,6 +4129,12 @@ class SimResult {
         this.minDungenonTime = 0;
 
         this.wipeEvents = [];
+        
+        // 时间序列数据用于图表显示
+        this.timeSeriesData = {
+            timestamps: [],
+            players: {}
+        };
     }
 
     addWipeEvent(logs, simulationTime, wave) {
@@ -4334,6 +4354,28 @@ class SimResult {
                 this.playerRanOutOfManaTime[unit.hrid].totalTimeForOutOfMana += time - this.playerRanOutOfManaTime[unit.hrid].startTimeForOutOfMana;
             }
         }
+    }
+
+    // 添加时间序列数据点
+    addTimeSeriesSnapshot(time, players) {
+        this.timeSeriesData.timestamps.push(time);
+        
+        players.forEach(player => {
+            if (!this.timeSeriesData.players[player.hrid]) {
+                this.timeSeriesData.players[player.hrid] = {
+                    hp: [],
+                    mp: [],
+                    maxHp: [],
+                    maxMp: []
+                };
+            }
+            
+            const playerData = this.timeSeriesData.players[player.hrid];
+            playerData.hp.push(player.combatDetails.currentHitpoints);
+            playerData.mp.push(player.combatDetails.currentManapoints);
+            playerData.maxHp.push(player.combatDetails.maxHitpoints);
+            playerData.maxMp.push(player.combatDetails.maxManapoints);
+        });
     }
 }
 
@@ -4734,9 +4776,16 @@ onmessage = async function (event) {
                 players.push(currentPlayer);
             }
             let simulationTimeLimit = event.data.simulationTimeLimit;
-            let combatSimulator = new _combatsimulator_combatSimulator__WEBPACK_IMPORTED_MODULE_0__["default"](players, zone);
+            let enableHpMpVisualization = event.data.extra.enableHpMpVisualization || false;
+            let combatSimulator = new _combatsimulator_combatSimulator__WEBPACK_IMPORTED_MODULE_0__["default"](players, zone, { enableHpMpVisualization });
             combatSimulator.addEventListener("progress", (event) => {
-                this.postMessage({ type: "simulation_progress", progress: event.detail.progress, zone: event.detail.zone, difficultyTier: event.detail.difficultyTier });
+                this.postMessage({ 
+                    type: "simulation_progress", 
+                    progress: event.detail.progress, 
+                    zone: event.detail.zone, 
+                    difficultyTier: event.detail.difficultyTier,
+                    timeSeriesData: event.detail.timeSeriesData
+                });
             });
 
             try {

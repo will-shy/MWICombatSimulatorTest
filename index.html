@@ -1127,6 +1127,27 @@
                 </div>
             </div>
         </div>
+        <!-- #region HP/MP 可视化图表 -->
+        <div class="row mt-4 d-none" id="combatChartsContainer">
+            <div class="col-12">
+                <div class="row mb-3">
+                    <b data-i18n="common:Experiment.hpMpVisualization">HP/MP 可视化图表</b>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px;">
+                            <canvas id="hpChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div style="background-color: #1e1e1e; padding: 15px; border-radius: 5px;">
+                            <canvas id="mpChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- #endregion -->
     </div>
     <div class="modal" id="triggerModal" tabindex="-1">
         <!-- #region Trigger Modal -->
@@ -1708,7 +1729,21 @@
                                     </div>
                                 </div>
                             </div>
-
+                            <div class="outlined-box p-3">
+                                <div class="row mb-3">
+                                    <b data-i18n="common:Experiment.hpMpVisualization">HP/MP 可视化</b>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="row align-items-center">
+                                        <div class="col-md-auto">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox" id="hpMpVisualizationToggle">
+                                                <label class="form-check-label" for="hpMpVisualizationToggle" data-i18n="common:Experiment.enableHpMpVisualization">启用 HP/MP 变化折线图</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1848,6 +1883,7 @@
     </div>
     <script src="js/i18n.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.0/js/bootstrap.bundle.min.js" integrity="sha512-9GacT4119eY3AcosfWtHMsT5JyZudrexyEVzTBWV3viP/YfB9e2pEy3N7WXL3SV6ASXpTU0vzzSxsbfsuUH4sQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js" integrity="sha512-Y51n9mtKTVBh3Jbx5pZSJNDDMyY+yGe77DGtBPzRlgsf/YLCh13kSZ3JmfHGzYFCmOndraf0sQgfM654b7dJ3w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="bundle.js" type="module"></script>
 </body>
 <footer>

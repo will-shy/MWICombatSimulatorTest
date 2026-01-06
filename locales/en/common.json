@@ -108,7 +108,12 @@
         "uploadAndRun" : "Upload & Run",
         "download" : "Download Results",
         "dungeonStartWave" : "Dungeon Start Wave",
-        "wave" : "Wave"
-
+        "wave" : "Wave",
+        "hpMpVisualization" : "HP/MP Visualization Charts",
+        "enableHpMpVisualization" : "Enable HP/MP Timeline Charts",
+        "hpOverTime" : "HP Over Time",
+        "mpOverTime" : "MP Over Time",
+        "timeInSeconds" : "Time (seconds)",
+        "waitingForData" : "Waiting for simulation data..."
     }
 }
