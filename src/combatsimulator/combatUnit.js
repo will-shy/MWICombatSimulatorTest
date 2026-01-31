@@ -362,6 +362,7 @@ class CombatUnit {
         this.combatDetails.combatStats.threat += threatBoosts.flatBoost;
 
         this.combatDetails.combatStats.retaliation += this.getBuffBoost("/buff_types/retaliation").flatBoost;
+        this.combatDetails.combatStats.tenacity += this.getBuffBoost("/buff_types/tenacity").flatBoost;
     }
 
     addBuff(buff, currentTime) {
@@ -469,9 +470,18 @@ class CombatUnit {
 
     reset(currentTime = 0) {
         this.clearCCs();
-        this.clearBuffs();
-        this.updateCombatDetails();
-        this.resetCooldowns(currentTime);
+        
+        // 只有玩家在地下城团灭重开时保留buff和CD，敌人始终完全重置
+        if (currentTime == 0 || !this.isPlayer) {
+            // 首次战斗开始 或 敌人重置：完全重置
+            this.clearBuffs();
+            this.updateCombatDetails();
+            this.resetCooldowns(currentTime);
+        } else {
+            // 地下城团灭重开（仅玩家）：只移除过期buff，保留CD
+            this.removeExpiredBuffs(currentTime);
+            this.updateCombatDetails();
+        }
 
         this.combatDetails.currentHitpoints = this.combatDetails.maxHitpoints;
         this.combatDetails.currentManapoints = this.combatDetails.maxManapoints;
