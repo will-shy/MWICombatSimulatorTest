@@ -1353,7 +1353,18 @@ function showAllSimulationResults(simResults) {
 
     let isLabyrinth = simResults?.[0].isLabyrinth ?? false;
     if (isLabyrinth) {
-        //TODO
+        const table = document.getElementById('allZonesData');
+        const rows = table.getElementsByTagName('tr');
+        const col = 3;
+
+        for (let row = 1; row < rows.length; row++) {
+            const cell = rows[row].cells[col];
+            const value = parseFloat(cell.textContent.replace(/,/g, ''));
+            if (value >= 30) {
+                cell.style.backgroundColor = 'green';
+                cell.style.color = 'white';
+            }
+        }        
     } else {
         const table = document.getElementById('allZonesData');
         const rows = table.getElementsByTagName('tr');
@@ -1374,10 +1385,9 @@ function showAllSimulationResults(simResults) {
                 }
             }
 
-            // 将最大值单元格的背景色设置为绿色
             if (maxCell && max != 0) {
                 maxCell.style.backgroundColor = 'green';
-                maxCell.style.color = 'white'; // 设置文字颜色为白色以提高可读性
+                maxCell.style.color = 'white';
             }
         }
     }
