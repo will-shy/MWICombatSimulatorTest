@@ -6,13 +6,20 @@ import Drops from "./drops";
 class Monster extends CombatUnit {
 
     difficultyTier = 0;
+    
+    LabyrinthMonsterBaseRoomLevel = 100; //Base stats are designed for room level 100, and scale proportionally    
+    roomLevel = 0;
 
-    constructor(hrid, difficultyTier = 0) {
+    constructor(hrid, difficultyTier = 0, roomLevel = 0) {
         super();
 
         this.isPlayer = false;
         this.hrid = hrid;
         this.difficultyTier = difficultyTier;
+        this.roomLevel = roomLevel
+        if (this.roomLevel <= 0) {
+            this.roomLevel = this.LabyrinthMonsterBaseRoomLevel;
+        }
 
         let gameMonster = combatMonsterDetailMap[this.hrid];
         if (!gameMonster) {
@@ -46,14 +53,20 @@ class Monster extends CombatUnit {
         let defLevelMultiplier = 1.0 + 0.15 * this.difficultyTier;
         let levelBonus = 20.0 * this.difficultyTier;
 
-        this.staminaLevel = levelMultiplier * (gameMonster.combatDetails.staminaLevel + levelBonus);
-        this.intelligenceLevel = levelMultiplier * (gameMonster.combatDetails.intelligenceLevel + levelBonus);
-        this.attackLevel = levelMultiplier * (gameMonster.combatDetails.attackLevel + levelBonus);
-        this.meleeLevel = levelMultiplier * (gameMonster.combatDetails.meleeLevel + levelBonus);
-        this.defenseLevel = defLevelMultiplier * (gameMonster.combatDetails.defenseLevel + levelBonus);
-        this.rangedLevel = levelMultiplier * (gameMonster.combatDetails.rangedLevel + levelBonus);
-        this.magicLevel = levelMultiplier * (gameMonster.combatDetails.magicLevel + levelBonus);
+        let labyrinthScaleFactor = this.roomLevel / this.LabyrinthMonsterBaseRoomLevel;
 
+        this.staminaLevel = levelMultiplier * (gameMonster.combatDetails.staminaLevel + levelBonus) * labyrinthScaleFactor;
+        this.intelligenceLevel = levelMultiplier * (gameMonster.combatDetails.intelligenceLevel + levelBonus) * labyrinthScaleFactor;
+        this.attackLevel = levelMultiplier * (gameMonster.combatDetails.attackLevel + levelBonus) * labyrinthScaleFactor;
+        this.meleeLevel = levelMultiplier * (gameMonster.combatDetails.meleeLevel + levelBonus) * labyrinthScaleFactor;
+        this.defenseLevel = defLevelMultiplier * (gameMonster.combatDetails.defenseLevel + levelBonus) * labyrinthScaleFactor;
+        this.rangedLevel = levelMultiplier * (gameMonster.combatDetails.rangedLevel + levelBonus) * labyrinthScaleFactor;
+        this.magicLevel = levelMultiplier * (gameMonster.combatDetails.magicLevel + levelBonus) * labyrinthScaleFactor;
+        
+        for (let i = 0; i < this.abilities.length; i++) {
+            let abilityLevel = Math.round(this.abilities[i].level * labyrinthScaleFactor);
+            this.abilities[i].level = abilityLevel;
+        }
         
         let expMultiplier = 1.0 + 0.5 * this.difficultyTier;
         let expBonus = 5.0 * this.difficultyTier;
@@ -65,6 +78,11 @@ class Monster extends CombatUnit {
         for (const [key, value] of Object.entries(gameMonster.combatDetails.combatStats)) {
             this.combatDetails.combatStats[key] = value;
         }
+
+        this.combatDetails.combatStats.armor *= labyrinthScaleFactor;
+        this.combatDetails.combatStats.waterResistance *= labyrinthScaleFactor;
+        this.combatDetails.combatStats.natureResistance *= labyrinthScaleFactor;
+        this.combatDetails.combatStats.firePenetration *= labyrinthScaleFactor;
 
         [
             "stabAccuracy",
