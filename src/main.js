@@ -3084,7 +3084,8 @@ function startSimulation(selectedPlayers) {
         let simHrids = gameLabyrinths
             .map(action => {
                 let result = [];
-                for (let roomLevel = 20; roomLevel <= 220; roomLevel+=20) {
+                // floor 1 is room level 20-40, +20 level per floor
+                for (let roomLevel = 40; roomLevel <= 220; roomLevel+=20) {
                     result.push({ labyrinthHrid: action.hrid, roomLevel: roomLevel, crates: crates });
                 }
                 return result;
