@@ -2206,6 +2206,8 @@ class CombatUnit {
             rangedExperience: 0,
             magicExperience: 0,
             retaliation: 0,
+            maxHitpointsRatio: 0,
+            maxManapointsRatio: 0,
         },
     };
     combatBuffs = {};
@@ -2238,10 +2240,14 @@ class CombatUnit {
             });
         });
 
-        this.combatDetails.maxHitpoints = Math.floor
-            (10 * (10 + this.combatDetails.staminaLevel) + this.combatDetails.combatStats.maxHitpoints);
-        this.combatDetails.maxManapoints = Math.floor
-            (10 * (10 + this.combatDetails.intelligenceLevel) + this.combatDetails.combatStats.maxManapoints);
+        this.combatDetails.maxHitpoints = Math.floor(
+            (10 * (10 + this.combatDetails.staminaLevel) + this.combatDetails.combatStats.maxHitpoints)
+            * (1 + this.combatDetails.combatStats.maxHitpointsRatio)
+        );
+        this.combatDetails.maxManapoints = Math.floor(
+            (10 * (10 + this.combatDetails.intelligenceLevel) + this.combatDetails.combatStats.maxManapoints)
+            * (1 + this.combatDetails.combatStats.maxManapointsRatio)
+        );
 
         let accuracyRatioBoostFromFury = this.getBuffBoost("/buff_types/fury_accuracy").ratioBoost;
         let damageRatioBoostFromFury = this.getBuffBoost("/buff_types/fury_damage").ratioBoost;
@@ -3908,11 +3914,12 @@ class Monster extends _combatUnit__WEBPACK_IMPORTED_MODULE_1__["default"] {
 
         this.enrageTime = gameMonster.enrageTime;
 
+        let labyrinthScaleFactor = this.roomLevel / this.LabyrinthMonsterBaseRoomLevel;
         for (let i = 0; i < gameMonster.abilities.length; i++) {
             if (gameMonster.abilities[i].minDifficultyTier > this.difficultyTier) {
                 continue;
             }
-            this.abilities[i] = new _ability__WEBPACK_IMPORTED_MODULE_0__["default"](gameMonster.abilities[i].abilityHrid, gameMonster.abilities[i].level);
+            this.abilities[i] = new _ability__WEBPACK_IMPORTED_MODULE_0__["default"](gameMonster.abilities[i].abilityHrid, Math.round(gameMonster.abilities[i].level * labyrinthScaleFactor));
         }
         if(gameMonster.dropTable)
         for (let i = 0; i < gameMonster.dropTable.length; i++) {
@@ -3943,12 +3950,6 @@ class Monster extends _combatUnit__WEBPACK_IMPORTED_MODULE_1__["default"] {
         this.rangedLevel = levelMultiplier * (gameMonster.combatDetails.rangedLevel + levelBonus) * labyrinthScaleFactor;
         this.magicLevel = levelMultiplier * (gameMonster.combatDetails.magicLevel + levelBonus) * labyrinthScaleFactor;
         
-        for (let i = 0; i < this.abilities.length; i++) {
-            if (!this.abilities[i]) continue;
-            let abilityLevel = Math.round(this.abilities[i].level * labyrinthScaleFactor);
-            this.abilities[i].level = abilityLevel;
-        }
-        
         let expMultiplier = 1.0 + 0.5 * this.difficultyTier;
         let expBonus = 5.0 * this.difficultyTier;
 
@@ -3963,7 +3964,7 @@ class Monster extends _combatUnit__WEBPACK_IMPORTED_MODULE_1__["default"] {
         this.combatDetails.combatStats.armor *= labyrinthScaleFactor;
         this.combatDetails.combatStats.waterResistance *= labyrinthScaleFactor;
         this.combatDetails.combatStats.natureResistance *= labyrinthScaleFactor;
-        this.combatDetails.combatStats.firePenetration *= labyrinthScaleFactor;
+        this.combatDetails.combatStats.fireResistance *= labyrinthScaleFactor;
 
         [
             "stabAccuracy",

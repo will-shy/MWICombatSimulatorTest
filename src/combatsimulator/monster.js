@@ -28,11 +28,12 @@ class Monster extends CombatUnit {
 
         this.enrageTime = gameMonster.enrageTime;
 
+        let labyrinthScaleFactor = this.roomLevel / this.LabyrinthMonsterBaseRoomLevel;
         for (let i = 0; i < gameMonster.abilities.length; i++) {
             if (gameMonster.abilities[i].minDifficultyTier > this.difficultyTier) {
                 continue;
             }
-            this.abilities[i] = new Ability(gameMonster.abilities[i].abilityHrid, gameMonster.abilities[i].level);
+            this.abilities[i] = new Ability(gameMonster.abilities[i].abilityHrid, Math.floor(gameMonster.abilities[i].level * labyrinthScaleFactor));
         }
         if(gameMonster.dropTable)
         for (let i = 0; i < gameMonster.dropTable.length; i++) {
@@ -63,12 +64,6 @@ class Monster extends CombatUnit {
         this.rangedLevel = levelMultiplier * (gameMonster.combatDetails.rangedLevel + levelBonus) * labyrinthScaleFactor;
         this.magicLevel = levelMultiplier * (gameMonster.combatDetails.magicLevel + levelBonus) * labyrinthScaleFactor;
         
-        for (let i = 0; i < this.abilities.length; i++) {
-            if (!this.abilities[i]) continue;
-            let abilityLevel = Math.round(this.abilities[i].level * labyrinthScaleFactor);
-            this.abilities[i].level = abilityLevel;
-        }
-        
         let expMultiplier = 1.0 + 0.5 * this.difficultyTier;
         let expBonus = 5.0 * this.difficultyTier;
 
@@ -83,7 +78,7 @@ class Monster extends CombatUnit {
         this.combatDetails.combatStats.armor *= labyrinthScaleFactor;
         this.combatDetails.combatStats.waterResistance *= labyrinthScaleFactor;
         this.combatDetails.combatStats.natureResistance *= labyrinthScaleFactor;
-        this.combatDetails.combatStats.firePenetration *= labyrinthScaleFactor;
+        this.combatDetails.combatStats.fireResistance *= labyrinthScaleFactor;
 
         [
             "stabAccuracy",
