@@ -3919,7 +3919,7 @@ class Monster extends _combatUnit__WEBPACK_IMPORTED_MODULE_1__["default"] {
             if (gameMonster.abilities[i].minDifficultyTier > this.difficultyTier) {
                 continue;
             }
-            this.abilities[i] = new _ability__WEBPACK_IMPORTED_MODULE_0__["default"](gameMonster.abilities[i].abilityHrid, Math.round(gameMonster.abilities[i].level * labyrinthScaleFactor));
+            this.abilities[i] = new _ability__WEBPACK_IMPORTED_MODULE_0__["default"](gameMonster.abilities[i].abilityHrid, Math.floor(gameMonster.abilities[i].level * labyrinthScaleFactor));
         }
         if(gameMonster.dropTable)
         for (let i = 0; i < gameMonster.dropTable.length; i++) {
