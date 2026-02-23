@@ -64,6 +64,7 @@ class Monster extends CombatUnit {
         this.magicLevel = levelMultiplier * (gameMonster.combatDetails.magicLevel + levelBonus) * labyrinthScaleFactor;
         
         for (let i = 0; i < this.abilities.length; i++) {
+            if (!this.abilities[i]) continue;
             let abilityLevel = Math.round(this.abilities[i].level * labyrinthScaleFactor);
             this.abilities[i].level = abilityLevel;
         }
