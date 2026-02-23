@@ -3731,6 +3731,7 @@ function loadEquipmentSetIntoUI(equipmentSet) {
     if (equipmentSet.achievements) {
         for (const achievement in equipmentSet.achievements) {
             const field = document.querySelector('[data-achievement-hrid="' + achievement + '"]');
+            if (!field) continue;
             if (equipmentSet.achievements[achievement]) {
                 field.checked = true;
             } else {
@@ -4014,6 +4015,7 @@ function doSoloImport() {
     if (importSet.achievements) {
         for (const achievement in importSet.achievements) {
             const field = document.querySelector('[data-achievement-hrid="' + achievement + '"]');
+            if (!field) continue;
             if (importSet.achievements[achievement]) {
                 field.checked = true;
             } else {
@@ -4221,6 +4223,7 @@ function updateNextPlayer(currentPlayerNumber) {
     if (importSet.achievements) {
         for (const achievement in importSet.achievements) {
             const field = document.querySelector('[data-achievement-hrid="' + achievement + '"]');
+            if (!field) continue;
             if (importSet.achievements[achievement]) {
                 field.checked = true;
                 player.achievements[achievement] = true;
