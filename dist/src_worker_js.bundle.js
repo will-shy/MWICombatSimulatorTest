@@ -559,7 +559,7 @@ class CombatSimulator extends EventTarget {
             this.simResult.dungeonsFailed = this.zone.dungeonsFailed;
             if (this.simResult.dungeonsCompleted < 1) {
                 this.simResult.maxWaveReached = 0;
-                for (let i = 0; i <= this.zone.dungeonSpawnInfo.maxWaves; i++) {
+                for (let i = 1; i <= this.zone.dungeonSpawnInfo.maxWaves; i++) {
                     let waveName = "#" + i.toString();
                     const idx = this.simResult.timeSpentAlive.findIndex(e => e.name === waveName);
                     if (idx == -1 || this.simResult.timeSpentAlive[idx].count == 0) {
