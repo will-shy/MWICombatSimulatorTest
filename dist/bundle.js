@@ -712,7 +712,13 @@ class CombatUnit {
             this.permanentBuffs[buff.typeHrid].flatBoost += buff.flatBoost;
             this.permanentBuffs[buff.typeHrid].ratioBoost += buff.ratioBoost;
         } else {
-            this.permanentBuffs[buff.typeHrid] = buff;
+            this.permanentBuffs[buff.typeHrid] = {
+                uniqueHrid: buff.uniqueHrid,
+                typeHrid: buff.typeHrid,
+                flatBoost: buff.flatBoost,
+                ratioBoost: buff.ratioBoost,
+                duration: buff.duration
+            };
         }
     }
 

@@ -591,7 +591,7 @@ class CombatSimulator extends EventTarget {
                 this.simResult.addAttack(
                     source,
                     target,
-                    "autoAttack",
+                    attackType,
                     attackResult.didHit ? attackResult.damageDone : "miss"
                 );
             }
