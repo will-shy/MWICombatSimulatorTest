@@ -4951,6 +4951,85 @@ onmessage = async function (event) {
                 };
                 extraBuffs.push(comDropBuff);
             }
+            if (event.data.extra.personalBuffs) {
+                const personalBuffs = {
+                    "/items/seal_of_attack_speed": {
+                        "uniqueHrid": "/buff_uniques/personal_attack_speed",
+                        "typeHrid": "/buff_types/attack_speed",
+                        "ratioBoost": 0.15,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_cast_speed": {
+                        "uniqueHrid": "/buff_uniques/personal_cast_speed",
+                        "typeHrid": "/buff_types/cast_speed",
+                        "ratioBoost": 0,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0.15,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_combat_drop": {
+                        "uniqueHrid": "/buff_uniques/personal_combat_drop",
+                        "typeHrid": "/buff_types/combat_drop_quantity",
+                        "ratioBoost": 0,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0.15,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_critical_rate": {
+                        "uniqueHrid": "/buff_uniques/personal_critical_rate",
+                        "typeHrid": "/buff_types/critical_rate",
+                        "ratioBoost": 0,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0.1,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_damage": {
+                        "uniqueHrid": "/buff_uniques/personal_damage",
+                        "typeHrid": "/buff_types/damage",
+                        "ratioBoost": 0.08,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_rare_find": {
+                        "uniqueHrid": "/buff_uniques/personal_rare_find",
+                        "typeHrid": "/buff_types/rare_find",
+                        "ratioBoost": 0,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0.6,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    },
+                    "/items/seal_of_wisdom": {
+                        "uniqueHrid": "/buff_uniques/personal_wisdom",
+                        "typeHrid": "/buff_types/wisdom",
+                        "ratioBoost": 0,
+                        "ratioBoostLevelBonus": 0,
+                        "flatBoost": 0.2,
+                        "flatBoostLevelBonus": 0,
+                        "startTime": "0001-01-01T00:00:00Z",
+                        "duration": 0
+                    }
+                };
+                for (let buff of event.data.extra.personalBuffs) {
+                    if (personalBuffs[buff]) {
+                        extraBuffs.push(personalBuffs[buff]);
+                    }
+                }
+            }
 
             let playersData = event.data.players;
             let players = [];
