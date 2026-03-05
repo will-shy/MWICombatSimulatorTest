@@ -896,12 +896,14 @@ class CombatSimulator extends EventTarget {
                     let furyExpirationEvent = new _events_furyExpirationEvent__WEBPACK_IMPORTED_MODULE_16__["default"](this.simulationTime + furyExpireTime, furyAmount, source);
                     this.eventQueue.addEvent(furyExpirationEvent);
 
-                    source.addBuff(furyAccuracyBuf, this.simulationTime);
-                    source.addBuff(furyDamageBuf, this.simulationTime);
+                    source.addBuffs([furyAccuracyBuf , furyDamageBuf], this.simulationTime);
+                    // source.addBuff(furyAccuracyBuf, this.simulationTime);
+                    // source.addBuff(furyDamageBuf, this.simulationTime);
                 }
                 else {
-                    source.removeBuff(furyAccuracyBuf);
-                    source.removeBuff(furyDamageBuf);
+                    source.removeBuffs([furyAccuracyBuf, furyDamageBuf]);
+                    // source.removeBuff(furyAccuracyBuf);
+                    // source.removeBuff(furyDamageBuf);
                 }
             }
 
@@ -1362,8 +1364,9 @@ class CombatSimulator extends EventTarget {
                     "startTime": "0001-01-01T00:00:00Z",
                     "duration": ENRAGE_TICK_INTERVAL
             };
-            enemy.addBuff(enrageDamageBuff);
-            enemy.addBuff(enrageAccuracyBuff);
+            enemy.addBuffs([enrageDamageBuff, enrageAccuracyBuff]);
+            // enemy.addBuff(enrageDamageBuff);
+            // enemy.addBuff(enrageAccuracyBuff);
             
             this.simResult.maxEnrageStack = Math.max(this.simResult.maxEnrageStack, nowStack);
         });
@@ -1872,12 +1875,14 @@ class CombatSimulator extends EventTarget {
                         let furyExpirationEvent = new _events_furyExpirationEvent__WEBPACK_IMPORTED_MODULE_16__["default"](this.simulationTime + furyExpireTime, furyAmount, source);
                         this.eventQueue.addEvent(furyExpirationEvent);
 
-                        source.addBuff(furyAccuracyBuf, this.simulationTime);
-                        source.addBuff(furyDamageBuf, this.simulationTime);
+                        source.addBuffs([furyAccuracyBuf, furyDamageBuf], this.simulationTime);
+                        // source.addBuff(furyAccuracyBuf, this.simulationTime);
+                        // source.addBuff(furyDamageBuf, this.simulationTime);
                     }
                     else {
-                        source.removeBuff(furyAccuracyBuf);
-                        source.removeBuff(furyDamageBuf);
+                        source.removeBuffs([furyAccuracyBuf, furyDamageBuf]);
+                        // source.removeBuff(furyAccuracyBuf);
+                        // source.removeBuff(furyDamageBuf);
                     }
                 }
 
@@ -2431,11 +2436,51 @@ class CombatUnit {
         this.combatDetails.combatStats.tenacity += this.getBuffBoost("/buff_types/tenacity").flatBoost;
     }
 
+    addBuffs(buffs, currentTime) {
+        buffs.forEach(buff => buff.startTime = currentTime);
+
+        let needUpdate = false;
+        for (const buff of buffs) {
+            if (!this.combatBuffs[buff.uniqueHrid] || this.combatBuffs[buff.uniqueHrid].ratioBoost != buff.ratioBoost || this.combatBuffs[buff.uniqueHrid].flatBoost != buff.flatBoost) {
+                needUpdate = true;
+            }
+            this.combatBuffs[buff.uniqueHrid] = buff;
+        }
+
+        if (needUpdate) {
+            this.updateCombatDetails();
+        }
+    }
+
     addBuff(buff, currentTime) {
         buff.startTime = currentTime;
+
+        let needUpdate = true;
+        if (this.combatBuffs[buff.uniqueHrid] && this.combatBuffs[buff.uniqueHrid].ratioBoost === buff.ratioBoost && this.combatBuffs[buff.uniqueHrid].flatBoost === buff.flatBoost) {
+            needUpdate = false;
+        }
+
         this.combatBuffs[buff.uniqueHrid] = buff;
 
-        this.updateCombatDetails();
+        if (needUpdate) {
+            this.updateCombatDetails();
+        }
+    }
+
+    removeBuffs(buffs) {
+        let needUpdate = false;
+        buffs.forEach(buff => {
+            if (!this.combatBuffs[buff.uniqueHrid]) {
+                return;
+            }
+            delete this.combatBuffs[buff.uniqueHrid];
+            needUpdate = true;
+        })
+
+        if (needUpdate) {
+            this.updateCombatDetails();
+        }
+
     }
 
     removeBuff(buff) {
@@ -2547,12 +2592,12 @@ class CombatUnit {
         if (currentTime == 0 || !this.isPlayer) {
             // 首次战斗开始 或 敌人重置：完全重置
             this.clearBuffs();
-            this.updateCombatDetails();
+            // this.updateCombatDetails();
             this.resetCooldowns(currentTime);
         } else {
             // 地下城团灭重开（仅玩家）：只移除过期buff，保留CD
             this.removeExpiredBuffs(currentTime);
-            this.updateCombatDetails();
+            // this.updateCombatDetails();
         }
 
         this.combatDetails.currentHitpoints = this.combatDetails.maxHitpoints;
