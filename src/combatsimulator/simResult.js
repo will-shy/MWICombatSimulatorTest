@@ -37,6 +37,7 @@ class SimResult {
         this.numberOfPlayers = numberOfPlayers;
         this.maxEnrageStack = 0;
         this.minDungenonTime = 0;
+        this.maxDungenonTime = 0;
         this.lastDungeonFinishTime = 0;
         this.lastEncounterFinishTime = 0;
 
@@ -93,6 +94,10 @@ class SimResult {
 
         if (this.minDungenonTime == 0 || this.minDungenonTime > currentDungenonTime) {
             this.minDungenonTime = currentDungenonTime;
+        }
+
+        if (this.maxDungenonTime < currentDungenonTime) {
+            this.maxDungenonTime = currentDungenonTime;
         }
     }
 

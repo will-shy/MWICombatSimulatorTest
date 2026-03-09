@@ -3927,6 +3927,12 @@ function showKills(simResult, playerToDisplay) {
             minimumTimeRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.minimumTime");
             newChildren.push(minimumTimeRow);
         }
+        if (simResult.maxDungenonTime > 0) {
+            let maximumTime = (simResult.maxDungenonTime / ONE_SECOND / 60).toFixed(1);
+            let maximumTimeRow = createRow(["col-md-6", "col-md-6 text-end"], ["Maximum Time", maximumTime]);
+            maximumTimeRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.maximumTime");
+            newChildren.push(maximumTimeRow);
+        }
     } else {
         // 使用最后一场战斗完成时间来计算，避免未完成战斗的时间被计入
         let encounterHoursSimulated = simResult.lastEncounterFinishTime > 0 
