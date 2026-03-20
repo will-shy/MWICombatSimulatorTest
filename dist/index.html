@@ -569,14 +569,20 @@
                             <div class="col-md-6">
                                 <b data-i18n="characterManagement.abilities">Abilities</b>
                             </div>
-                            <div class="col">
+                            <div class="col-md-auto">
                                 <b data-i18n="leaderboardPanel.level">Level</b>
+                            </div>
+                            <div class="col-md-auto container">
+                                <div class="d-flex align-items-center gap-2">
+                                        <span id="gearLabel" class="text-primary fw-bold">⚙</span>
+                                        <div class="form-check form-switch m-0">
+                                            <input class="form-check-input" type="checkbox" id="abilityOrderSwitch">
+                                        </div>
+                                        <span id="arrowLabel" class="text-secondary">⇅</span>
+                                    </div>
                             </div>
                         </div>
                         <div class="row mb-2">
-                            <div class="col-md-1">
-                                <button id="selectAbilityMoveUp_0" class="btn btn-primary" type="button" disabled>#</button>
-                            </div>
                             <div class="col-md-6">
                                 <select id="selectAbility_0" class="form-select">
                                     <option value="" data-i18n="characterSelectPage.slots.empty">Empty</option>
@@ -586,18 +592,18 @@
                                 <input type="number" id="inputAbilityLevel_0" class="form-control" value="1" min="1"
                                     max="400" required />
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-auto">
                                 <button id="buttonAbilityTrigger_0" class="btn btn-primary" type="button"
                                     data-bs-toggle="modal" data-bs-target="#triggerModal" data-bs-triggertype="ability"
                                     data-bs-triggerindex="0">
                                     Trigger
                                 </button>
                             </div>
+                            <div class="col-md-auto" style="display: none;">
+                                <button id="selectAbilityMoveUp_0" class="btn btn-primary" type="button" disabled>#</button>
+                            </div>
                         </div>
                         <div class="row mb-2">
-                            <div class="col-md-1">
-                                <button id="selectAbilityMoveUp_1" class="btn btn-primary" type="button" disabled>#</button>
-                            </div>
                             <div class="col-md-6">
                                 <select id="selectAbility_1" class="form-select">
                                     <option value="" data-i18n="characterSelectPage.slots.empty">Empty</option>
@@ -607,18 +613,18 @@
                                 <input type="number" id="inputAbilityLevel_1" class="form-control" value="1" min="1"
                                     max="400" required />
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-auto">
                                 <button id="buttonAbilityTrigger_1" class="btn btn-primary" type="button"
                                     data-bs-toggle="modal" data-bs-target="#triggerModal" data-bs-triggertype="ability"
                                     data-bs-triggerindex="1">
                                     Trigger
                                 </button>
                             </div>
+                            <div class="col-md-auto" style="display: none;">
+                                <button id="selectAbilityMoveUp_1" class="btn btn-primary" type="button" disabled>#</button>
+                            </div>
                         </div>
                         <div class="row mb-2">
-                            <div class="col-md-1">
-                                <button id="selectAbilityMoveUp_2" class="btn btn-primary" type="button">↑</button>
-                            </div>
                             <div class="col-md-6">
                                 <select id="selectAbility_2" class="form-select">
                                     <option value="" data-i18n="characterSelectPage.slots.empty">Empty</option>
@@ -628,18 +634,18 @@
                                 <input type="number" id="inputAbilityLevel_2" class="form-control" value="1" min="1"
                                     max="400" required />
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-auto">
                                 <button id="buttonAbilityTrigger_2" class="btn btn-primary" type="button"
                                     data-bs-toggle="modal" data-bs-target="#triggerModal" data-bs-triggertype="ability"
                                     data-bs-triggerindex="2">
                                     Trigger
                                 </button>
                             </div>
+                            <div class="col-md-auto" style="display: none;">
+                                <button id="selectAbilityMoveUp_2" class="btn btn-primary" type="button">↑</button>
+                            </div>
                         </div>
                         <div class="row mb-2">
-                            <div class="col-md-1">
-                                <button id="selectAbilityMoveUp_3" class="btn btn-primary" type="button">↑</button>
-                            </div>
                             <div class="col-md-6">
                                 <select id="selectAbility_3" class="form-select">
                                     <option value="" data-i18n="characterSelectPage.slots.empty">Empty</option>
@@ -649,18 +655,18 @@
                                 <input type="number" id="inputAbilityLevel_3" class="form-control" value="1" min="1"
                                     max="400" required />
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-auto">
                                 <button id="buttonAbilityTrigger_3" class="btn btn-primary" type="button"
                                     data-bs-toggle="modal" data-bs-target="#triggerModal" data-bs-triggertype="ability"
                                     data-bs-triggerindex="3">
                                     Trigger
                                 </button>
                             </div>
+                            <div class="col-md-auto" style="display: none;">
+                                <button id="selectAbilityMoveUp_3" class="btn btn-primary" type="button">↑</button>
+                            </div>
                         </div>
                         <div class="row mb-3">
-                            <div class="col-md-1">
-                                <button id="selectAbilityMoveUp_4" class="btn btn-primary" type="button">↑</button>
-                            </div>
                             <div class="col-md-6">
                                 <select id="selectAbility_4" class="form-select">
                                     <option value="" data-i18n="characterSelectPage.slots.empty">Empty</option>
@@ -670,12 +676,15 @@
                                 <input type="number" id="inputAbilityLevel_4" class="form-control" value="1" min="1"
                                     max="400" required />
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-auto">
                                 <button id="buttonAbilityTrigger_4" class="btn btn-primary" type="button"
                                     data-bs-toggle="modal" data-bs-target="#triggerModal" data-bs-triggertype="ability"
                                     data-bs-triggerindex="4">
                                     Trigger
                                 </button>
+                            </div>
+                            <div class="col-md-auto" style="display: none;">
+                                <button id="selectAbilityMoveUp_4" class="btn btn-primary" type="button">↑</button>
                             </div>
                         </div>
                         <!-- #endregion-->
@@ -1442,6 +1451,18 @@
                                             <input class="form-check-input player-checkbox" type="checkbox" id="player3">
                                             <label class="form-check-label" for="player3">
                                                 Player 3
+                                            </label>
+                                        </div>
+                                        <div class="form-check" style="display: none;">
+                                            <input class="form-check-input player-checkbox" type="checkbox" id="player4">
+                                            <label class="form-check-label" for="player4">
+                                                Player 4
+                                            </label>
+                                        </div>
+                                        <div class="form-check" style="display: none;">
+                                            <input class="form-check-input player-checkbox" type="checkbox" id="player5">
+                                            <label class="form-check-label" for="player5">
+                                                Player 5
                                             </label>
                                         </div>
                                 </div>

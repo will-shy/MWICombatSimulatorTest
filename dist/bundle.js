@@ -2562,6 +2562,33 @@ function initAbilitiesSection() {
 
         selectElement.addEventListener("change", abilitySelectHandler);
     }
+
+    document.getElementById('abilityOrderSwitch').addEventListener('change', function() {
+            const gear = document.getElementById('gearLabel');
+            const arrow = document.getElementById('arrowLabel');
+            
+            if (this.checked) {
+                gear.classList.remove('text-primary', 'fw-bold');
+                gear.classList.add('text-secondary');
+                
+                arrow.classList.remove('text-secondary');
+                arrow.classList.add('text-primary', 'fw-bold');
+            } else {
+                gear.classList.remove('text-secondary');
+                gear.classList.add('text-primary', 'fw-bold');
+                
+                arrow.classList.remove('text-primary', 'fw-bold');
+                arrow.classList.add('text-secondary');
+            }
+
+            for (let i = 0; i < 5; i++) {
+                let triggerButton = document.getElementById("buttonAbilityTrigger_" + i);
+                triggerButton.parentElement.style.display = this.checked ? 'none' : 'block';
+                let moveButton = document.getElementById("selectAbilityMoveUp_" + i);
+                moveButton.parentElement.style.display = this.checked ? 'block' : 'none';
+            }
+        });
+
 }
 
 function abilitySelectHandler() {
@@ -4651,34 +4678,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const simDungeonToggle = document.getElementById('simDungeonToggle');
     const playerContainer = document.getElementById('playerCheckBox');
 
+    const player4Input = document.getElementById('player4');
+    const player5Input = document.getElementById('player5');
+
     function addPlayers() {
-        const player4 = document.createElement('div');
-        player4.classList.add('form-check');
-        player4.innerHTML = `
-            <input class="form-check-input player-checkbox" type="checkbox" id="player4">
-            <label class="form-check-label" for="player4">
-                Player 4
-            </label>
-        `;
-
-        const player5 = document.createElement('div');
-        player5.classList.add('form-check');
-        player5.innerHTML = `
-            <input class="form-check-input player-checkbox" type="checkbox" id="player5">
-            <label class="form-check-label" for="player5">
-                Player 5
-            </label>
-        `;
-
-        playerContainer.appendChild(player4);
-        playerContainer.appendChild(player5);
+        player4Input.parentElement.style.display = 'block';
+        player5Input.parentElement.style.display = 'block';
     }
 
     function removePlayers() {
-        const player4 = document.getElementById('player4');
-        const player5 = document.getElementById('player5');
-        if (player4) player4.parentElement.remove();
-        if (player5) player5.parentElement.remove();
+        player4Input.parentElement.style.display = 'none';
+        player5Input.parentElement.style.display = 'none';
     }
 
     function updatePlayerNames() {
