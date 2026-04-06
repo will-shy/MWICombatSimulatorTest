@@ -593,6 +593,9 @@ class CombatSimulator extends EventTarget {
                 this.simResult.bossSpawns.push(boss.combatMonsterHrid);
             }
         }
+        if (this.labyrinth) {
+            this.simResult.labyAttemptCount = this.labyrinth.attemptCount;
+        }
 
         return this.simResult;
     }
@@ -3900,9 +3903,12 @@ class Labyrinth{
                 this.buffs = this.buffs.concat(_data_labyrinthCrateDetailMap_json__WEBPACK_IMPORTED_MODULE_1__[crate]);
             }
         }
+
+        this.attemptCount = 0;
     }
 
     getMonster () {
+        this.attemptCount ++;
         return [new _monster__WEBPACK_IMPORTED_MODULE_0__["default"](this.monsterHrid, 0, this.roomLevel)];
     }
 
@@ -4357,6 +4363,7 @@ class SimResult {
         this.maxDungenonTime = 0;
         this.lastDungeonFinishTime = 0;
         this.lastEncounterFinishTime = 0;
+        this.labyAttemptCount = 0;
 
         this.wipeEvents = [];
         

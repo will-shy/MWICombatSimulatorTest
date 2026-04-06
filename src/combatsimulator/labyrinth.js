@@ -12,9 +12,12 @@ class Labyrinth{
                 this.buffs = this.buffs.concat(labyrinthCrateDetailMap[crate]);
             }
         }
+
+        this.attemptCount = 0;
     }
 
     getMonster () {
+        this.attemptCount ++;
         return [new Monster(this.monsterHrid, 0, this.roomLevel)];
     }
 

@@ -2082,6 +2082,12 @@ function showKills(simResult, playerToDisplay) {
     let newNoRngDropChildren = [];
 
     let hoursSimulated = simResult.simulatedTime / ONE_HOUR;
+    if (simResult.isDungeon && simResult.lastDungeonFinishTime > 0) {
+        hoursSimulated = simResult.lastDungeonFinishTime / ONE_HOUR;
+    } else if (simResult.lastEncounterFinishTime > 0) {
+        hoursSimulated = simResult.lastEncounterFinishTime / ONE_HOUR;
+    }
+
     let encountersPerHour = 0;
     let encountersRow = null;
     if (simResult.isDungeon) {
@@ -2096,12 +2102,8 @@ function showKills(simResult, playerToDisplay) {
             failedDungeonsRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.dungeonsFailed");
             newChildren.push(failedDungeonsRow);
         }
-        // 使用最后一轮完成时间来计算平均时间，避免未完成轮次的时间被计入
-        let dungeonHoursSimulated = simResult.lastDungeonFinishTime > 0 
-            ? simResult.lastDungeonFinishTime / ONE_HOUR 
-            : hoursSimulated;
-        encountersPerHour = (simResult.dungeonsCompleted / dungeonHoursSimulated).toFixed(1);
-        let averageTime = (dungeonHoursSimulated * 60 / simResult.dungeonsCompleted).toFixed(1);
+        encountersPerHour = (simResult.dungeonsCompleted / hoursSimulated).toFixed(1);
+        let averageTime = (hoursSimulated * 60 / simResult.dungeonsCompleted).toFixed(1);
         encountersRow = createRow(["col-md-6", "col-md-6 text-end"], ["Average Time", averageTime]);
         encountersRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.averageTime");
         if (simResult.minDungenonTime > 0) {
@@ -2117,13 +2119,19 @@ function showKills(simResult, playerToDisplay) {
             newChildren.push(maximumTimeRow);
         }
     } else {
-        // 使用最后一场战斗完成时间来计算，避免未完成战斗的时间被计入
-        let encounterHoursSimulated = simResult.lastEncounterFinishTime > 0 
-            ? simResult.lastEncounterFinishTime / ONE_HOUR 
-            : hoursSimulated;
-        encountersPerHour = (simResult.encounters / encounterHoursSimulated).toFixed(1);
+        encountersPerHour = (simResult.encounters / hoursSimulated).toFixed(1); 
         encountersRow = createRow(["col-md-6", "col-md-6 text-end"], ["Encounters", encountersPerHour]);
         encountersRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.encounters");
+    }
+
+    if (simResult.labyAttemptCount > 0) {
+        let labyAttemptCountRow = createRow(["col-md-6", "col-md-6 text-end"], ["Labyrinth Attempt Count", (simResult.labyAttemptCount / hoursSimulated).toFixed(1)]);
+        labyAttemptCountRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.labyAttemptCount");
+        newChildren.push(labyAttemptCountRow);
+
+        let labySuccessRateRow = createRow(["col-md-6", "col-md-6 text-end"], ["Labyrinth Success Rate", (simResult.encounters / simResult.labyAttemptCount * 100).toFixed(1) + "%"]);
+        labySuccessRateRow.firstElementChild.setAttribute("data-i18n", "common:simulationResults.labySuccessRate");
+        newChildren.push(labySuccessRateRow);
     }
 
     if (simResult.maxEnrageStack > 0) {

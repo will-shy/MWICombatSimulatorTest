@@ -74,7 +74,9 @@
         "minimumTime": "Minimum Time",
         "maximumTime": "Maximum Time",
         "maxEnrageStack": "Max Stack of Enrage",
-        "debuffOnLevelGap": "Debuff on Level Gap"
+        "debuffOnLevelGap": "Debuff on Level Gap",
+        "labySuccessRate" : "Labyrinth Success Rate",
+        "labyAttemptCount" : "Labyrinth Attempt Count"
     },
     "selectPlayer": "SelectPlayer",
     "selectAllOrNot": "Select / Deselect All",

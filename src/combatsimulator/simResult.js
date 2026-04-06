@@ -40,6 +40,7 @@ class SimResult {
         this.maxDungenonTime = 0;
         this.lastDungeonFinishTime = 0;
         this.lastEncounterFinishTime = 0;
+        this.labyAttemptCount = 0;
 
         this.wipeEvents = [];
         

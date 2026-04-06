@@ -251,6 +251,9 @@ class CombatSimulator extends EventTarget {
                 this.simResult.bossSpawns.push(boss.combatMonsterHrid);
             }
         }
+        if (this.labyrinth) {
+            this.simResult.labyAttemptCount = this.labyrinth.attemptCount;
+        }
 
         return this.simResult;
     }
