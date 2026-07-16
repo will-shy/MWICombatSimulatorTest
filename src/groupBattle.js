@@ -17,6 +17,9 @@ import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
 
 const ONE_SECOND = 1e9;
 const PRESET_STORAGE_KEY = "mwiGroupBattleMonsterPresets";
+// Handoff key read by the original simulator (main.js) to auto-import a preset.
+// Must match SOLO_IMPORT_HANDOFF_KEY in src/main.js.
+const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
 
 let worker = new Worker(new URL("worker.js", import.meta.url));
 
@@ -96,6 +99,122 @@ function buildAbilityDTO(hrid, level, triggers) {
     return { hrid: ability.hrid, level: ability.level, triggers: ability.triggers };
 }
 
+// Inverse of soloExportToDTO / equipmentSetToDTO: turn an internal player DTO
+// back into the "solo export" JSON the standard simulator's Import/Export uses,
+// so a preset (or roster player) can be re-imported there. Food/drinks are
+// intentionally empty (group battles strip them).
+function dtoToSoloExport(dto) {
+    let equipment = [];
+    for (const [key, val] of Object.entries(dto.equipment || {})) {
+        if (!val || !val.hrid) continue;
+        let type = key.replace("/equipment_types/", "");
+        equipment.push({
+            itemLocationHrid: "/item_locations/" + type,
+            itemHrid: val.hrid,
+            enhancementLevel: Number(val.enhancementLevel) || 0,
+        });
+    }
+
+    let triggerMap = {};
+    let abilities = (dto.abilities || []).filter(Boolean).map((a) => {
+        if (a.triggers) triggerMap[a.hrid] = a.triggers;
+        return { abilityHrid: a.hrid, level: Number(a.level) || 1 };
+    });
+
+    return {
+        player: {
+            staminaLevel: dto.staminaLevel ?? 1,
+            intelligenceLevel: dto.intelligenceLevel ?? 1,
+            attackLevel: dto.attackLevel ?? 1,
+            meleeLevel: dto.meleeLevel ?? 1,
+            defenseLevel: dto.defenseLevel ?? 1,
+            rangedLevel: dto.rangedLevel ?? 1,
+            magicLevel: dto.magicLevel ?? 1,
+            equipment,
+        },
+        food: { "/action_types/combat": [{ itemHrid: "" }, { itemHrid: "" }, { itemHrid: "" }] },
+        drinks: { "/action_types/combat": [{ itemHrid: "" }, { itemHrid: "" }, { itemHrid: "" }] },
+        abilities,
+        triggerMap,
+        houseRooms: dto.houseRooms || {},
+        achievements: dto.achievements || {},
+    };
+}
+
+// Convert one "equipment set" (the object shape the standard simulator persists
+// in localStorage under "equipmentSets") into a Player.createFromDTO-compatible
+// DTO. This shape differs from a solo export: levels/equipment/abilities are
+// keyed objects (not arrays), the weapon lives under a single "weapon" slot
+// (main_hand vs two_hand is inferred from the item's own equipment type), and
+// there is an extra "charm" slot.
+function equipmentSetToDTO(set, hrid) {
+    const levels = set.levels || {};
+    const lvl = (skill) => Number(levels[skill]) || 1;
+
+    let equipment = {};
+    const simpleSlots = [
+        "head", "body", "legs", "feet", "hands",
+        "off_hand", "pouch", "neck", "earrings", "ring", "back", "charm",
+    ];
+    for (const slot of simpleSlots) {
+        let entry = (set.equipment || {})[slot];
+        let itemHrid = entry && entry.equipment;
+        equipment["/equipment_types/" + slot] =
+            itemHrid && itemDetailMap[itemHrid]
+                ? { hrid: itemHrid, enhancementLevel: Number(entry.enhancementLevel) || 0 }
+                : null;
+    }
+    // Weapon: resolve to main_hand or two_hand from the item's own type.
+    equipment["/equipment_types/main_hand"] = null;
+    equipment["/equipment_types/two_hand"] = null;
+    let weaponEntry = (set.equipment || {}).weapon;
+    let weaponHrid = weaponEntry && weaponEntry.equipment;
+    if (weaponHrid && itemDetailMap[weaponHrid]) {
+        let wtype = itemDetailMap[weaponHrid].equipmentDetail?.type;
+        let slot = wtype === "/equipment_types/two_hand" ? "two_hand" : "main_hand";
+        equipment["/equipment_types/" + slot] = {
+            hrid: weaponHrid,
+            enhancementLevel: Number(weaponEntry.enhancementLevel) || 0,
+        };
+    }
+
+    const triggerMap = set.triggerMap || {};
+
+    // Group battles assume no food or drink for any player.
+    let food = [null, null, null];
+    let drinks = [null, null, null];
+
+    // Equipment set abilities are keyed 0..4 as { ability, level }.
+    let abilities = [0, 1, 2, 3, 4].map((i) => {
+        let entry = (set.abilities || {})[i];
+        let abilityHrid = entry && entry.ability;
+        if (!abilityHrid) return null;
+        try {
+            return buildAbilityDTO(abilityHrid, Number(entry.level) || 1, triggerMap[abilityHrid]);
+        } catch (e) {
+            return null;
+        }
+    });
+
+    return {
+        hrid: hrid,
+        staminaLevel: lvl("stamina"),
+        intelligenceLevel: lvl("intelligence"),
+        attackLevel: lvl("attack"),
+        meleeLevel: lvl("melee"),
+        defenseLevel: lvl("defense"),
+        rangedLevel: lvl("ranged"),
+        magicLevel: lvl("magic"),
+        equipment: equipment,
+        food: food,
+        drinks: drinks,
+        abilities: abilities,
+        houseRooms: set.houseRooms || {},
+        achievements: set.achievements || {},
+        debuffOnLevelGap: 0,
+    };
+}
+
 // Accepts: a JSON array of export objects/strings, OR newline-separated export
 // strings, OR the "group" export (an object keyed "1".."5").
 function parseImport(text) {
@@ -170,31 +289,194 @@ function doImport(append) {
     document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-// Built-in test rosters (one export each), by role. Food/drinks are always
-// stripped by soloExportToDTO regardless of what the source export contains.
-const TEST_ROLE_EXPORTS = [
+// ------------------------------------------------------------ Group Builder ---
+// The Group Builder assembles a roster from "presets", each with a count. Three
+// kinds of preset feed it:
+//   1. PREDEFINED_PRESETS - hardcoded role rosters (cannot be edited).
+//   2. jsonPresets         - named solo-exports pasted by the user (session only).
+//   3. equipmentSetPresets - the standard sim's saved equipment sets, read from
+//                            localStorage (refreshable).
+// "Build roster (replace)" rebuilds importedPlayers from every preset's count.
+
+const LS_EQUIPMENT_SETS_KEY = "equipmentSets";
+
+// Predefined presets are fixed; their count inputs live in the HTML.
+const PREDEFINED_PRESETS = [
     { key: "Ranger", inputId: "testCountRanger", export: rangerExport },
     { key: "Healer", inputId: "testCountHealer", export: healerExport },
     { key: "Tank", inputId: "testCountTank", export: tankExport },
     { key: "Smash", inputId: "testCountSmash", export: smashExport },
 ];
 
-function doTestImport() {
-    importedPlayers = [];
+// User presets loaded from pasted JSON: { name, dto, count }.
+let jsonPresets = [];
+// User presets loaded from localStorage equipment sets: { name, dto, count }.
+let equipmentSetPresets = [];
 
+// Read the standard simulator's saved equipment sets from localStorage and turn
+// each into a preset. Preserves the previously entered count for a set of the
+// same name so a Refresh does not wipe the user's chosen counts.
+function refreshEquipmentSetPresets() {
+    let prevCounts = {};
+    for (const p of equipmentSetPresets) prevCounts[p.name] = p.count;
+
+    let sets = {};
+    try {
+        sets = JSON.parse(localStorage.getItem(LS_EQUIPMENT_SETS_KEY)) || {};
+    } catch (e) {
+        sets = {};
+    }
+
+    equipmentSetPresets = [];
     let errors = [];
-    for (const role of TEST_ROLE_EXPORTS) {
-        let count = Math.max(0, Number(document.getElementById(role.inputId).value) || 0);
+    for (const name of Object.keys(sets)) {
+        try {
+            let dto = equipmentSetToDTO(sets[name], "preset");
+            equipmentSetPresets.push({ name, dto, count: prevCounts[name] ?? 0 });
+        } catch (e) {
+            errors.push(name + ": " + e.message);
+        }
+    }
+
+    renderUserPresetList();
+    if (errors.length) {
+        showError(t("equipmentSetsLoadedWithErrors", { count: errors.length, errors: errors.join("\n") }));
+    }
+}
+
+// Add a named preset from the JSON textarea. Uses only the FIRST export in the
+// pasted data (a preset is a single player template that gets multiplied by
+// count). Not persisted.
+function addJsonPreset() {
+    let nameInput = document.getElementById("jsonPresetName");
+    let textarea = document.getElementById("jsonPresetText");
+    let name = nameInput.value.trim();
+
+    if (!name) {
+        showError(t("presetNameRequired"));
+        return;
+    }
+    let exports;
+    try {
+        exports = parseImport(textarea.value);
+    } catch (e) {
+        showError(t("couldNotParseImport", { msg: e.message }));
+        return;
+    }
+    if (!exports.length || !exports[0] || !exports[0].player) {
+        showError(t("noPlayerDataFound"));
+        return;
+    }
+
+    let dto;
+    try {
+        dto = soloExportToDTO(exports[0], "preset");
+    } catch (e) {
+        showError(t("couldNotParseImport", { msg: e.message }));
+        return;
+    }
+
+    jsonPresets.push({ name, dto, count: 1 });
+    nameInput.value = "";
+    textarea.value = "";
+    clearError();
+    renderUserPresetList();
+}
+
+// Render the combined user-preset list (JSON presets + equipment set presets),
+// each row with an editable count and (for JSON presets) a remove button.
+function renderUserPresetList() {
+    let container = document.getElementById("userPresetList");
+    container.innerHTML = "";
+
+    if (!jsonPresets.length && !equipmentSetPresets.length) {
+        let empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = t("noUserPresets");
+        container.appendChild(empty);
+        return;
+    }
+
+    const addRow = (preset, kind, index) => {
+        let row = document.createElement("div");
+        row.className = "preset-row";
+
+        // Clicking the name (or its area) opens the review modal.
+        let name = document.createElement("span");
+        name.className = "preset-name preset-review";
+        name.textContent = preset.name;
+        name.title = t("clickForDetails");
+        name.addEventListener("click", () => openPresetModal(preset));
+
+        let count = document.createElement("input");
+        count.type = "number";
+        count.min = "0";
+        count.max = "50";
+        count.value = preset.count;
+        count.style.width = "60px";
+        count.title = t("presetCountTitle");
+        count.addEventListener("input", () => {
+            preset.count = Math.max(0, Number(count.value) || 0);
+        });
+
+        row.appendChild(name);
+        // JSON presets keep a small source tag; equipment-set presets don't need
+        // one (all visible presets are equipment sets, so the label just adds noise).
+        if (kind === "json") {
+            let src = document.createElement("span");
+            src.className = "preset-src";
+            src.textContent = t("srcJson");
+            row.appendChild(src);
+        }
+        row.appendChild(count);
+
+        if (kind === "json") {
+            let remove = document.createElement("button");
+            remove.className = "remove-preset";
+            remove.textContent = "✕";
+            remove.title = t("removePreset");
+            remove.addEventListener("click", () => {
+                jsonPresets.splice(index, 1);
+                renderUserPresetList();
+            });
+            row.appendChild(remove);
+        }
+
+        container.appendChild(row);
+    };
+
+    jsonPresets.forEach((p, i) => addRow(p, "json", i));
+    equipmentSetPresets.forEach((p, i) => addRow(p, "equipmentSet", i));
+}
+
+// Rebuild the entire roster from every preset's count (predefined + user).
+function buildRoster() {
+    importedPlayers = [];
+    let errors = [];
+
+    const addCopies = (label, count, buildDto) => {
         for (let i = 1; i <= count; i++) {
             try {
                 let index = importedPlayers.length + 1;
-                let hrid = "player" + index;
-                let dto = soloExportToDTO(role.export, hrid);
-                importedPlayers.push({ name: role.key + " " + i, dto });
+                let dto = buildDto("player" + index);
+                importedPlayers.push({ name: label + " " + i, dto });
             } catch (e) {
-                errors.push(role.key + " " + i + ": " + e.message);
+                errors.push(label + " " + i + ": " + e.message);
             }
         }
+    };
+
+    for (const role of PREDEFINED_PRESETS) {
+        let count = Math.max(0, Number(document.getElementById(role.inputId).value) || 0);
+        addCopies(role.key, count, (hrid) => soloExportToDTO(role.export, hrid));
+    }
+    for (const preset of jsonPresets) {
+        addCopies(preset.name, Math.max(0, Number(preset.count) || 0),
+            (hrid) => ({ ...structuredClone(preset.dto), hrid }));
+    }
+    for (const preset of equipmentSetPresets) {
+        addCopies(preset.name, Math.max(0, Number(preset.count) || 0),
+            (hrid) => ({ ...structuredClone(preset.dto), hrid }));
     }
 
     renderPlayerList();
@@ -297,7 +579,7 @@ function playerDetailHtml(d) {
             <div><h5>${escapeHtml(t("abilities"))}</h5>${abilityHtml}</div>
         </div>
         <div class="row" style="margin-top:10px;">
-            <button class="secondary show-status-btn">Show Detailed Combat Status</button>
+            <button class="secondary show-status-btn">${escapeHtml(t("showDetailedStatus"))}</button>
         </div>
         <div class="detailed-status" style="display:none;"></div>
     </div>`;
@@ -467,6 +749,138 @@ function refreshHpDependentViews() {
     }
 }
 
+// The five real combat styles map to a color; magic is further split by damage
+// element (fire/water/nature). "unarmed"/unknown falls back to a neutral color.
+// "wark" is a synthetic style for defensive/bulwark players (a bulwark uses the
+// smash style but plays a distinct tank role) - detected via the weapon's
+// defensiveDamage stat, and given its own color.
+const STYLE_COLORS = {
+    "/combat_styles/smash": "#e8963c",   // orange
+    "/combat_styles/slash": "#e05a5a",   // red
+    "/combat_styles/stab": "#e8d24c",    // yellow
+    "/combat_styles/ranged": "#5fbf6f",  // green
+    "/combat_styles/magic": "#9b7fe0",   // violet (overridden by element below)
+    wark: "#4bb3c4",                     // cyan/teal - defensive (bulwark)
+};
+
+// A weapon is a "bulwark" (defensive) if its combat stats include defensiveDamage.
+function isBulwark(hrid) {
+    let cs = itemDetailMap[hrid]?.equipmentDetail?.combatStats;
+    return !!(cs && "defensiveDamage" in cs);
+}
+const MAGIC_ELEMENT_COLORS = {
+    "/damage_types/fire": "#ff6b3d",
+    "/damage_types/water": "#4c9be8",
+    "/damage_types/nature": "#5fbf6f",
+};
+// Aura abilities. Most end in "_aura", but Insanity, Invincible, and Revive are
+// auras too despite their hrids not following that pattern.
+const AURA_ABILITY_HRIDS = new Set([
+    "/abilities/critical_aura", "/abilities/fierce_aura", "/abilities/guardian_aura",
+    "/abilities/mystic_aura", "/abilities/speed_aura",
+    "/abilities/insanity", "/abilities/invincible", "/abilities/revive",
+]);
+// Each aura gets its own border/glow color on the roster card.
+const AURA_COLORS = {
+    "/abilities/critical_aura": "#f0c250", // gold
+    "/abilities/fierce_aura": "#ff6b3d",   // red-orange
+    "/abilities/guardian_aura": "#4c9be8", // blue
+    "/abilities/mystic_aura": "#9b7fe0",   // violet
+    "/abilities/speed_aura": "#4bd0a0",    // teal-green
+    "/abilities/insanity": "#e0489b",      // magenta
+    "/abilities/invincible": "#d8dde3",    // silver-white
+    "/abilities/revive": "#7ee081",        // light green
+};
+function auraColor(hrid) {
+    return AURA_COLORS[hrid] || "#f0c250";
+}
+
+// Cache of derived summaries keyed by dto reference, so we build each Player
+// only once per import (constructing a Player + combat details is expensive and
+// renderPlayerList runs on every roster change).
+const derivedSummaryCache = new WeakMap();
+
+function derivePlayerSummary(dto) {
+    if (derivedSummaryCache.has(dto)) return derivedSummaryCache.get(dto);
+
+    let summary;
+    try {
+        let zone = new Zone("/actions/combat/fly");
+        let player = Player.createFromDTO(structuredClone(dto));
+        player.zoneBuffs = zone.buffs;
+        player.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
+        player.reset(0);
+        player.generatePermanentBuffs();
+        player.reset(0);
+
+        let cd = player.combatDetails;
+        let cs = cd.combatStats;
+        summary = {
+            maxHitpoints: cd.maxHitpoints,
+            maxManapoints: cd.maxManapoints,
+            combatStyleHrid: cs.combatStyleHrid || "",
+            damageType: cs.damageType || "",
+        };
+    } catch (e) {
+        summary = { maxHitpoints: 0, maxManapoints: 0, combatStyleHrid: "", damageType: "" };
+    }
+
+    // Weapon (main_hand preferred, else two_hand) + enhancement level.
+    let weapon = dto.equipment["/equipment_types/main_hand"] || dto.equipment["/equipment_types/two_hand"];
+    summary.weaponName = weapon ? itemName(weapon.hrid) : null;
+    summary.weaponEnh = weapon ? (Number(weapon.enhancementLevel) || 0) : 0;
+    // Defensive ("wark") if the equipped weapon is a bulwark.
+    summary.isWark = weapon ? isBulwark(weapon.hrid) : false;
+
+    // Aura: an equipped aura ability, if any (used for the distinct border).
+    let aura = (dto.abilities || []).find((a) => a && AURA_ABILITY_HRIDS.has(a.hrid));
+    summary.auraHrid = aura ? aura.hrid : null;
+
+    derivedSummaryCache.set(dto, summary);
+    return summary;
+}
+
+// Resolve the accent color for a player's card from combat style + element.
+function styleColor(summary) {
+    if (summary.isWark) return STYLE_COLORS.wark;
+    if (summary.combatStyleHrid === "/combat_styles/magic") {
+        return MAGIC_ELEMENT_COLORS[summary.damageType] || STYLE_COLORS["/combat_styles/magic"];
+    }
+    return STYLE_COLORS[summary.combatStyleHrid] || "var(--dim)";
+}
+
+// Fixed display order for the roster:
+//   Wark → Ranged → Stab → Smash → Slash → Magic(Nature → Fire → Water) → other.
+// Lower rank sorts first. Within the same rank, original import order is kept.
+function styleRank(summary) {
+    if (summary.isWark) return 0;
+    switch (summary.combatStyleHrid) {
+        case "/combat_styles/ranged": return 1;
+        case "/combat_styles/stab": return 2;
+        case "/combat_styles/smash": return 3;
+        case "/combat_styles/slash": return 4;
+        case "/combat_styles/magic":
+            switch (summary.damageType) {
+                case "/damage_types/nature": return 5;
+                case "/damage_types/fire": return 6;
+                case "/damage_types/water": return 7;
+                default: return 8; // magic, unknown element
+            }
+        default: return 9; // unarmed / unknown
+    }
+}
+
+// Short label for the style chip, e.g. "Ranged", "Magic · Fire", or "Wark".
+function styleLabel(summary) {
+    if (summary.isWark) return t("styleWark");
+    if (!summary.combatStyleHrid) return t("unarmed");
+    let base = combatStyleName(summary.combatStyleHrid);
+    if (summary.combatStyleHrid === "/combat_styles/magic" && summary.damageType) {
+        return base + " · " + damageTypeName(summary.damageType);
+    }
+    return base;
+}
+
 function renderPlayerList() {
     const container = document.getElementById("playerList");
     document.getElementById("playerCount").textContent = importedPlayers.length;
@@ -479,61 +893,175 @@ function renderPlayerList() {
         return;
     }
 
-    let html = "";
-    importedPlayers.forEach((p, i) => {
-        let d = p.dto;
-        let style = "unarmed";
-        let main = d.equipment["/equipment_types/main_hand"] || d.equipment["/equipment_types/two_hand"];
-        if (main) style = itemName(main.hrid);
-        html += `<div class="player-card">
-            <div class="player-head">
-                <button class="expand-btn" data-expand="${i}" aria-label="expand">▸</button>
-                <span class="pnum">${i + 1}</span>
-                <input class="name-edit" data-i="${i}" value="${escapeHtml(p.name)}" />
-                <span class="dim">${escapeHtml(style)}</span>
-                <button class="btn-x" data-remove="${i}">x</button>
-            </div>
-            <div class="player-detail" id="pdetail-${i}" style="display:none;" data-player-index="${i}">${playerDetailHtml(d)}</div>
+    // Display in a fixed style order (Wark, Ranged, Stab, Smash, Slash, Magic
+    // by element, then others), while keeping each card's ORIGINAL import index
+    // so remove/rename/modal still target the right entry. A stable sort keeps
+    // import order within a style group.
+    let ordered = importedPlayers
+        .map((p, i) => ({ p, i, s: derivePlayerSummary(p.dto) }))
+        .sort((a, b) => styleRank(a.s) - styleRank(b.s));
+
+    let html = '<div class="roster-grid">';
+    ordered.forEach(({ p, i, s }) => {
+        let accent = styleColor(s);
+        let auraClass = s.auraHrid ? " has-aura" : "";
+        let auraName = s.auraHrid ? abilityName(s.auraHrid) : "";
+        let auraCol = s.auraHrid ? auraColor(s.auraHrid) : "";
+        let auraVar = s.auraHrid ? ` --accent-aura:${auraCol};` : "";
+
+        let weaponLine = s.weaponName
+            ? `${escapeHtml(s.weaponName)}${s.weaponEnh ? " +" + s.weaponEnh : ""}`
+            : `<span class="dim">${escapeHtml(t("noWeapon"))}</span>`;
+
+        // Percentages are 100% at import (players start full); bars still convey
+        // relative HP/MP magnitude via the numeric label.
+        html += `<div class="roster-card${auraClass}" data-open="${i}" style="--accent-style:${accent};${auraVar}" title="${escapeHtml(t("clickForDetails"))}">
+            <button class="rc-remove" data-remove="${i}" title="${escapeHtml(t("removePlayer"))}">✕</button>
+            <div class="rc-name">${escapeHtml(p.name)}</div>
+            <div class="rc-weapon">${weaponLine}</div>
+            ${auraName ? `<div class="rc-aura" style="color:${auraCol};">✦ ${escapeHtml(auraName)}</div>` : ""}
+            <div class="rc-style" style="background:${accent};">${escapeHtml(styleLabel(s))}</div>
+            <div class="rc-bar rc-hp"><div class="rc-bar-fill" style="width:100%;"></div><span class="rc-bar-label">HP ${fmtNum(s.maxHitpoints)}</span></div>
+            <div class="rc-bar rc-mp"><div class="rc-bar-fill" style="width:100%;"></div><span class="rc-bar-label">MP ${fmtNum(s.maxManapoints)}</span></div>
         </div>`;
     });
+    html += "</div>";
     container.innerHTML = html;
 
-    container.querySelectorAll("[data-remove]").forEach((btn) => {
-        btn.addEventListener("click", () => {
+    container.querySelectorAll(".rc-remove").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+            ev.stopPropagation(); // don't also open the detail modal
             importedPlayers.splice(Number(btn.dataset.remove), 1);
             reindexPlayers();
             renderPlayerList();
         });
     });
-    container.querySelectorAll(".name-edit").forEach((inp) => {
-        inp.addEventListener("change", () => {
-            importedPlayers[Number(inp.dataset.i)].name = inp.value;
+    container.querySelectorAll(".roster-card").forEach((card) => {
+        card.addEventListener("click", () => openPlayerModal(Number(card.dataset.open)));
+        // Rename via double-click on the name (keeps single-click for details).
+        let nameEl = card.querySelector(".rc-name");
+        nameEl.addEventListener("dblclick", (ev) => {
+            ev.stopPropagation();
+            beginRename(card, Number(card.dataset.open), nameEl);
         });
     });
-    container.querySelectorAll(".show-status-btn").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            let playerDetail = btn.closest(".player-detail");
-            let idx = Number(playerDetail.dataset.playerIndex);
-            let statusEl = playerDetail.querySelector(".detailed-status");
+}
+
+// Inline-edit a player's name in place. Committed on blur / Enter.
+function beginRename(card, idx, nameEl) {
+    let input = document.createElement("input");
+    input.className = "name-edit";
+    input.value = importedPlayers[idx].name;
+    input.addEventListener("click", (e) => e.stopPropagation());
+    let commit = () => {
+        importedPlayers[idx].name = input.value.trim() || importedPlayers[idx].name;
+        renderPlayerList();
+    };
+    input.addEventListener("blur", commit);
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+        if (e.key === "Escape") { e.preventDefault(); renderPlayerList(); }
+    });
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+}
+
+// --------------------------------------------------------------- Detail modal -
+
+// Shared modal renderer: shows the equipment/ability summary for a DTO, the
+// on-demand detailed combat status, and an "Export JSON" button that copies a
+// re-importable solo-export to the clipboard.
+function openDetailModal(title, dto) {
+    let overlay = document.getElementById("playerModalOverlay");
+    let titleEl = document.getElementById("playerModalTitle");
+    let bodyEl = document.getElementById("playerModalBody");
+
+    titleEl.textContent = title;
+
+    // Export toolbar + the standard detail body.
+    let toolbar = `<div class="row" style="margin-bottom:10px;">
+        <button class="secondary export-json-btn">${escapeHtml(t("exportJson"))}</button>
+        <button class="secondary open-original-btn">${escapeHtml(t("openInOriginal"))}</button>
+        <span class="export-status hint"></span>
+    </div>`;
+    bodyEl.innerHTML = toolbar + playerDetailHtml(dto);
+
+    // Wire the "Show Detailed Combat Status" button inside the modal body.
+    let statusBtn = bodyEl.querySelector(".show-status-btn");
+    if (statusBtn) {
+        statusBtn.addEventListener("click", () => {
+            let statusEl = bodyEl.querySelector(".detailed-status");
             let open = statusEl.style.display !== "none";
             if (open) {
                 statusEl.style.display = "none";
-                btn.textContent = "Show Detailed Combat Status";
+                statusBtn.textContent = t("showDetailedStatus");
             } else {
-                renderDetailedStatus(statusEl, importedPlayers[idx].dto);
+                renderDetailedStatus(statusEl, dto);
                 statusEl.style.display = "block";
-                btn.textContent = "Hide Detailed Combat Status";
+                statusBtn.textContent = t("hideDetailedStatus");
             }
         });
-    });
-    container.querySelectorAll("[data-expand]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            let detail = document.getElementById("pdetail-" + btn.dataset.expand);
-            let open = detail.style.display !== "none";
-            detail.style.display = open ? "none" : "block";
-            btn.textContent = open ? "▸" : "▾";
+    }
+
+    // Wire the Export JSON button: copy a solo-export to the clipboard.
+    let exportBtn = bodyEl.querySelector(".export-json-btn");
+    let exportStatus = bodyEl.querySelector(".export-status");
+    if (exportBtn) {
+        exportBtn.addEventListener("click", async () => {
+            let json = JSON.stringify(dtoToSoloExport(dto));
+            try {
+                await navigator.clipboard.writeText(json);
+                exportStatus.textContent = t("copiedToClipboard");
+            } catch (e) {
+                // Fallback for browsers/contexts without clipboard access.
+                let ta = document.createElement("textarea");
+                ta.value = json;
+                bodyEl.appendChild(ta);
+                ta.select();
+                try { document.execCommand("copy"); exportStatus.textContent = t("copiedToClipboard"); }
+                catch (e2) { exportStatus.textContent = t("copyFailed"); }
+                ta.remove();
+            }
         });
-    });
+    }
+
+    // Wire "Open in original simulator": stash the solo-export in localStorage
+    // (the original page consumes SOLO_IMPORT_HANDOFF_KEY on load and applies it)
+    // and open index.html in a new tab.
+    let openBtn = bodyEl.querySelector(".open-original-btn");
+    if (openBtn) {
+        openBtn.addEventListener("click", () => {
+            try {
+                localStorage.setItem(SOLO_IMPORT_HANDOFF_KEY, JSON.stringify(dtoToSoloExport(dto)));
+            } catch (e) {
+                exportStatus.textContent = t("copyFailed");
+                return;
+            }
+            window.open("index.html", "_blank", "noopener");
+        });
+    }
+
+    overlay.style.display = "flex";
+    document.getElementById("playerModalClose").focus();
+}
+
+// Opens the detail modal for a roster player.
+function openPlayerModal(idx) {
+    let p = importedPlayers[idx];
+    if (!p) return;
+    openDetailModal(p.name, p.dto);
+}
+
+// Opens the detail modal for a user preset (JSON or equipment set).
+function openPresetModal(preset) {
+    if (!preset) return;
+    openDetailModal(preset.name, preset.dto);
+}
+
+function closePlayerModal() {
+    let overlay = document.getElementById("playerModalOverlay");
+    if (overlay) overlay.style.display = "none";
 }
 
 function reindexPlayers() {
@@ -581,10 +1109,19 @@ function initEnemyLevelSelect() {
 }
 
 // Enables/disables the level dropdown depending on whether the selected monster
-// is a level-scaled Trial Monster or a fixed-stat custom preset.
+// is a level-scaled Trial Monster or a fixed-stat custom preset. In Trial Mode
+// the tier is frozen to T1 regardless of the selected monster.
 function syncEnemyLevelSelect() {
     const enemySelect = document.getElementById("enemySelect");
     const levelSelect = document.getElementById("enemyLevelSelect");
+
+    if (currentBattleMode === "trialMode") {
+        levelSelect.value = String(TRIAL_MIN_LEVEL);
+        levelSelect.disabled = true;
+        levelSelect.style.opacity = "0.5";
+        return;
+    }
+
     const isTrial = (enemySelect.value || "").startsWith("trial:");
     levelSelect.disabled = !isTrial;
     levelSelect.style.opacity = isTrial ? "1" : "0.5";
@@ -1070,6 +1607,45 @@ function switchTab(tabId) {
     });
 }
 
+function switchSubTab(subTabId) {
+    document.querySelectorAll(".subtabpanel").forEach((el) => {
+        el.style.display = el.id === subTabId ? "" : "none";
+    });
+    // Scope to import sub-tab buttons only (they carry data-subtab), so this
+    // doesn't fight the battle-mode tabs which reuse the .subtab visual class.
+    document.querySelectorAll(".subtab[data-subtab]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.subtab === subTabId);
+    });
+}
+
+// Battle-mode tabs (Single Boss / Trial Mode) inside the enemy card.
+// Trial Mode is the default.
+let currentBattleMode = "trialMode";
+function switchModeTab(modeTabId) {
+    currentBattleMode = modeTabId;
+    document.querySelectorAll(".modepanel").forEach((el) => {
+        el.style.display = el.id === modeTabId ? "" : "none";
+    });
+    document.querySelectorAll(".subtab[data-modetab]").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.modetab === modeTabId);
+    });
+
+    // Trial Mode always starts at T1 (L100) and escalates automatically, so the
+    // per-enemy tier selector is frozen to L100 and disabled while in that mode.
+    const levelSelect = document.getElementById("enemyLevelSelect");
+    const frozenNote = document.getElementById("trialTierFrozenNote");
+    if (modeTabId === "trialMode") {
+        levelSelect.value = String(TRIAL_MIN_LEVEL);
+        levelSelect.disabled = true;
+        levelSelect.style.opacity = "0.5";
+        if (frozenNote) frozenNote.style.display = "";
+    } else {
+        if (frozenNote) frozenNote.style.display = "none";
+        // Restore normal enable/disable behavior for the current enemy.
+        syncEnemyLevelSelect();
+    }
+}
+
 // ----------------------------------------------------------------- Run battle
 
 function runBattle() {
@@ -1105,28 +1681,282 @@ function runBattle() {
     window.__enemyNames = {};
     enemies.forEach((e) => (window.__enemyNames[e.custom.hrid] = e.custom.name));
 
-    worker.postMessage({
-        type: "start_battle",
-        players: playersToSim,
-        enemies: enemies,
-        timeCapSeconds: timeCapSeconds,
+    runBattleOnWorker({ players: playersToSim, enemies, timeCapSeconds })
+        .then((simResult) => {
+            document.getElementById("runBattle").disabled = false;
+            document.getElementById("battleStatus").textContent = "";
+            renderResult(simResult);
+        })
+        .catch((err) => {
+            document.getElementById("runBattle").disabled = false;
+            document.getElementById("battleStatus").textContent = "";
+            showError(t("simulationErrorPrefix") + err);
+        });
+}
+
+// Promise-based single-battle request. The worker runs one battle at a time, so
+// requests are serialized via a FIFO queue of pending resolvers. This lets Trial
+// Mode await tiers sequentially while single-boss keeps working unchanged.
+let pendingBattleResolvers = [];
+function runBattleOnWorker({ players, enemies, timeCapSeconds }) {
+    return new Promise((resolve, reject) => {
+        pendingBattleResolvers.push({ resolve, reject });
+        worker.postMessage({
+            type: "start_battle",
+            players,
+            enemies,
+            timeCapSeconds,
+        });
     });
 }
 
 worker.onmessage = function (event) {
     switch (event.data.type) {
-        case "battle_result":
-            document.getElementById("runBattle").disabled = false;
-            document.getElementById("battleStatus").textContent = "";
-            renderResult(event.data.simResult);
+        case "battle_result": {
+            let pending = pendingBattleResolvers.shift();
+            if (pending) pending.resolve(event.data.simResult);
             break;
-        case "simulation_error":
-            document.getElementById("runBattle").disabled = false;
-            document.getElementById("battleStatus").textContent = "";
-            showError(t("simulationErrorPrefix") + event.data.error);
+        }
+        case "simulation_error": {
+            let pending = pendingBattleResolvers.shift();
+            if (pending) pending.reject(event.data.error);
             break;
+        }
     }
 };
+
+// ---------------------------------------------------------------- Trial Mode -
+
+const TRIAL_MIN_LEVEL = 100;
+const TRIAL_MAX_LEVEL = 300;      // matches the level-select bound
+const TRIAL_LEVEL_STEP = 10;
+const trialModeState = { running: false };
+
+function tierLevel(tier) {
+    return TRIAL_MIN_LEVEL + TRIAL_LEVEL_STEP * (tier - 1);
+}
+function maxTier() {
+    return (TRIAL_MAX_LEVEL - TRIAL_MIN_LEVEL) / TRIAL_LEVEL_STEP + 1;
+}
+
+// Runs the current enemy group through escalating tiers (T1=L100, T2=L110, …)
+// until the group wipes, a tier ends inconclusively, or the total time budget
+// runs out. Players recover to full between tiers automatically (each battle
+// builds fresh Players from the DTO). Ignores the per-enemy level chosen when
+// building the group: every scaling enemy is re-leveled to the tier's level.
+async function runTrialMode() {
+    clearError();
+    if (trialModeState.running) return;
+
+    if (!importedPlayers.length) {
+        showError(t("importAtLeastOnePlayer"));
+        return;
+    }
+    if (!enemyGroup.length) {
+        showError(t("addAtLeastOneEnemy"));
+        return;
+    }
+    let scalingCount = enemyGroup.filter((e) => e.scaling).length;
+    if (!scalingCount) {
+        showError(t("trialNeedsScalingEnemy"));
+        return;
+    }
+    if (scalingCount < enemyGroup.length) {
+        // Non-scaling custom enemies won't escalate; warn but continue.
+        showError(t("trialHasStaticEnemies"));
+    }
+
+    let playersToSim = importedPlayers.map((p) => structuredClone(p.dto));
+    let totalBudgetSeconds = Number(document.getElementById("trialTimeCap").value) || 3600;
+
+    // Names for the result view (same maps the single-boss result uses).
+    window.__playerNames = {};
+    importedPlayers.forEach((p) => (window.__playerNames[p.dto.hrid] = p.name));
+
+    trialModeState.running = true;
+    let runBtn = document.getElementById("runTrial");
+    runBtn.disabled = true;
+
+    let remainingSeconds = totalBudgetSeconds;
+    let tiers = [];       // per-tier records
+    let stopReason = "completed"; // completed | defeat | timeout | ended
+
+    try {
+        for (let tier = 1; tier <= maxTier(); tier++) {
+            if (remainingSeconds <= 0) { stopReason = "timeout"; break; }
+
+            let level = tierLevel(tier);
+            document.getElementById("trialStatus").textContent =
+                t("trialRunningTier", { tier, level });
+
+            // Re-level scaling enemies to this tier; give each a unique hrid.
+            let enemies = enemyGroup.map((spec, i) => {
+                let copy = structuredClone(spec);
+                if (copy.scaling) copy.level = level;
+                copy.hrid = "/custom_monsters/e" + (i + 1) + "_" +
+                    (spec.name || "custom").toLowerCase().replace(/[^a-z0-9]+/g, "_");
+                return { custom: copy };
+            });
+
+            let simResult = await runBattleOnWorker({
+                players: playersToSim,
+                enemies,
+                timeCapSeconds: remainingSeconds,
+            });
+
+            let durationNs = simResult.battleDurationNs ?? simResult.simulatedTime ?? 0;
+            let durationSeconds = durationNs / 1e9;
+            remainingSeconds -= durationSeconds;
+
+            let wiped = (simResult.playerFinalState || [])
+                .filter((p) => p.currentHitpoints <= 0).length;
+
+            // Lowest surviving enemy HP fraction (the "last boss" health).
+            let enemyStates = simResult.enemyFinalState || [];
+            let bossHpFrac = null;
+            if (enemyStates.length) {
+                let alive = enemyStates.filter((e) => e.currentHitpoints > 0);
+                let ref = (alive.length ? alive : enemyStates)
+                    .reduce((a, b) => (a.maxHitpoints ? a.currentHitpoints / a.maxHitpoints : 0)
+                        <= (b.maxHitpoints ? b.currentHitpoints / b.maxHitpoints : 0) ? a : b);
+                bossHpFrac = ref.maxHitpoints ? ref.currentHitpoints / ref.maxHitpoints : 0;
+            }
+
+            tiers.push({
+                tier, level,
+                outcome: simResult.battleOutcome,
+                durationSeconds,
+                wiped,
+                totalPlayers: (simResult.playerFinalState || []).length,
+                bossHpFrac,
+                // Full battle result kept so clicking the tier row can show the
+                // same combat detail view the single-boss mode renders.
+                result: simResult,
+            });
+
+            renderTrialModeResult(tiers, null); // live progress
+
+            if (simResult.battleOutcome === "victory") {
+                continue; // advance to next tier
+            }
+            // defeat / timeout / ended -> stop the run
+            stopReason = simResult.battleOutcome;
+            break;
+        }
+        // Falling out of the loop with every tier won means the whole ladder
+        // was cleared; stopReason stays "completed".
+    } catch (err) {
+        showError(t("simulationErrorPrefix") + err);
+    } finally {
+        trialModeState.running = false;
+        runBtn.disabled = false;
+        document.getElementById("trialStatus").textContent = "";
+    }
+
+    renderTrialModeResult(tiers, stopReason);
+}
+
+function trialOutcomeLabel(outcome) {
+    switch (outcome) {
+        case "victory": return t("trialOutcomeVictory");
+        case "defeat": return t("trialOutcomeDefeat");
+        case "timeout": return t("trialOutcomeTimeout");
+        default: return t("trialOutcomeEnded");
+    }
+}
+
+// Renders the trial-mode summary + per-tier table. `stopReason` is null while
+// the run is still in progress.
+function renderTrialModeResult(tiers, stopReason) {
+    const container = document.getElementById("trialModeResult");
+    if (!tiers.length) { container.innerHTML = ""; return; }
+
+    let reached = tiers[tiers.length - 1];
+    let clearedThrough = tiers.filter((x) => x.outcome === "victory").length;
+
+    let headline;
+    if (stopReason === null) {
+        headline = t("trialInProgress", { tier: reached.tier, level: reached.level });
+    } else {
+        headline = t("trialReachedTier", {
+            tier: reached.tier, level: reached.level, cleared: clearedThrough,
+        });
+    }
+
+    let rows = tiers.map((x, i) => {
+        let bossHp = x.bossHpFrac == null ? "—"
+            : (x.outcome === "victory" ? "0%" : (x.bossHpFrac * 100).toFixed(1) + "%");
+        let wipeCls = x.wiped > 0 ? ' style="color:#ff6b6b;"' : "";
+        // Rows with a stored result are clickable to open the combat-detail modal.
+        let clickable = x.result ? ' class="trial-tier-row" data-tier-index="' + i + '" title="' + escapeHtml(t("clickForCombatDetails")) + '"' : "";
+        return `<tr${clickable}>
+            <td>T${x.tier}</td>
+            <td>L${x.level}</td>
+            <td>${escapeHtml(trialOutcomeLabel(x.outcome))}</td>
+            <td>${fmtTime(x.durationSeconds * 1e9)}</td>
+            <td${wipeCls}>${x.wiped} / ${x.totalPlayers}</td>
+            <td>${bossHp}</td>
+        </tr>`;
+    }).join("");
+
+    let lastBossNote = "";
+    if (stopReason && stopReason !== "completed" && reached.bossHpFrac != null &&
+        reached.outcome !== "victory") {
+        lastBossNote = `<p class="hint">${escapeHtml(t("trialLastBossHp", {
+            tier: reached.tier,
+            pct: (reached.bossHpFrac * 100).toFixed(1),
+        }))}</p>`;
+    }
+
+    container.innerHTML = `
+        <h4 style="margin:6px 0;">${escapeHtml(headline)}</h4>
+        ${lastBossNote}
+        <table class="tbl">
+            <thead><tr>
+                <th>${escapeHtml(t("trialColTier"))}</th>
+                <th>${escapeHtml(t("trialColLevel"))}</th>
+                <th>${escapeHtml(t("trialColOutcome"))}</th>
+                <th>${escapeHtml(t("trialColTime"))}</th>
+                <th>${escapeHtml(t("trialColWiped"))}</th>
+                <th>${escapeHtml(t("trialColBossHp"))}</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+    container.style.display = "block";
+
+    // Wire tier-row clicks to open the combat-detail modal for that tier.
+    container.querySelectorAll(".trial-tier-row").forEach((row) => {
+        row.addEventListener("click", () => {
+            let x = tiers[Number(row.dataset.tierIndex)];
+            if (x && x.result) openTrialResultModal(x);
+        });
+    });
+}
+
+// Combat-detail modal for one trial tier: renders the same content as the
+// single-boss result (summary + damage done/taken + combat log) into the
+// modal's own element IDs, so it's decoupled from the main result panel.
+let trialModalLog = [];
+function openTrialResultModal(tierRecord) {
+    let overlay = document.getElementById("trialResultModalOverlay");
+    let titleEl = document.getElementById("trialResultModalTitle");
+    titleEl.textContent = t("trialTierResultTitle", { tier: tierRecord.tier, level: tierRecord.level });
+
+    trialModalLog = tierRecord.result.battleLog || [];
+    // Reset the modal's log filter/search so each open starts clean.
+    document.getElementById("trialLogFilter").value = "all";
+    document.getElementById("trialLogSearch").value = "";
+
+    renderResult(tierRecord.result, false, IDS_MODAL);
+
+    overlay.style.display = "flex";
+    document.getElementById("trialResultModalClose").focus();
+}
+
+function closeTrialResultModal() {
+    let overlay = document.getElementById("trialResultModalOverlay");
+    if (overlay) overlay.style.display = "none";
+}
 
 // ------------------------------------------------------------------- Results
 
@@ -1147,11 +1977,27 @@ function fmtTime(ns) {
     return m > 0 ? `${m}m ${rem}s` : `${rem}s`;
 }
 
-function renderResult(result, scrollTo = true) {
-    const panel = document.getElementById("resultPanel");
-    panel.style.display = "block";
-    if (scrollTo) {
-        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+// Element IDs for the two result render targets: the main single-boss panel
+// (default) and the trial-tier modal. Passing IDS_MODAL lets renderResult and
+// its helpers draw the same content into the modal without duplicating logic.
+const IDS_MAIN = {
+    summary: "resultSummary", damageTotals: "damageTotals", damageTaken: "damageTaken",
+    combatLog: "combatLog", logCount: "logCount", logFilter: "logFilter", logSearch: "logSearch",
+    logHideAura: "logHideAura", logPlayer: "logPlayer",
+};
+const IDS_MODAL = {
+    summary: "trialResultSummary", damageTotals: "trialDamageTotals", damageTaken: "trialDamageTaken",
+    combatLog: "trialCombatLog", logCount: "trialLogCount", logFilter: "trialLogFilter", logSearch: "trialLogSearch",
+    logHideAura: "trialLogHideAura", logPlayer: "trialLogPlayer",
+};
+
+function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
+    if (ids === IDS_MAIN) {
+        const panel = document.getElementById("resultPanel");
+        panel.style.display = "block";
+        if (scrollTo) {
+            panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
     }
 
     const outcomeLabels = {
@@ -1186,16 +2032,19 @@ function renderResult(result, scrollTo = true) {
     }
     summary += "</tbody></table></div>";
 
-    document.getElementById("resultSummary").innerHTML = summary;
+    document.getElementById(ids.summary).innerHTML = summary;
 
     // Damage totals (per source) and damage taken (per target/player)
-    renderDamageTotals(result);
-    renderDamageTaken(result);
+    renderDamageTotals(result, ids);
+    renderDamageTaken(result, ids);
 
     // Combat log
-    window.__battleLog = result.battleLog || [];
-    window.__lastBattleResult = result;
-    renderLog();
+    if (ids === IDS_MAIN) {
+        window.__battleLog = result.battleLog || [];
+        window.__lastBattleResult = result;
+    }
+    populateLogPlayerSelect(ids, result.battleLog || []);
+    renderLog(ids, result.battleLog || []);
 }
 
 // Shared aggregator: groups attack log entries by a top-level key (source for
@@ -1233,9 +2082,11 @@ function accuracyPct(hits, misses) {
 
 // Renders an expandable damage table. rowIdPrefix must be unique per table
 // instance (e.g. "dmgdone", "dmgtaken") so both tables can be open at once.
-function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPrefix) {
+// showTitle=false omits the <h4> heading (used when the section already has a
+// collapsible <summary> providing the title, as in the trial modal).
+function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPrefix, showTitle = true) {
     let rows = Object.values(groups).sort((a, b) => b.dmg - a.dmg);
-    let html = `<h4>${escapeHtml(t(titleKey))}</h4><table class="tbl"><thead><tr>
+    let html = `${showTitle ? `<h4>${escapeHtml(t(titleKey))}</h4>` : ""}<table class="tbl"><thead><tr>
         <th>${escapeHtml(t("source"))}</th><th>${escapeHtml(t("totalDmg"))}</th>
         <th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
     </tr></thead><tbody>`;
@@ -1276,27 +2127,80 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
     });
 }
 
-function renderDamageTotals(result) {
+function renderDamageTotals(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let doneGroups = aggregateAttacks(result.battleLog, "source");
-    renderExpandableDamageTable("damageTotals", "damageDone", doneGroups, dur, "dmgdone");
+    // rowIdPrefix must be unique per container so both tables (and the modal's
+    // own tables) can be open simultaneously without colliding detail-row IDs.
+    // The modal wraps each section in its own <details> summary, so skip the h4.
+    renderExpandableDamageTable(ids.damageTotals, "damageDone", doneGroups, dur, ids.damageTotals + "_dd", ids === IDS_MAIN);
 }
 
-function renderDamageTaken(result) {
+function renderDamageTaken(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let takenGroups = aggregateAttacks(result.battleLog, "target");
-    renderExpandableDamageTable("damageTaken", "damageTaken", takenGroups, dur, "dmgtaken");
+    renderExpandableDamageTable(ids.damageTaken, "damageTaken", takenGroups, dur, ids.damageTaken + "_dt", ids === IDS_MAIN);
 }
 
-function renderLog() {
-    const filter = document.getElementById("logFilter").value;
-    const search = document.getElementById("logSearch").value.trim().toLowerCase();
-    const container = document.getElementById("combatLog");
-    let log = window.__battleLog || [];
+// The ability/source hrids carried by a log entry, used to detect aura info.
+function logEntryAbilityHrids(e) {
+    return [e.ability, e.healSource, e.manaSource, e.consumable].filter(Boolean);
+}
+
+// Does this entry involve an aura ability (cast, heal, mana, etc.)?
+function logEntryIsAura(e) {
+    return logEntryAbilityHrids(e).some((h) => AURA_ABILITY_HRIDS.has(h));
+}
+
+// The acting unit for an entry (attacker/caster), as "hrid|isPlayer", or null
+// if the entry has no single actor. Used for the "filter by player" dropdown.
+function logEntryActor(e) {
+    if (e.kind === "attack") return e.sourceIsPlayer ? e.source + "|1" : null;
+    if (e.unit != null && e.isPlayer) return e.unit + "|1";
+    return null;
+}
+
+// Rebuild the "filter by player" dropdown from the players that appear as
+// actors in the current log. Preserves the current selection if still valid.
+function populateLogPlayerSelect(ids, log) {
+    let sel = document.getElementById(ids.logPlayer);
+    if (!sel) return;
+    let prev = sel.value;
+
+    let seen = new Map(); // hrid -> name
+    for (const e of log) {
+        let actor = logEntryActor(e);
+        if (!actor) continue;
+        let hrid = actor.slice(0, -2); // strip "|1"
+        if (!seen.has(hrid)) seen.set(hrid, nameFor(hrid, true));
+    }
+
+    let opts = `<option value="all">${escapeHtml(t("logAllPlayers"))}</option>`;
+    for (const [hrid, name] of seen) {
+        opts += `<option value="${escapeHtml(hrid)}">${escapeHtml(name)}</option>`;
+    }
+    sel.innerHTML = opts;
+    // Restore prior selection if that player is still present.
+    if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
+}
+
+function renderLog(ids = IDS_MAIN, logOverride = null) {
+    const filter = document.getElementById(ids.logFilter).value;
+    const search = document.getElementById(ids.logSearch).value.trim().toLowerCase();
+    const hideAura = document.getElementById(ids.logHideAura)?.checked;
+    const playerSel = document.getElementById(ids.logPlayer);
+    const playerFilter = playerSel ? playerSel.value : "all";
+    const container = document.getElementById(ids.combatLog);
+    let log = logOverride !== null ? logOverride : (window.__battleLog || []);
 
     let lines = [];
     for (const e of log) {
         if (filter !== "all" && e.kind !== filter) continue;
+        if (hideAura && logEntryIsAura(e)) continue;
+        if (playerFilter !== "all") {
+            let actor = logEntryActor(e);
+            if (!actor || actor.slice(0, -2) !== playerFilter) continue;
+        }
         let line = formatLogEntry(e);
         if (search && !line.text.toLowerCase().includes(search)) continue;
         lines.push(line);
@@ -1304,6 +2208,7 @@ function renderLog() {
 
     if (!lines.length) {
         container.innerHTML = `<div class="empty">${escapeHtml(t("noLogEntriesMatch"))}</div>`;
+        document.getElementById(ids.logCount).textContent = 0;
         return;
     }
 
@@ -1317,7 +2222,7 @@ function renderLog() {
         html += `<div class="empty">${escapeHtml(t("moreEntriesHidden", { count: lines.length - CAP }))}</div>`;
     }
     container.innerHTML = html;
-    document.getElementById("logCount").textContent = lines.length;
+    document.getElementById(ids.logCount).textContent = lines.length;
 }
 
 // Translates an ability/consumable hrid to a display name via i18next
@@ -1431,14 +2336,55 @@ window.addEventListener("DOMContentLoaded", () => {
         btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
 
-    // Players
+    // Import sub-tabs (Group Builder / Paste JSON). Scope to [data-subtab] so
+    // this doesn't also fire for the battle-mode tabs, which share the .subtab
+    // visual class but carry data-modetab (that would call switchSubTab(undefined)
+    // and hide every .subtabpanel, including the Group Builder).
+    document.querySelectorAll(".subtab[data-subtab]").forEach((btn) => {
+        btn.addEventListener("click", () => switchSubTab(btn.dataset.subtab));
+    });
+
+    // Player detail modal: close via ✕, clicking the backdrop, or Esc.
+    document.getElementById("playerModalClose").addEventListener("click", closePlayerModal);
+    document.getElementById("playerModalOverlay").addEventListener("click", (ev) => {
+        if (ev.target.id === "playerModalOverlay") closePlayerModal();
+    });
+    document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") {
+            let overlay = document.getElementById("playerModalOverlay");
+            if (overlay && overlay.style.display !== "none") closePlayerModal();
+        }
+    });
+
+    // Players — Paste JSON sub-tab
     document.getElementById("importReplace").addEventListener("click", () => doImport(false));
     document.getElementById("importAppend").addEventListener("click", () => doImport(true));
-    document.getElementById("clearPlayers").addEventListener("click", () => {
+    const clearRoster = () => {
         importedPlayers = [];
         renderPlayerList();
+    };
+    document.getElementById("clearPlayers").addEventListener("click", clearRoster);
+    document.getElementById("clearPlayers2").addEventListener("click", clearRoster);
+
+    // Players — Group Builder sub-tab
+    document.getElementById("buildRoster").addEventListener("click", buildRoster);
+    document.getElementById("addJsonPreset").addEventListener("click", addJsonPreset);
+    document.getElementById("refreshEquipmentSets").addEventListener("click", refreshEquipmentSetPresets);
+    refreshEquipmentSetPresets(); // initial load from localStorage
+
+    // Predefined preset names are clickable to review the built-in roster.
+    document.querySelectorAll(".preset-review[data-role]").forEach((el) => {
+        el.title = t("clickForDetails");
+        el.addEventListener("click", () => {
+            let role = PREDEFINED_PRESETS.find((r) => r.key === el.dataset.role);
+            if (!role) return;
+            try {
+                openDetailModal(role.key, soloExportToDTO(role.export, "preset"));
+            } catch (e) {
+                showError(t("couldNotParseImport", { msg: e.message }));
+            }
+        });
     });
-    document.getElementById("importTestGroup").addEventListener("click", doTestImport);
 
     // Enemy group
     document.getElementById("addEnemy").addEventListener("click", addEnemy);
@@ -1462,10 +2408,36 @@ window.addEventListener("DOMContentLoaded", () => {
         renderEnemyGroup();
     });
 
+    // Battle mode tabs (Single Boss / Trial Mode)
+    document.querySelectorAll(".subtab[data-modetab]").forEach((btn) => {
+        btn.addEventListener("click", () => switchModeTab(btn.dataset.modetab));
+    });
+    // Apply the default mode (Trial) so the tier selector starts frozen.
+    switchModeTab(currentBattleMode);
+
     // Battle
     document.getElementById("runBattle").addEventListener("click", runBattle);
-    document.getElementById("logFilter").addEventListener("change", renderLog);
-    document.getElementById("logSearch").addEventListener("input", renderLog);
+    document.getElementById("runTrial").addEventListener("click", runTrialMode);
+    document.getElementById("logFilter").addEventListener("change", () => renderLog());
+    document.getElementById("logSearch").addEventListener("input", () => renderLog());
+    document.getElementById("logHideAura").addEventListener("change", () => renderLog());
+    document.getElementById("logPlayer").addEventListener("change", () => renderLog());
+
+    // Trial-tier result modal: log filter/search operate on the modal's own log.
+    document.getElementById("trialLogFilter").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
+    document.getElementById("trialLogSearch").addEventListener("input", () => renderLog(IDS_MODAL, trialModalLog));
+    document.getElementById("trialLogHideAura").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
+    document.getElementById("trialLogPlayer").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
+    document.getElementById("trialResultModalClose").addEventListener("click", closeTrialResultModal);
+    document.getElementById("trialResultModalOverlay").addEventListener("click", (ev) => {
+        if (ev.target.id === "trialResultModalOverlay") closeTrialResultModal();
+    });
+    document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") {
+            let ov = document.getElementById("trialResultModalOverlay");
+            if (ov && ov.style.display !== "none") closeTrialResultModal();
+        }
+    });
 
     // Presets
     document.getElementById("savePresetBtn").addEventListener("click", savePreset);

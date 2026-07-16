@@ -3982,6 +3982,35 @@ function resetImportInputs() {
     document.getElementById('inputSetSolo').value = '';
 }
 
+// Handoff from the Group Battle page: it stashes a solo-export under this
+// localStorage key and opens this page in a new tab. On load we consume the
+// key, fill the Solo import box, apply it to the active player, then clear it.
+const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
+function applyPendingSoloImport() {
+    let payload;
+    try {
+        payload = localStorage.getItem(SOLO_IMPORT_HANDOFF_KEY);
+    } catch (e) {
+        return;
+    }
+    if (!payload) return;
+
+    // Consume immediately so a reload doesn't re-import.
+    try { localStorage.removeItem(SOLO_IMPORT_HANDOFF_KEY); } catch (e) { /* ignore */ }
+
+    try {
+        // Validate it's JSON with a player before touching the form.
+        let parsed = JSON.parse(payload);
+        if (!parsed || !parsed.player) return;
+        document.getElementById("inputSetSolo").value = payload;
+        doSoloImport();
+        updateState();
+        updateUI();
+    } catch (e) {
+        console.log("Solo import handoff failed:", e);
+    }
+}
+
 function doGroupExport() {
     try {
         navigator.clipboard.writeText(JSON.stringify(playerDataMap)).then(() => alert("Current Group has been copied to clipboard."));
@@ -4833,3 +4862,6 @@ initHpMpVisualization();
 
 updateState();
 updateUI();
+
+// If the Group Battle page handed off a preset to import, apply it now.
+applyPendingSoloImport();
