@@ -152,8 +152,8 @@ class CombatUnit {
     };
     combatBuffs = {};
     permanentBuffs = {};
-    zoneBuffs = {};
-    extraBuffs = {};
+    zoneBuffs = [];
+    extraBuffs = [];
 
     constructor() { }
 
@@ -529,6 +529,7 @@ class CombatUnit {
             this.clearBuffs();
             // this.updateCombatDetails();
             this.resetCooldowns(currentTime);
+            this.lastLoggedEnrageStack = 0;
         } else {
             // 地下城团灭重开（仅玩家）：只移除过期buff，保留CD
             this.removeExpiredBuffs(currentTime);

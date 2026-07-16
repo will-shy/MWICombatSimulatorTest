@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MWI Group Battle Simulator</title>
+    <link rel="icon" href="data:," />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-http-backend/1.3.2/i18nextHttpBackend.min.js" integrity="sha512-6KSl9S4uqyiqhlImZ5pcEQKCU7Mk/nyr+nJQAZe9ZY9en6cUmQKG/b3v1Db/1fOiV5zdOjjwWQ/S90p7eDLxgA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="js/i18n.js"></script>
+    <style>
+        :root {
+            --bg: #1e1f24;
+            --panel: #2a2c33;
+            --panel2: #33353d;
+            --text: #e8e8ea;
+            --dim: #9aa0aa;
+            --accent: #5b9bd5;
+            --border: #3d404a;
+            --win: #4caf50;
+            --lose: #e05252;
+            --draw: #d4a13a;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        header {
+            padding: 14px 20px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        header h1 { font-size: 18px; margin: 0; }
+        header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+
+        header .header-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        /* The language switcher is injected by js/i18n.js as a fixed-position
+           element (top-right of the viewport). Re-anchor it into the header's
+           normal flow, next to the back-to-standard link, so it never overlaps
+           the title, and normalize both buttons to a consistent size. */
+        header .language-switcher {
+            position: static !important;
+            display: flex;
+            gap: 6px;
+        }
+        header .language-switcher button {
+            min-width: 64px;
+            padding: 5px 10px;
+            font-size: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--panel2);
+            color: var(--dim);
+        }
+        header .language-switcher button.btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            padding: 16px 20px;
+        }
+
+        @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .card h2 { font-size: 15px; margin: 0 0 12px; }
+        .card h4 { font-size: 13px; margin: 14px 0 6px; color: var(--dim); }
+
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+
+        select, input[type="number"], input[type="text"] {
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+        .row label { color: var(--dim); }
+
+        button {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 7px 14px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        button:hover { filter: brightness(1.1); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.secondary { background: var(--panel2); border: 1px solid var(--border); }
+
+        .btn-x {
+            background: transparent;
+            color: var(--lose);
+            padding: 2px 8px;
+            border: 1px solid var(--border);
+        }
+
+        .hint { color: var(--dim); font-size: 12px; margin: 6px 0; }
+
+        .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
+        .tbl th { color: var(--dim); font-weight: 600; }
+        .tbl tr.dead td { color: var(--lose); text-decoration: line-through; }
+        .tbl .src-player td:first-child { color: var(--accent); }
+        .tbl .src-enemy td:first-child { color: var(--draw); }
+        .name-edit { width: 130px; padding: 2px 4px; }
+
+        .empty { color: var(--dim); font-style: italic; padding: 8px 0; }
+
+        .scroll { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+
+        #errorBox {
+            display: none;
+            background: #4a1f1f;
+            border: 1px solid var(--lose);
+            color: #ffb3b3;
+            padding: 10px;
+            border-radius: 6px;
+            margin: 0 20px 8px;
+            white-space: pre-wrap;
+            font-size: 12px;
+        }
+
+        .outcome { font-weight: 700; font-size: 16px; }
+        .outcome.win { color: var(--win); }
+        .outcome.lose { color: var(--lose); }
+        .outcome.draw { color: var(--draw); }
+        .summary-row { margin-bottom: 8px; }
+        .final-states { display: inline-block; vertical-align: top; width: 48%; margin-right: 1%; }
+
+        #resultPanel { display: none; }
+
+        .log-controls { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+        #combatLog {
+            max-height: 520px;
+            overflow-y: auto;
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-line { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+        .log-time { color: var(--dim); display: inline-block; width: 72px; }
+        .l-player-atk { color: #cfe6ff; }
+        .l-enemy-atk { color: #ffd9c2; }
+        .l-miss { opacity: 0.6; }
+        .l-heal { color: #b6e6b6; }
+        .l-death { color: var(--lose); font-weight: 600; }
+        .l-consume { color: #d9c2ff; }
+        .l-mana { color: #9ec5fe; }
+        .l-buffcast { color: #ffe08a; }
+        .l-enrage { color: #ff6b6b; font-weight: bold; }
+        .dim { color: var(--dim); }
+        b { color: #fff; }
+
+        .tbl tr.expandable { cursor: pointer; }
+        .tbl tr.expandable:hover { background: rgba(91,155,213,0.08); }
+        .tbl tr.expandable td:first-child::before { content: "▸ "; color: var(--dim); }
+        .tbl tr.expandable.open td:first-child::before { content: "▾ "; color: var(--accent); }
+        .tbl tr.detail-row td { background: var(--panel2); padding: 0; }
+        .tbl tr.detail-row .detail-inner { padding: 8px 8px 8px 22px; }
+        .tbl .sub-tbl { width: 100%; font-size: 11px; }
+        .tbl .sub-tbl th, .tbl .sub-tbl td { border-bottom: 1px solid rgba(255,255,255,0.06); padding: 3px 6px; }
+
+        .tabbar {
+            display: flex;
+            gap: 4px;
+            padding: 0 20px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+        }
+        .tab {
+            background: transparent;
+            color: var(--dim);
+            border: none;
+            border-bottom: 2px solid transparent;
+            border-radius: 0;
+            padding: 10px 16px;
+        }
+        .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+        .tab:hover { filter: none; color: var(--text); }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 10px;
+        }
+        .preset-grid label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            color: var(--dim);
+            font-size: 12px;
+        }
+        .preset-grid input, .preset-grid select { width: 100%; }
+
+        .player-card {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            margin-bottom: 6px;
+            background: var(--panel2);
+        }
+        .player-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+        }
+        .player-head .pnum { color: var(--dim); min-width: 18px; text-align: right; font-size: 12px; }
+        .player-head .name-edit { flex: 1; }
+        .expand-btn {
+            background: transparent;
+            border: none;
+            color: var(--accent);
+            padding: 2px 6px;
+            font-size: 13px;
+        }
+        .expand-btn:hover { filter: none; }
+        .player-detail {
+            padding: 8px 12px 12px 34px;
+            border-top: 1px solid var(--border);
+        }
+        .detail-skills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+        .chip {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2px 10px;
+            font-size: 12px;
+        }
+        .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .detail-cols { grid-template-columns: 1fr; } }
+        .detail-cols h5 { margin: 0 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-abilities { margin: 0; padding-left: 18px; font-size: 12px; }
+        .detail-abilities li { padding: 1px 0; }
+        .ability-detail {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            background: var(--panel2);
+        }
+        .ability-detail .tbl { margin-top: 4px; }
+
+        .trial-card {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+        }
+        .trial-card:hover { border-color: var(--accent); }
+        .trial-card.active { border-color: var(--accent); background: rgba(91,155,213,0.12); }
+        .trial-card .tm-name { font-weight: 600; }
+        .trial-card .tm-meta { font-size: 12px; color: var(--dim); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .stat-tile {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .stat-tile .stat-label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+        .stat-tile .stat-value { font-size: 16px; font-weight: 600; }
+        .stat-tile.highlight { border-color: var(--accent); }
+
+        .rules-banner {
+            background: rgba(91,155,213,0.12);
+            border-bottom: 1px solid var(--accent);
+            font-size: 13px;
+        }
+        .rules-banner b { color: var(--accent); }
+        .rules-banner summary {
+            padding: 8px 20px;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .rules-banner summary::-webkit-details-marker { display: none; }
+        .rules-banner summary::before {
+            content: "▸";
+            color: var(--accent);
+            transition: transform 0.15s ease;
+        }
+        .rules-banner[open] summary::before { transform: rotate(90deg); }
+        .rules-banner ul {
+            margin: 0;
+            padding: 0 20px 10px 38px;
+            list-style: disc;
+        }
+        .rules-banner li { padding: 2px 0; }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator</h1>
+            <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
+        </div>
+    </header>
+
+    <details class="rules-banner">
+        <summary><b data-i18n="common:groupBattle.rulesBannerTitle">Group Battle Rules:</b></summary>
+        <ul>
+            <li data-i18n-html data-i18n="common:groupBattle.rulesBannerNoFoodDrink">No food or drink consumables are used — all players get a flat <b>+3 percentage points</b> added to HP regen and MP regen instead (e.g. 1% → 4%).</li>
+            <li data-i18n-html data-i18n="common:groupBattle.rulesBannerMonsterHp">Monster max HP is increased by <b>+1% per player</b> in the group.</li>
+            <li data-i18n-html data-i18n="common:groupBattle.rulesBannerEnrage">Monster <b>enrages after 10 minutes</b> in combat, then gains +10% damage and +10% accuracy for every additional 10 minutes alive (stacking up to +100%/+100% at 100 minutes).</li>
+        </ul>
+    </details>
+
+    <div class="tabbar">
+        <button class="tab active" data-tab="battleTab" data-i18n="common:groupBattle.tabBattle">Battle</button>
+        <button class="tab" data-tab="presetsTab" data-i18n="common:groupBattle.tabPresets">Monster Presets</button>
+    </div>
+
+    <div id="errorBox"></div>
+
+    <!-- ======================= BATTLE TAB ======================= -->
+    <div id="battleTab" class="tabpanel">
+    <div class="layout">
+        <!-- Players -->
+        <div class="card">
+            <h2>1. <span data-i18n="common:groupBattle.importPlayersTitle">Import Players</span> (<span id="playerCount">0</span>)</h2>
+            <p class="hint" data-i18n="common:groupBattle.importPlayersHint">
+                Paste player data exported from the main simulator (Import/Export → Solo export).
+                Accepts a single export, a JSON array of exports, newline-separated exports, or a group export.
+                Import as many as you like (10–50+). Note: food &amp; drinks are ignored in group battles — levels, equipment, and abilities are used.
+            </p>
+            <textarea id="importText" data-i18n-placeholder="common:groupBattle.importTextPlaceholder" placeholder='Paste one export, or a JSON array: [ {"player":{...},"food":{...},...}, {...} ]'></textarea>
+            <div class="row">
+                <button id="importReplace" data-i18n="common:groupBattle.importReplace">Import (replace)</button>
+                <button id="importAppend" class="secondary" data-i18n="common:groupBattle.importAppend">Import (append)</button>
+                <button id="clearPlayers" class="secondary" data-i18n="common:groupBattle.clearAll">Clear all</button>
+            </div>
+
+            <!-- Test Import -->
+            <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
+                <b data-i18n="common:groupBattle.testImportTitle">Test Import</b>
+            </div>
+            <p class="hint" data-i18n-html data-i18n="common:groupBattle.testImportHint">Load built-in test rosters by role. Food &amp; drinks are always stripped.</p>
+            <div class="row">
+                <label for="testCountRanger" data-i18n="common:groupBattle.testRanger">Ranger</label>
+                <input type="number" id="testCountRanger" value="10" min="0" max="50" style="width:60px;" />
+                <label for="testCountHealer" data-i18n="common:groupBattle.testHealer">Healer</label>
+                <input type="number" id="testCountHealer" value="5" min="0" max="50" style="width:60px;" />
+                <label for="testCountTank" data-i18n="common:groupBattle.testTank">Tank</label>
+                <input type="number" id="testCountTank" value="5" min="0" max="50" style="width:60px;" />
+                <label for="testCountSmash" data-i18n="common:groupBattle.testSmash">Smash</label>
+                <input type="number" id="testCountSmash" value="10" min="0" max="50" style="width:60px;" />
+            </div>
+            <div class="row">
+                <button id="importTestGroup" data-i18n="common:groupBattle.importTestGroup">Import Test Group (replace)</button>
+            </div>
+
+            <div id="playerList"></div>
+        </div>
+
+        <!-- Enemies -->
+        <div class="card">
+            <h2>2. <span data-i18n="common:groupBattle.buildEnemyGroupTitle">Build Enemy Group</span></h2>
+            <p class="hint" data-i18n-html data-i18n="common:groupBattle.buildEnemyGroupHint">Pick a monster and (for Trial Monsters) its level, then add it to the group. Max 20 enemies.
+                Build custom presets in the <b>Monster Presets</b> tab.</p>
+            <div class="row">
+                <select id="enemySelect" style="min-width: 220px;"></select>
+                <select id="enemyLevelSelect" style="width: 110px;"></select>
+                <input type="number" id="enemyCountToAdd" value="1" min="1" max="20" style="width:70px;" title="How many copies to add" />
+                <button id="addEnemy" data-i18n="common:groupBattle.add">Add</button>
+                <button id="previewEnemyBtn" class="secondary" data-i18n="common:groupBattle.preview">Preview</button>
+                <button id="clearEnemies" class="secondary" data-i18n="common:groupBattle.clearAllEnemies">Clear all enemies</button>
+            </div>
+            <div id="enemyPreviewPanel" style="display:none; margin-top:8px;">
+                <div class="row" style="justify-content:space-between; align-items:center;">
+                    <h4 style="margin:0;"><span data-i18n="common:groupBattle.previewTitlePrefix">Preview —</span> <span id="enemyPreviewName"></span></h4>
+                    <button id="closeEnemyPreviewBtn" class="secondary" data-i18n="common:groupBattle.close">x</button>
+                </div>
+                <div id="enemyPreviewStats"></div>
+            </div>
+            <div id="enemyGroup" class="scroll"></div>
+
+            <h2 style="margin-top:18px;">3. <span data-i18n="common:groupBattle.battleSettingsTitle">Battle Settings</span></h2>
+            <div class="row">
+                <label for="timeCap" data-i18n="common:groupBattle.timeCap">Time cap (seconds)</label>
+                <input type="number" id="timeCap" value="3600" min="10" max="86400" />
+                <span class="hint" data-i18n="common:groupBattle.timeCapHint">Battle ends when one side is wiped, or when this cap is reached.</span>
+            </div>
+            <div class="row" style="margin-top:14px;">
+                <button id="runBattle" data-i18n="common:groupBattle.runBattle">▶ Run Battle</button>
+                <span id="battleStatus" class="hint"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultPanel" class="layout" style="grid-template-columns: 1fr;">
+        <div class="card">
+            <h2 data-i18n="common:groupBattle.battleResultTitle">Battle Result</h2>
+            <div id="resultSummary"></div>
+            <div id="damageTotals"></div>
+            <div id="damageTaken"></div>
+        </div>
+        <div class="card">
+            <h2><span data-i18n="common:groupBattle.combatLogTitle">Combat Log</span> (<span id="logCount">0</span> <span data-i18n="common:groupBattle.entries">entries</span>)</h2>
+            <div class="log-controls">
+                <label for="logFilter" data-i18n="common:groupBattle.show">Show</label>
+                <select id="logFilter">
+                    <option value="all" data-i18n="common:groupBattle.logAllEvents">All events</option>
+                    <option value="attack" data-i18n="common:groupBattle.logAttacksOnly">Attacks only</option>
+                    <option value="heal" data-i18n="common:groupBattle.logHealsOnly">Heals only</option>
+                    <option value="manaGain" data-i18n="common:groupBattle.logManaGainsOnly">Mana gains only</option>
+                    <option value="buffCast" data-i18n="common:groupBattle.logBuffCastsOnly">Buff casts only</option>
+                    <option value="enrage" data-i18n="common:groupBattle.logEnrageOnly">Enrage only</option>
+                    <option value="death" data-i18n="common:groupBattle.logDeathsOnly">Deaths only</option>
+                    <option value="consumable" data-i18n="common:groupBattle.logConsumablesOnly">Consumables only</option>
+                </select>
+                <input type="text" id="logSearch" data-i18n-placeholder="common:groupBattle.searchPlaceholder" placeholder="Search (name, ability...)" style="min-width:220px;" />
+            </div>
+            <div id="combatLog"></div>
+        </div>
+    </div>
+    </div><!-- /battleTab -->
+
+    <!-- ======================= PRESETS TAB ======================= -->
+    <div id="presetsTab" class="tabpanel" style="display:none;">
+        <!-- Trial Monsters (built-in, level-scaled) -->
+        <div class="layout" style="grid-template-columns: 340px 1fr;">
+            <div class="card">
+                <h2 data-i18n="common:groupBattle.trialMonstersTitle">Trial Monsters</h2>
+                <p class="hint" data-i18n="common:groupBattle.trialMonstersHint">Built-in monsters that scale with level (T1 = L100 up to L300, step 10).
+                    Pick one and a level to preview its full status, then add it to the battle enemy group.</p>
+                <div id="trialMonsterList" class="scroll" style="max-height:520px;"></div>
+            </div>
+
+            <div class="card">
+                <h2><span data-i18n="common:groupBattle.statusPreviewTitle">Status Preview</span> — <span id="trialPreviewName">Trial Chameleon</span></h2>
+                <div class="row">
+                    <label for="trialLevel" data-i18n="common:groupBattle.level">Level</label>
+                    <select id="trialLevel"></select>
+                    <span class="hint" id="trialWeakPoints"></span>
+                </div>
+                <div id="trialStatusPreview"></div>
+                <div class="row" style="margin-top:10px;">
+                    <input type="number" id="trialCountToAdd" value="1" min="1" max="20" style="width:70px;" title="How many copies to add" />
+                    <button id="addTrialMonsterBtn" data-i18n="common:groupBattle.addToEnemyGroup">Add to Enemy Group →</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Paste importer + custom static presets -->
+        <div class="layout">
+            <div class="card">
+                <h2 data-i18n="common:groupBattle.importStatBlockTitle">Import from in-game stat block (custom, non-scaling)</h2>
+                <p class="hint" data-i18n="common:groupBattle.importStatBlockHint">
+                    For monsters NOT in the Trial Monsters list. Paste a stat block (label: value per line).
+                    Recognized labels: Combat Style, Damage Type, Attack Interval, Cast Speed, Ability Haste,
+                    Ranged/Magic/Stab/Slash/Smash Accuracy &amp; Damage, Max Hitpoints, Max Manapoints,
+                    Stab/Slash/Smash/Ranged/Magic Evasion, Armor, Water/Nature/Fire Resistance, Tenacity, Threat.
+                    Suffixes K/M and % are understood. "Defensive Damage" is a display-only value and is ignored.
+                    These presets are fixed at the stats you enter (no level scaling).
+                </p>
+                <div class="row">
+                    <label for="pasteName" data-i18n="common:groupBattle.presetName">Preset name</label>
+                    <input type="text" id="pasteName" data-i18n-placeholder="common:groupBattle.presetNamePlaceholder" placeholder="e.g. Custom Boss" style="min-width:220px;" />
+                </div>
+                <textarea id="pasteBlock" placeholder="Combat Style: Ranged&#10;Damage Type: Physical&#10;Attack Interval: 1.71s&#10;Max Hitpoints: 550K&#10;Ranged Accuracy: 506&#10;Ranged Damage: 385&#10;..."></textarea>
+                <div class="row">
+                    <button id="parsePasteBtn" data-i18n="common:groupBattle.parseAndFill">Parse &amp; fill editor →</button>
+                </div>
+            </div>
+
+            <!-- Saved presets -->
+            <div class="card">
+                <h2><span data-i18n="common:groupBattle.savedCustomPresetsTitle">Saved Custom Presets</span> (<span id="presetCount">0</span>)</h2>
+                <p class="hint" data-i18n="common:groupBattle.savedCustomPresetsHint">Presets are saved in your browser. Select one to edit, or add it to the battle enemy list.</p>
+                <div id="presetList" class="scroll"></div>
+            </div>
+        </div>
+
+        <!-- Editor -->
+        <div class="layout" style="grid-template-columns:1fr;">
+            <div class="card">
+                <h2 data-i18n="common:groupBattle.presetEditorTitle">Preset Editor</h2>
+                <div class="preset-grid">
+                    <label><span data-i18n="common:groupBattle.name">Name</span><input type="text" id="f_name" /></label>
+                    <label><span data-i18n="common:groupBattle.combatStyle">Combat Style</span>
+                        <select id="f_combatStyleHrid">
+                            <option value="/combat_styles/smash" data-i18n="combatStyleNames./combat_styles/smash">Smash</option>
+                            <option value="/combat_styles/slash" data-i18n="combatStyleNames./combat_styles/slash">Slash</option>
+                            <option value="/combat_styles/stab" data-i18n="combatStyleNames./combat_styles/stab">Stab</option>
+                            <option value="/combat_styles/ranged" data-i18n="combatStyleNames./combat_styles/ranged">Ranged</option>
+                            <option value="/combat_styles/magic" data-i18n="combatStyleNames./combat_styles/magic">Magic</option>
+                        </select>
+                    </label>
+                    <label><span data-i18n="common:groupBattle.damageType">Damage Type</span>
+                        <select id="f_damageType">
+                            <option value="/damage_types/physical" data-i18n="damageTypeNames./damage_types/physical">Physical</option>
+                            <option value="/damage_types/water" data-i18n="damageTypeNames./damage_types/water">Water</option>
+                            <option value="/damage_types/nature" data-i18n="damageTypeNames./damage_types/nature">Nature</option>
+                            <option value="/damage_types/fire" data-i18n="damageTypeNames./damage_types/fire">Fire</option>
+                        </select>
+                    </label>
+                    <label><span data-i18n="common:groupBattle.attackIntervalS">Attack Interval (s)</span><input type="number" step="0.01" id="f_attackIntervalSeconds" value="3" /></label>
+                    <label><span data-i18n="common:groupBattle.castSpeedPct">Cast Speed (%)</span><input type="number" step="0.1" id="f_castSpeed" value="0" /></label>
+                    <label><span data-i18n="common:groupBattle.abilityHaste">Ability Haste</span><input type="number" id="f_abilityHaste" value="0" /></label>
+
+                    <label><span data-i18n="common:groupBattle.accuracyActiveStyle">Accuracy (active style)</span><input type="number" id="f_accuracyRating" value="10" /></label>
+                    <label><span data-i18n="common:groupBattle.maxDamageActiveStyle">Max Damage (active style)</span><input type="number" id="f_maxDamage" value="10" /></label>
+
+                    <label><span data-i18n="common:groupBattle.maxHitpoints">Max Hitpoints</span><input type="number" id="f_maxHitpoints" value="110" /></label>
+                    <label><span data-i18n="common:groupBattle.maxManapoints">Max Manapoints</span><input type="number" id="f_maxManapoints" value="110" /></label>
+
+                    <label><span data-i18n="common:groupBattle.stabEvasion">Stab Evasion</span><input type="number" id="f_stabEvasion" value="10" /></label>
+                    <label><span data-i18n="common:groupBattle.slashEvasion">Slash Evasion</span><input type="number" id="f_slashEvasion" value="10" /></label>
+                    <label><span data-i18n="common:groupBattle.smashEvasion">Smash Evasion</span><input type="number" id="f_smashEvasion" value="10" /></label>
+                    <label><span data-i18n="common:groupBattle.rangedEvasion">Ranged Evasion</span><input type="number" id="f_rangedEvasion" value="10" /></label>
+                    <label><span data-i18n="common:groupBattle.magicEvasion">Magic Evasion</span><input type="number" id="f_magicEvasion" value="10" /></label>
+
+                    <label><span data-i18n="common:groupBattle.armor">Armor</span><input type="number" id="f_totalArmor" value="0" /></label>
+                    <label><span data-i18n="common:groupBattle.waterResistance">Water Resistance</span><input type="number" id="f_totalWaterResistance" value="0" /></label>
+                    <label><span data-i18n="common:groupBattle.natureResistance">Nature Resistance</span><input type="number" id="f_totalNatureResistance" value="0" /></label>
+                    <label><span data-i18n="common:groupBattle.fireResistance">Fire Resistance</span><input type="number" id="f_totalFireResistance" value="0" /></label>
+
+                    <label><span data-i18n="common:groupBattle.tenacity">Tenacity</span><input type="number" id="f_tenacity" value="0" /></label>
+                    <label><span data-i18n="common:groupBattle.threat">Threat</span><input type="number" id="f_threat" value="100" /></label>
+                </div>
+                <div class="row" style="margin-top:12px;">
+                    <button id="savePresetBtn" data-i18n="common:groupBattle.savePreset">Save preset</button>
+                    <button id="newPresetBtn" class="secondary" data-i18n="common:groupBattle.clearEditor">Clear editor</button>
+                    <span id="presetStatus" class="hint"></span>
+                </div>
+            </div>
+        </div>
+    </div><!-- /presetsTab -->
+
+    <script src="groupBattle.js" type="module"></script>
+    <script>
+        // js/i18n.js appends the language switcher to document.body as a
+        // fixed-position element. Move it into the header (right side) so it
+        // sits next to the title instead of floating over it.
+        (function relocateLanguageSwitcher() {
+            const header = document.querySelector("header");
+            const tryMove = () => {
+                const switcher = document.querySelector(".language-switcher");
+                if (switcher && header && switcher.parentElement !== header) {
+                    header.appendChild(switcher);
+                    return true;
+                }
+                return false;
+            };
+            if (tryMove()) return;
+            const observer = new MutationObserver(() => {
+                if (tryMove()) observer.disconnect();
+            });
+            observer.observe(document.body, { childList: true });
+        })();
+    </script>
+</body>
+
+</html>

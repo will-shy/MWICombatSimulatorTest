@@ -42,6 +42,12 @@ class CombatSimulator extends EventTarget {
         this.allPlayersDead = false;
         this.enableHpMpVisualization = options.enableHpMpVisualization || false;
 
+        // Battle mode: a single fixed encounter fought to completion, with a
+        // detailed combat log. Set via simulateBattle(). zone/labyrinth are null.
+        this.battleMode = false;
+        this.logEvents = !!options.logEvents;
+        this.fixedEnemies = options.fixedEnemies || null;
+
         this.wipeLogs = {
             buffer: new Array(200),
             index: 0,
@@ -258,15 +264,73 @@ class CombatSimulator extends EventTarget {
         return this.simResult;
     }
 
+    async simulateBattle(timeCap) {
+        this.battleMode = true;
+        this.logEvents = true;
+        this.reset();
+
+        let combatStartEvent = new CombatStartEvent(0);
+        this.eventQueue.addEvent(combatStartEvent);
+
+        this.battleOver = false;
+
+        while (!this.battleOver && this.simulationTime < timeCap) {
+            let nextEvent = this.eventQueue.getNextEvent();
+            if (!nextEvent) {
+                break;
+            }
+            await this.processEvent(nextEvent);
+        }
+
+        let enemiesAlive = this.enemies
+            ? this.enemies.some((e) => e && e.combatDetails.currentHitpoints > 0)
+            : false;
+        let playersAlive = this.players.some((p) => p.combatDetails.currentHitpoints > 0);
+
+        let outcome;
+        if (this.simulationTime >= timeCap) {
+            outcome = "timeout";
+        } else if (playersAlive && !enemiesAlive) {
+            outcome = "victory";
+        } else if (!playersAlive) {
+            outcome = "defeat";
+        } else {
+            outcome = "ended";
+        }
+
+        this.simResult.battleOutcome = outcome;
+        this.simResult.battleDurationNs = this.simulationTime;
+        this.simResult.simulatedTime = this.simulationTime;
+        this.simResult.playerSurvivors = this.players
+            .filter((p) => p.combatDetails.currentHitpoints > 0)
+            .map((p) => p.hrid);
+        this.simResult.playerFinalState = this.players.map((p) => ({
+            hrid: p.hrid,
+            currentHitpoints: p.combatDetails.currentHitpoints,
+            maxHitpoints: p.combatDetails.maxHitpoints,
+            currentManapoints: p.combatDetails.currentManapoints,
+            maxManapoints: p.combatDetails.maxManapoints,
+        }));
+        this.simResult.enemyFinalState = (this.fixedEnemies || []).map((e) => ({
+            hrid: e.hrid,
+            currentHitpoints: e.combatDetails.currentHitpoints,
+            maxHitpoints: e.combatDetails.maxHitpoints,
+        }));
+
+        return this.simResult;
+    }
+
     reset() {
         this.tempDungeonCount = 0;
         this.simulationTime = 0;
         this.eventQueue.clear();
         this.simResult = new SimResult(this.zone, this.labyrinth, this.players.length);
+        this.simResult.logEvents = this.logEvents;
     }
 
     async processEvent(event) {
         this.simulationTime = event.time;
+        this.simResult.currentTime = event.time;
 
         // console.log(this.simulationTime / 1e9, event.type, event);
 
@@ -376,7 +440,9 @@ class CombatSimulator extends EventTarget {
             }
         }
 
-        if (this.zone) {
+        if (this.battleMode) {
+            this.enemies = this.fixedEnemies;
+        } else if (this.zone) {
             if (!this.zone.isDungeon) {
                 this.enemies = this.zone.getRandomEncounter();
             } else {
@@ -662,7 +728,7 @@ class CombatSimulator extends EventTarget {
     }
 
     checkEncounterEnd() {
-        if (this.enemies) {
+        if (this.enemies && !this.battleMode) {
             let deadEnemies = this.enemies.filter((enemy) => enemy.combatDetails.currentHitpoints <= 0 && enemy.experienceRate == 0);
             if (deadEnemies.length > 0) {
                 deadEnemies.forEach(enemy => {
@@ -677,6 +743,19 @@ class CombatSimulator extends EventTarget {
         }
 
         let encounterEnded = false;
+
+        // Battle mode: single fight, no respawns. End as soon as one side is wiped.
+        if (this.battleMode) {
+            let enemiesAlive = this.enemies && this.enemies.some((e) => e.combatDetails.currentHitpoints > 0);
+            let playersAlive = this.players.some((p) => p.combatDetails.currentHitpoints > 0);
+            if (!enemiesAlive || !playersAlive) {
+                this.eventQueue.clearEventsOfType(AutoAttackEvent.type);
+                this.eventQueue.clearEventsOfType(AbilityCastEndEvent.type);
+                this.battleOver = true;
+                return true;
+            }
+            return false;
+        }
 
         if (this.enemies && !this.enemies.some((enemy) => enemy.combatDetails.currentHitpoints > 0)) {
             this.eventQueue.clearEventsOfType(AutoAttackEvent.type);
@@ -1005,6 +1084,11 @@ class CombatSimulator extends EventTarget {
 
             console.log(enemy.hrid, nowStack, " stack Enrage at ", (event.encounterTime / ONE_SECOND));
 
+            if (nowStack !== enemy.lastLoggedEnrageStack) {
+                enemy.lastLoggedEnrageStack = nowStack;
+                this.simResult.addEnrageStack(enemy, nowStack);
+            }
+
             const enrageDamageBuff = {
                     "uniqueHrid": "/buff_uniques/enrage_damage",
                     "typeHrid": "/buff_types/damage",
@@ -1296,6 +1380,7 @@ class CombatSimulator extends EventTarget {
                     let checkBuffExpirationEvent = new CheckBuffExpirationEvent(this.simulationTime + buff.duration, target);
                     this.eventQueue.addEvent(checkBuffExpirationEvent);
                 }
+                this.simResult.addBuffCast(source, ability, target);
             }
             return;
         }
@@ -1310,6 +1395,7 @@ class CombatSimulator extends EventTarget {
             let checkBuffExpirationEvent = new CheckBuffExpirationEvent(this.simulationTime + buff.duration, source);
             this.eventQueue.addEvent(checkBuffExpirationEvent);
         }
+        this.simResult.addBuffCast(source, ability, source);
     }
 
     processAbilityDamageEffect(source, ability, abilityEffect) {

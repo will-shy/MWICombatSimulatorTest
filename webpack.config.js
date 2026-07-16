@@ -2,10 +2,13 @@ const path = require('path');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
-  entry: './src/main.js',
+  entry: {
+    bundle: './src/main.js',
+    groupBattle: './src/groupBattle.js',
+  },
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.js',
+    filename: '[name].js',
     clean: true,
   },
   mode: 'development',
@@ -24,7 +27,8 @@ module.exports = {
         { from: path.resolve(__dirname, 'patchNote.json'), to: 'patchNote.json' },
         { from: path.resolve(__dirname, 'index.html'), to: 'index.html' }, // Correctly copy to dist/index.html
         { from: path.resolve(__dirname, 'js'), to: 'js' },
-        { from: path.resolve(__dirname, 'locales'), to: 'locales' }
+        { from: path.resolve(__dirname, 'locales'), to: 'locales' },
+        { from: path.resolve(__dirname, 'group-battle.html'), to: 'group-battle.html' },
       ],
     }),
   ],
