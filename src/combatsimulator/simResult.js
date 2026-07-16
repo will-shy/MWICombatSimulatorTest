@@ -21,9 +21,6 @@ class SimResult {
             "player5": false
         };
         this.playerRanOutOfManaTime = {};
-        // Count of ability casts blocked because the player lacked mana (OOM),
-        // keyed by player hrid. Surfaced per tier in the Group Battle UI.
-        this.playerOomCastCount = {};
         this.manaUsed = {};
         this.timeSpentAlive = [];
         this.bossSpawns = [];
@@ -343,11 +340,7 @@ class SimResult {
     }
 
     addRanOutOfManaCount(unit, isOutOfMana, time) {
-        if (isOutOfMana) {
-            this.playerRanOutOfMana[unit.hrid] = true;
-            // Each blocked cast attempt increments the OOM cast counter.
-            this.playerOomCastCount[unit.hrid] = (this.playerOomCastCount[unit.hrid] || 0) + 1;
-        }
+        if (isOutOfMana) this.playerRanOutOfMana[unit.hrid] = true;
 
         if (!this.playerRanOutOfManaTime[unit.hrid]) {
             this.playerRanOutOfManaTime[unit.hrid] = {isOutOfMana: false, startTimeForOutOfMana:0, totalTimeForOutOfMana:0};
