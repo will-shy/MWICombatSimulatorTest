@@ -9,11 +9,30 @@ import combatTriggerComparatorDetailMap from "./combatsimulator/data/combatTrigg
 import trialMonsterPresets from "./combatsimulator/data/trialMonsterPresets.js";
 import { deriveTrialMonsterStats } from "./combatsimulator/trialMonsterScaling.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
-import rangerExport from "./combatsimulator/data/testPlayers/ranger.json";
-import healerExport from "./combatsimulator/data/testPlayers/healer.json";
-import tankExport from "./combatsimulator/data/testPlayers/tank.json";
-import smashExport from "./combatsimulator/data/testPlayers/smash.json";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+
+// Auto-load every predefined preset from the testPlayers folder. Each JSON file
+// is one solo-export; the preset's display name is derived from the filename
+// (e.g. "bow_insanity.json" -> "Bow Insanity"). Adding a file there adds a
+// preset with no code change.
+const TEST_PLAYER_CTX = require.context(
+    "./combatsimulator/data/testPlayers", false, /\.json$/
+);
+function prettyPresetName(file) {
+    return file
+        .replace(/^\.\//, "").replace(/\.json$/, "")
+        .split(/[_-]+/)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+}
+// [{ key, id, export }], sorted by name for a stable UI order.
+const PREDEFINED_PRESETS = TEST_PLAYER_CTX.keys()
+    .map((file) => ({
+        key: prettyPresetName(file),
+        id: file.replace(/^\.\//, "").replace(/\.json$/, ""),
+        export: TEST_PLAYER_CTX(file),
+    }))
+    .sort((a, b) => a.key.localeCompare(b.key));
 
 const ONE_SECOND = 1e9;
 const PRESET_STORAGE_KEY = "mwiGroupBattleMonsterPresets";
@@ -25,6 +44,10 @@ let worker = new Worker(new URL("worker.js", import.meta.url));
 
 // Imported players: array of { name, dto }
 let importedPlayers = [];
+// OOM (out-of-mana blocked casts) totals from the most recent run, keyed by
+// player dto.hrid. Accumulated across all tiers in Trial Mode; single battle in
+// Single Boss. Shown as a badge on each roster card. Empty until a run happens.
+let rosterOom = {};
 // Enemy group: array of custom monster specs (spec objects).
 let enemyGroup = [];
 // Saved monster presets: array of spec objects.
@@ -300,13 +323,23 @@ function doImport(append) {
 
 const LS_EQUIPMENT_SETS_KEY = "equipmentSets";
 
-// Predefined presets are fixed; their count inputs live in the HTML.
-const PREDEFINED_PRESETS = [
-    { key: "Ranger", inputId: "testCountRanger", export: rangerExport },
-    { key: "Healer", inputId: "testCountHealer", export: healerExport },
-    { key: "Tank", inputId: "testCountTank", export: tankExport },
-    { key: "Smash", inputId: "testCountSmash", export: smashExport },
+// Default counts for the standard team, matched by a substring of the preset id
+// (filename). First matching rule wins; presets not matched default to 0.
+const PREDEFINED_DEFAULT_COUNTS = [
+    ["crossbow", 10], ["bow", 2], ["nature", 5], ["slash", 2],
+    ["wark", 3], ["water", 2], ["stab", 2], ["smash", 10],
 ];
+function defaultCountForPreset(id) {
+    let lc = id.toLowerCase();
+    for (const [needle, n] of PREDEFINED_DEFAULT_COUNTS) {
+        if (lc.includes(needle)) return n;
+    }
+    return 0;
+}
+
+// Per-preset chosen count, keyed by preset id (dynamic count inputs are rendered
+// by renderPredefinedPresets). Seeded from PREDEFINED_DEFAULT_COUNTS.
+let predefinedCounts = {};
 
 // User presets loaded from pasted JSON: { name, dto, count }.
 let jsonPresets = [];
@@ -383,6 +416,49 @@ function addJsonPreset() {
     renderUserPresetList();
 }
 
+// Render the predefined presets (auto-loaded from the testPlayers folder): each
+// a clickable name (opens the review modal) plus a count input. Counts persist
+// in predefinedCounts across re-renders.
+function renderPredefinedPresets() {
+    let container = document.getElementById("predefinedPresetList");
+    if (!container) return;
+    container.innerHTML = "";
+
+    PREDEFINED_PRESETS.forEach((role) => {
+        if (!(role.id in predefinedCounts)) predefinedCounts[role.id] = defaultCountForPreset(role.id);
+
+        let row = document.createElement("div");
+        row.className = "preset-row";
+
+        let name = document.createElement("span");
+        name.className = "preset-name preset-review";
+        name.textContent = role.key;
+        name.title = t("clickForDetails");
+        name.addEventListener("click", () => {
+            try {
+                openDetailModal(role.key, soloExportToDTO(role.export, "preset"));
+            } catch (e) {
+                showError(t("couldNotParseImport", { msg: e.message }));
+            }
+        });
+
+        let count = document.createElement("input");
+        count.type = "number";
+        count.min = "0";
+        count.max = "50";
+        count.value = predefinedCounts[role.id];
+        count.style.width = "60px";
+        count.title = t("presetCountTitle");
+        count.addEventListener("input", () => {
+            predefinedCounts[role.id] = Math.max(0, Number(count.value) || 0);
+        });
+
+        row.appendChild(name);
+        row.appendChild(count);
+        container.appendChild(row);
+    });
+}
+
 // Render the combined user-preset list (JSON presets + equipment set presets),
 // each row with an editable count and (for JSON presets) a remove button.
 function renderUserPresetList() {
@@ -452,6 +528,7 @@ function renderUserPresetList() {
 // Rebuild the entire roster from every preset's count (predefined + user).
 function buildRoster() {
     importedPlayers = [];
+    rosterOom = {}; // stale OOM from a prior run no longer applies
     let errors = [];
 
     const addCopies = (label, count, buildDto) => {
@@ -467,7 +544,7 @@ function buildRoster() {
     };
 
     for (const role of PREDEFINED_PRESETS) {
-        let count = Math.max(0, Number(document.getElementById(role.inputId).value) || 0);
+        let count = Math.max(0, Number(predefinedCounts[role.id]) || 0);
         addCopies(role.key, count, (hrid) => soloExportToDTO(role.export, hrid));
     }
     for (const preset of jsonPresets) {
@@ -479,6 +556,9 @@ function buildRoster() {
             (hrid) => ({ ...structuredClone(preset.dto), hrid }));
     }
 
+    // Auto-assign auras to the best-fit players (overrides their original aura).
+    assignAuras();
+
     renderPlayerList();
     if (errors.length) {
         showError(t("importedWithErrors", { count: errors.length, errors: errors.join("\n") }));
@@ -486,6 +566,61 @@ function buildRoster() {
         clearError();
     }
     document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// -------------------------------------------------------------- Aura assign ---
+// Each aura is carried by the roster member with the highest matching skill.
+// Priority order below is also the tie/assignment order: an assigned player is
+// excluded from later auras (one aura per player). The chosen aura OVERRIDES the
+// player's original aura ability (or takes an empty ability slot).
+const AURA_ASSIGNMENTS = [
+    { hrid: "/abilities/fierce_aura", inputId: "auraLvlFierce", skill: "attackLevel" },
+    { hrid: "/abilities/mystic_aura", inputId: "auraLvlMystic", skill: "magicLevel" },
+    { hrid: "/abilities/critical_aura", inputId: "auraLvlCrit", skill: "rangedLevel" },
+    { hrid: "/abilities/guardian_aura", inputId: "auraLvlGuardian", skill: "defenseLevel" },
+    { hrid: "/abilities/speed_aura", inputId: "auraLvlSpeed", skill: "meleeLevel" },
+];
+
+// Replace/insert an aura ability in a player's DTO ability list. Prefers to
+// overwrite the player's existing aura slot; else the first empty slot; else
+// slot 0. Ability slots are a fixed length-5 array of {hrid,level,triggers}|null.
+function setPlayerAura(dto, auraHrid, level) {
+    if (!Array.isArray(dto.abilities)) dto.abilities = [null, null, null, null, null];
+    let auraDto;
+    try {
+        auraDto = buildAbilityDTO(auraHrid, level, undefined);
+    } catch (e) {
+        return; // unknown aura hrid in this data set — skip
+    }
+    let idx = dto.abilities.findIndex((a) => a && AURA_ABILITY_HRIDS.has(a.hrid));
+    if (idx < 0) idx = dto.abilities.findIndex((a) => !a);
+    if (idx < 0) idx = 0;
+    dto.abilities[idx] = auraDto;
+}
+
+// Assign every configured aura to the best-fit, not-yet-assigned player.
+function assignAuras() {
+    if (!importedPlayers.length) return;
+    let assigned = new Set(); // roster indices already carrying an assigned aura
+
+    for (const aura of AURA_ASSIGNMENTS) {
+        let level = Number(document.getElementById(aura.inputId)?.value);
+        if (!Number.isFinite(level)) level = 30;
+
+        // Best unassigned player by the aura's skill.
+        let bestIdx = -1, bestSkill = -Infinity;
+        importedPlayers.forEach((p, i) => {
+            if (assigned.has(i)) return;
+            let s = Number(p.dto[aura.skill]) || 0;
+            if (s > bestSkill) { bestSkill = s; bestIdx = i; }
+        });
+        if (bestIdx < 0) break; // no players left to assign
+
+        setPlayerAura(importedPlayers[bestIdx].dto, aura.hrid, level);
+        assigned.add(bestIdx);
+        // Derived summary is cached by dto reference; invalidate for this player.
+        derivedSummaryCache.delete(importedPlayers[bestIdx].dto);
+    }
 }
 
 // Prefer the game's real translated item/ability name (i18next, loaded by
@@ -901,7 +1036,21 @@ function renderPlayerList() {
         .map((p, i) => ({ p, i, s: derivePlayerSummary(p.dto) }))
         .sort((a, b) => styleRank(a.s) - styleRank(b.s));
 
-    let html = '<div class="roster-grid">';
+    // Aura-count-by-type subtitle (only auras actually present in the roster).
+    let auraCounts = {};
+    for (const { s } of ordered) {
+        if (s.auraHrid) auraCounts[s.auraHrid] = (auraCounts[s.auraHrid] || 0) + 1;
+    }
+    let auraChips = Object.entries(auraCounts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([hrid, n]) =>
+            `<span class="aura-chip" style="--accent-aura:${auraColor(hrid)};">${escapeHtml(abilityName(hrid))} ×${n}</span>`)
+        .join("");
+    let html = auraChips
+        ? `<div class="roster-aura-summary"><span class="dim">${escapeHtml(t("aurasLabel"))}</span> ${auraChips}</div>`
+        : "";
+
+    html += '<div class="roster-grid">';
     ordered.forEach(({ p, i, s }) => {
         let accent = styleColor(s);
         let auraClass = s.auraHrid ? " has-aura" : "";
@@ -913,10 +1062,17 @@ function renderPlayerList() {
             ? `${escapeHtml(s.weaponName)}${s.weaponEnh ? " +" + s.weaponEnh : ""}`
             : `<span class="dim">${escapeHtml(t("noWeapon"))}</span>`;
 
+        // OOM badge (from the most recent run), keyed by this player's hrid.
+        let oom = rosterOom[p.dto.hrid] || 0;
+        let oomBadge = oom > 0
+            ? `<span class="rc-oom" title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))} ${oom}</span>`
+            : "";
+
         // Percentages are 100% at import (players start full); bars still convey
         // relative HP/MP magnitude via the numeric label.
         html += `<div class="roster-card${auraClass}" data-open="${i}" style="--accent-style:${accent};${auraVar}" title="${escapeHtml(t("clickForDetails"))}">
             <button class="rc-remove" data-remove="${i}" title="${escapeHtml(t("removePlayer"))}">✕</button>
+            ${oomBadge}
             <div class="rc-name">${escapeHtml(p.name)}</div>
             <div class="rc-weapon">${weaponLine}</div>
             ${auraName ? `<div class="rc-aura" style="color:${auraCol};">✦ ${escapeHtml(auraName)}</div>` : ""}
@@ -1685,7 +1841,10 @@ function runBattle() {
         .then((simResult) => {
             document.getElementById("runBattle").disabled = false;
             document.getElementById("battleStatus").textContent = "";
+            // OOM badges on roster cards reflect this single battle.
+            rosterOom = { ...(simResult.playerOomCastCount || {}) };
             renderResult(simResult);
+            renderPlayerList();
         })
         .catch((err) => {
             document.getElementById("runBattle").disabled = false;
@@ -1780,6 +1939,7 @@ async function runTrialMode() {
     let remainingSeconds = totalBudgetSeconds;
     let tiers = [];       // per-tier records
     let stopReason = "completed"; // completed | defeat | timeout | ended
+    rosterOom = {};       // reset per-player OOM totals for this run
 
     try {
         for (let tier = 1; tier <= maxTier(); tier++) {
@@ -1822,6 +1982,15 @@ async function runTrialMode() {
                 bossHpFrac = ref.maxHitpoints ? ref.currentHitpoints / ref.maxHitpoints : 0;
             }
 
+            // Total OOM (ability casts blocked by lack of mana) across all players.
+            let oomMap = simResult.playerOomCastCount || {};
+            let oomTotal = Object.values(oomMap).reduce((a, n) => a + (Number(n) || 0), 0);
+            // Accumulate per-player OOM across tiers for the roster-card badges.
+            for (const [hrid, n] of Object.entries(oomMap)) {
+                rosterOom[hrid] = (rosterOom[hrid] || 0) + (Number(n) || 0);
+            }
+            renderPlayerList(); // refresh card badges live as tiers complete
+
             tiers.push({
                 tier, level,
                 outcome: simResult.battleOutcome,
@@ -1829,6 +1998,7 @@ async function runTrialMode() {
                 wiped,
                 totalPlayers: (simResult.playerFinalState || []).length,
                 bossHpFrac,
+                oomTotal,
                 // Full battle result kept so clicking the tier row can show the
                 // same combat detail view the single-boss mode renders.
                 result: simResult,
@@ -1889,6 +2059,7 @@ function renderTrialModeResult(tiers, stopReason) {
         let wipeCls = x.wiped > 0 ? ' style="color:#ff6b6b;"' : "";
         // Rows with a stored result are clickable to open the combat-detail modal.
         let clickable = x.result ? ' class="trial-tier-row" data-tier-index="' + i + '" title="' + escapeHtml(t("clickForCombatDetails")) + '"' : "";
+        let oom = x.oomTotal || 0;
         return `<tr${clickable}>
             <td>T${x.tier}</td>
             <td>L${x.level}</td>
@@ -1896,6 +2067,7 @@ function renderTrialModeResult(tiers, stopReason) {
             <td>${fmtTime(x.durationSeconds * 1e9)}</td>
             <td${wipeCls}>${x.wiped} / ${x.totalPlayers}</td>
             <td>${bossHp}</td>
+            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${oom}</td>
         </tr>`;
     }).join("");
 
@@ -1919,6 +2091,7 @@ function renderTrialModeResult(tiers, stopReason) {
                 <th>${escapeHtml(t("trialColTime"))}</th>
                 <th>${escapeHtml(t("trialColWiped"))}</th>
                 <th>${escapeHtml(t("trialColBossHp"))}</th>
+                <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("trialColOom"))}</th>
             </tr></thead>
             <tbody>${rows}</tbody>
         </table>`;
@@ -2010,16 +2183,19 @@ function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
     let summary = `<div class="summary-row">${outcomeLabels[result.battleOutcome] || result.battleOutcome}</div>`;
     summary += `<div class="summary-row"><b>${escapeHtml(t("battleDuration"))}</b> ${fmtTime(result.battleDurationNs)}</div>`;
 
-    // Player final states
-    summary += `<div class="final-states"><h4>${escapeHtml(t("players"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th><th>${escapeHtml(t("mp"))}</th><th>${escapeHtml(t("deaths"))}</th></tr></thead><tbody>`;
+    // Player final states (incl. OOM = ability casts blocked by lack of mana)
+    let oomMap = result.playerOomCastCount || {};
+    summary += `<div class="final-states"><h4>${escapeHtml(t("players"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th><th>${escapeHtml(t("mp"))}</th><th>${escapeHtml(t("deaths"))}</th><th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th></tr></thead><tbody>`;
     for (const ps of result.playerFinalState || []) {
         let deaths = (result.deaths && result.deaths[ps.hrid]) || 0;
+        let oom = oomMap[ps.hrid] || 0;
         let dead = ps.currentHitpoints <= 0;
         summary += `<tr class="${dead ? "dead" : ""}">
             <td>${escapeHtml(nameFor(ps.hrid, true))}</td>
             <td>${Math.round(ps.currentHitpoints)}/${ps.maxHitpoints}</td>
             <td>${Math.round(ps.currentManapoints)}/${ps.maxManapoints}</td>
-            <td>${deaths}</td></tr>`;
+            <td>${deaths}</td>
+            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${oom}</td></tr>`;
     }
     summary += "</tbody></table></div>";
 
@@ -2321,6 +2497,7 @@ window.addEventListener("DOMContentLoaded", () => {
     // since translated strings baked into HTML at render time don't update
     // on their own the way data-i18n elements do.
     onLanguageChange(() => {
+        renderPredefinedPresets();
         renderPlayerList();
         renderEnemyGroup();
         renderPresetList();
@@ -2361,6 +2538,7 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("importAppend").addEventListener("click", () => doImport(true));
     const clearRoster = () => {
         importedPlayers = [];
+        rosterOom = {};
         renderPlayerList();
     };
     document.getElementById("clearPlayers").addEventListener("click", clearRoster);
@@ -2372,19 +2550,9 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("refreshEquipmentSets").addEventListener("click", refreshEquipmentSetPresets);
     refreshEquipmentSetPresets(); // initial load from localStorage
 
-    // Predefined preset names are clickable to review the built-in roster.
-    document.querySelectorAll(".preset-review[data-role]").forEach((el) => {
-        el.title = t("clickForDetails");
-        el.addEventListener("click", () => {
-            let role = PREDEFINED_PRESETS.find((r) => r.key === el.dataset.role);
-            if (!role) return;
-            try {
-                openDetailModal(role.key, soloExportToDTO(role.export, "preset"));
-            } catch (e) {
-                showError(t("couldNotParseImport", { msg: e.message }));
-            }
-        });
-    });
+    // Predefined presets (dynamic from testPlayers folder): render rows with
+    // clickable names + count inputs.
+    renderPredefinedPresets();
 
     // Enemy group
     document.getElementById("addEnemy").addEventListener("click", addEnemy);
