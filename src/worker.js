@@ -2,6 +2,27 @@ import CombatSimulator from "./combatsimulator/combatSimulator";
 import Player from "./combatsimulator/player";
 import Zone from "./combatsimulator/zone";
 import Labyrinth from "./combatsimulator/labyrinth";
+import Monster from "./combatsimulator/monster";
+import CustomMonster from "./combatsimulator/customMonster";
+import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+
+
+class SimulationManager {
+    constructor() {
+        this.simulations = [];
+        this.simResults;
+    }
+
+    addSimulation(sim) {
+        this.simulations.push(sim);
+    }
+
+    async startSimulations(simulationTimeLimit) {
+        const simulationPromises = this.simulations.map(simulation => simulation.simulate(simulationTimeLimit));
+        const results = await Promise.all(simulationPromises);
+        return results;
+    }
+}
 
 onmessage = async function (event) {
     switch (event.data.type) {
@@ -165,5 +186,79 @@ onmessage = async function (event) {
                 this.postMessage({ type: "simulation_error", error: e });
             }
             break;
+        case "start_battle": {
+            // Single fixed encounter fought to completion, with a detailed combat log.
+            // A real zone is still needed for zone buffs; default to a harmless combat zone.
+            const battleZoneHrid = event.data.zoneHrid || "/actions/combat/fly";
+            let battleZone = new Zone(battleZoneHrid);
+
+            let battlePlayers = [];
+            let battlePlayersData = event.data.players;
+            for (let i = 0; i < battlePlayersData.length; i++) {
+                let currentPlayer = Player.createFromDTO(structuredClone(battlePlayersData[i]));
+                currentPlayer.zoneBuffs = battleZone.buffs;
+                currentPlayer.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
+                battlePlayers.push(currentPlayer);
+            }
+
+            // Monster HP scales +1% per player in the group (see group-battle.html banner).
+            const hpMultiplier = 1 + 0.01 * battlePlayers.length;
+
+            let fixedEnemies = event.data.enemies.map((enemy) => {
+                if (enemy.custom) {
+                    let spec = Object.assign({}, enemy.custom, { hpMultiplier });
+                    return new CustomMonster(spec);
+                }
+                return new Monster(enemy.hrid, enemy.eliteTier || 0);
+            });
+
+            let timeCapNs = (event.data.timeCapSeconds || 3600) * 1e9;
+
+            let battleSimulator = new CombatSimulator(battlePlayers, battleZone, null, {
+                logEvents: true,
+                fixedEnemies: fixedEnemies,
+            });
+
+            try {
+                let battleResult = await battleSimulator.simulateBattle(timeCapNs);
+                this.postMessage({ type: "battle_result", simResult: battleResult });
+            } catch (e) {
+                console.log(e);
+                this.postMessage({ type: "simulation_error", error: e.toString() });
+            }
+            break;
+        }
+        case "start_simulation_all_zones": {
+            const simManager = new SimulationManager();
+            const zoneHrids = event.data.zones;
+            for (let i = 0; i < zoneHrids.length; i++) {
+                const zoneInstance = new Zone(zoneHrids[i]);
+                if (zoneInstance.monsterSpawnInfo.randomSpawnInfo.spawns) {
+                    let players = [];
+                    let playersData = event.data.players;
+                    for (let i = 0; i < playersData.length; i++) {
+                        let currentPlayer = Player.createFromDTO(structuredClone(playersData[i]));
+                        currentPlayer.zoneBuffs = zoneInstance.buffs;
+                        currentPlayer.extraBuffs = [];
+                        players.push(currentPlayer);
+                    }
+                    let simulation = new CombatSimulator(players, zoneInstance, null);
+                    if (i == 0) {
+                        simulation.addEventListener("progress", (event) => {
+                            this.postMessage({ type: "simulation_progress", progress: event.detail });
+                        });
+                    }
+                    simManager.addSimulation(simulation);
+                }
+            }
+            try {
+                const simResults = await simManager.startSimulations(event.data.simulationTimeLimit);
+                this.postMessage({ type: "simulation_result_allZones", simResults: simResults });
+            } catch (e) {
+                console.log(e);
+                this.postMessage({ type: "simulation_error", error: e });
+            }
+            break;
+        }
     }
 };

@@ -43,12 +43,24 @@ class SimResult {
         this.labyAttemptCount = 0;
 
         this.wipeEvents = [];
-        
+
         // 时间序列数据用于图表显示
         this.timeSeriesData = {
             timestamps: [],
             players: {}
         };
+
+        // Battle-mode detailed combat log. Only populated when logEvents is enabled.
+        this.logEvents = false;
+        this.battleLog = [];
+        this.currentTime = 0;
+    }
+
+    logEvent(entry) {
+        if (!this.logEvents) {
+            return;
+        }
+        this.battleLog.push({ time: this.currentTime, ...entry });
     }
 
     addWipeEvent(logs, simulationTime, wave) {
@@ -66,6 +78,12 @@ class SimResult {
         }
 
         this.deaths[unit.hrid] += 1;
+
+        this.logEvent({
+            kind: "death",
+            unit: unit.hrid,
+            isPlayer: !!unit.isPlayer,
+        });
     }
 
     updateTimeSpentAlive(name, alive, time) {
@@ -179,6 +197,18 @@ class SimResult {
         }
 
         this.attacks[source.hrid][target.hrid][ability][hit] += 1;
+
+        this.logEvent({
+            kind: "attack",
+            source: source.hrid,
+            sourceIsPlayer: !!source.isPlayer,
+            target: target.hrid,
+            targetIsPlayer: !!target.isPlayer,
+            ability: ability,
+            hit: hit, // number = damage, "miss" = missed
+            targetHpAfter: target.combatDetails.currentHitpoints,
+            targetMaxHp: target.combatDetails.maxHitpoints,
+        });
     }
 
     addConsumableUse(unit, consumable) {
@@ -190,6 +220,37 @@ class SimResult {
         }
 
         this.consumablesUsed[unit.hrid][consumable.hrid] += 1;
+
+        this.logEvent({
+            kind: "consumable",
+            unit: unit.hrid,
+            isPlayer: !!unit.isPlayer,
+            consumable: consumable.hrid,
+        });
+    }
+
+    // Buff-only ability casts (e.g. Provoke, Fierce Aura) never deal damage, so
+    // they never appear in the "attack" log entries addAttack() produces. This
+    // is the only trace of them in the combat log, mirroring addConsumableUse's
+    // shape so the log/UI can treat both as "unit used X" events.
+    addBuffCast(unit, ability, target) {
+        this.logEvent({
+            kind: "buffCast",
+            unit: unit.hrid,
+            isPlayer: !!unit.isPlayer,
+            ability: ability.hrid,
+            target: target.hrid,
+            targetIsPlayer: !!target.isPlayer,
+        });
+    }
+
+    addEnrageStack(unit, stack) {
+        this.logEvent({
+            kind: "enrage",
+            unit: unit.hrid,
+            isPlayer: !!unit.isPlayer,
+            stack: stack,
+        });
     }
 
     addHitpointsGained(unit, source, amount) {
@@ -201,6 +262,18 @@ class SimResult {
         }
 
         this.hitpointsGained[unit.hrid][source] += amount;
+
+        if (amount > 0) {
+            this.logEvent({
+                kind: "heal",
+                unit: unit.hrid,
+                isPlayer: !!unit.isPlayer,
+                healSource: source,
+                amount: amount,
+                targetHpAfter: unit.combatDetails.currentHitpoints,
+                targetMaxHp: unit.combatDetails.maxHitpoints,
+            });
+        }
     }
 
     addManapointsGained(unit, source, amount) {
@@ -212,6 +285,18 @@ class SimResult {
         }
 
         this.manapointsGained[unit.hrid][source] += amount;
+
+        if (amount > 0) {
+            this.logEvent({
+                kind: "manaGain",
+                unit: unit.hrid,
+                isPlayer: !!unit.isPlayer,
+                manaSource: source,
+                amount: amount,
+                targetMpAfter: unit.combatDetails.currentManapoints,
+                targetMaxMp: unit.combatDetails.maxManapoints,
+            });
+        }
     }
 
     setDropRateMultipliers(unit) {
