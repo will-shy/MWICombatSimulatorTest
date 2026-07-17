@@ -39,6 +39,7 @@ class Monster extends CombatUnit {
         for (let i = 0; i < gameMonster.dropTable.length; i++) {
             this.dropTable[i] = new Drops(gameMonster.dropTable[i].itemHrid, gameMonster.dropTable[i].dropRate, gameMonster.dropTable[i].minCount, gameMonster.dropTable[i].maxCount, gameMonster.dropTable[i].difficultyTier);
         }
+        if (gameMonster.rareDropTable)
         for (let i = 0; i < gameMonster.rareDropTable.length; i++) {
             let dropTableItem = (gameMonster.dropTable && i < gameMonster.dropTable.length) ? gameMonster.dropTable[i] : null;
             let difficultyTier = dropTableItem?.difficultyTier ?? gameMonster.rareDropTable[i].minDifficultyTier;

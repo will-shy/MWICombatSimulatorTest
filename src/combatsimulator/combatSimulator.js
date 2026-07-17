@@ -1082,8 +1082,6 @@ class CombatSimulator extends EventTarget {
                 return;
             }
 
-            console.log(enemy.hrid, nowStack, " stack Enrage at ", (event.encounterTime / ONE_SECOND));
-
             if (nowStack !== enemy.lastLoggedEnrageStack) {
                 enemy.lastLoggedEnrageStack = nowStack;
                 this.simResult.addEnrageStack(enemy, nowStack);
@@ -1712,7 +1710,7 @@ class CombatSimulator extends EventTarget {
             for (const target of targets.filter((unit) => unit && unit.combatDetails.currentHitpoints > 0)) {
                 let amountHealed = CombatUtilities.processHeal(source, abilityEffect, target);
 
-                this.simResult.addHitpointsGained(target, ability.hrid, amountHealed);
+                this.simResult.addHitpointsGained(target, ability.hrid, amountHealed, source);
             }
             return;
         }
@@ -1736,7 +1734,7 @@ class CombatSimulator extends EventTarget {
             if (healTarget) {
                 let amountHealed = CombatUtilities.processHeal(source, abilityEffect, healTarget);
 
-                this.simResult.addHitpointsGained(healTarget, ability.hrid, amountHealed);
+                this.simResult.addHitpointsGained(healTarget, ability.hrid, amountHealed, source);
             }
             return;
         }
@@ -1765,7 +1763,7 @@ class CombatSimulator extends EventTarget {
 
             let amountHealed = CombatUtilities.processRevive(source, abilityEffect, reviveTarget);
 
-            this.simResult.addHitpointsGained(reviveTarget, ability.hrid, amountHealed);
+            this.simResult.addHitpointsGained(reviveTarget, ability.hrid, amountHealed, source);
 
             this.addNextAttackEvent(reviveTarget);
 
