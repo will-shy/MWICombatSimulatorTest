@@ -256,7 +256,10 @@ class SimResult {
         });
     }
 
-    addHitpointsGained(unit, source, amount) {
+    // `healer` is the unit that produced the heal (the caster of an ability that
+    // heals an ally). Omit it for self-heals (regen, lifesteal, consumables,
+    // self-cast) - it then defaults to the healed unit itself.
+    addHitpointsGained(unit, source, amount, healer = null) {
         if (!this.hitpointsGained[unit.hrid]) {
             this.hitpointsGained[unit.hrid] = {};
         }
@@ -267,10 +270,13 @@ class SimResult {
         this.hitpointsGained[unit.hrid][source] += amount;
 
         if (amount > 0) {
+            let healerUnit = healer || unit;
             this.logEvent({
                 kind: "heal",
                 unit: unit.hrid,
                 isPlayer: !!unit.isPlayer,
+                healer: healerUnit.hrid,
+                healerIsPlayer: !!healerUnit.isPlayer,
                 healSource: source,
                 amount: amount,
                 targetHpAfter: unit.combatDetails.currentHitpoints,

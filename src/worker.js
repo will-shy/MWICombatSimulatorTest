@@ -3,7 +3,7 @@ import Player from "./combatsimulator/player";
 import Zone from "./combatsimulator/zone";
 import Labyrinth from "./combatsimulator/labyrinth";
 import Monster from "./combatsimulator/monster";
-import CustomMonster from "./combatsimulator/customMonster";
+import GroupBattleMonster from "./combatsimulator/groupBattleMonster";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
 
 
@@ -205,9 +205,15 @@ onmessage = async function (event) {
             const hpMultiplier = 1 + 0.01 * battlePlayers.length;
 
             let fixedEnemies = event.data.enemies.map((enemy) => {
-                if (enemy.custom) {
-                    let spec = Object.assign({}, enemy.custom, { hpMultiplier });
-                    return new CustomMonster(spec);
+                if (enemy.trial) {
+                    // Trial enemy: real game monster, scaled by roomLevel = its trial
+                    // level (100..300). uniqueHrid keeps duplicates (e.g. 2x Trial
+                    // Badger) as separate rows in the per-enemy result breakdown.
+                    return new GroupBattleMonster(enemy.hrid, enemy.level || 100, {
+                        hpMultiplier,
+                        uniqueHrid: enemy.uniqueHrid,
+                        displayName: enemy.name,
+                    });
                 }
                 return new Monster(enemy.hrid, enemy.eliteTier || 0);
             });

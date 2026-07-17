@@ -6,9 +6,9 @@ import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTriggerDependencyDetailMap.json";
 import combatTriggerConditionDetailMap from "./combatsimulator/data/combatTriggerConditionDetailMap.json";
 import combatTriggerComparatorDetailMap from "./combatsimulator/data/combatTriggerComparatorDetailMap.json";
-import trialMonsterPresets from "./combatsimulator/data/trialMonsterPresets.js";
+import combatMonsterDetailMap from "./combatsimulator/data/combatMonsterDetailMap.json";
 import monsterGroupsData from "./combatsimulator/data/monsterGroups.json";
-import { deriveTrialMonsterStats } from "./combatsimulator/trialMonsterScaling.js";
+import GroupBattleMonster from "./combatsimulator/groupBattleMonster.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
 
@@ -1221,19 +1221,20 @@ function reindexPlayers() {
 
 // ------------------------------------------------------------------- Enemies -
 
-// Trial monster lookup by hrid, so predefined groups can reference monsters by
-// their hrid (see monsterGroups.json) instead of an array index.
-const trialMonsterByHrid = {};
-trialMonsterPresets.forEach((m, i) => { trialMonsterByHrid[m.hrid] = i; });
+// Display name for a monster, straight from the game data.
+function monsterName(hrid) {
+    return combatMonsterDetailMap[hrid]?.name || hrid;
+}
 
 // Predefined enemy groups (from monsterGroups.json). Each group is a named set
-// of trial monsters with counts; selecting one adds every member to the enemy
-// group. Members whose hrid is unknown are dropped (defensive against typos).
+// of monsters (by game-data hrid) with counts; selecting one fills the enemy
+// group with every member. Members whose hrid is unknown are dropped (defensive
+// against typos in the JSON).
 const MONSTER_GROUPS = (monsterGroupsData.groups || []).map((g) => ({
     name: g.name,
     members: (g.members || [])
-        .filter((mem) => trialMonsterByHrid[mem.hrid] != null)
-        .map((mem) => ({ trialIndex: trialMonsterByHrid[mem.hrid], count: mem.count || 1 })),
+        .filter((mem) => combatMonsterDetailMap[mem.hrid] != null)
+        .map((mem) => ({ hrid: mem.hrid, count: mem.count || 1 })),
 }));
 
 // Refresh the "add enemy" dropdown. Lists every predefined monster group; each
@@ -1280,11 +1281,23 @@ function syncEnemyLevelSelect() {
     levelSelect.style.opacity = "1";
 }
 
-// Builds a level-scaled trial monster spec (as added to the enemy group).
-function trialSpecAtLevel(trialIndex, level) {
-    const m = trialMonsterPresets[trialIndex];
-    if (!m) return null;
-    return Object.assign({ scaling: true, level }, m);
+// A lightweight enemy spec (one enemy). The full combat stats live in the game
+// data (combatMonsterDetailMap); the sim rebuilds the real Monster from hrid +
+// level, so the spec only needs identity + level. `trial`/`scaling` mark it as a
+// level-scaled game monster (all group-battle enemies are).
+function trialSpecAtLevel(hrid, level) {
+    if (!combatMonsterDetailMap[hrid]) return null;
+    return { trial: true, scaling: true, hrid, level, name: monsterName(hrid) };
+}
+
+// Builds a real GroupBattleMonster at the given level and returns its derived
+// combatDetails + abilities. Used by the preview and the enemy-group HP column
+// so they show EXACTLY what the sim uses (no parallel stat formula). hpMult lets
+// the HP tiles reflect the +1%/player group scaling.
+function monsterDerived(hrid, level, hpMult = 1) {
+    const m = new GroupBattleMonster(hrid, level, { hpMultiplier: hpMult });
+    m.updateCombatDetails();
+    return { cd: m.combatDetails, abilities: m.abilities.filter(Boolean) };
 }
 
 // Resolves the currently selected monster group into a FLAT list of monster
@@ -1304,7 +1317,7 @@ function resolveSelectedEnemySpecs() {
     const level = Number(document.getElementById("enemyLevelSelect").value) || 100;
     const specs = [];
     for (const mem of g.members) {
-        const spec = trialSpecAtLevel(mem.trialIndex, level);
+        const spec = trialSpecAtLevel(mem.hrid, level);
         if (!spec) continue;
         for (let c = 0; c < mem.count; c++) specs.push(spec);
     }
@@ -1321,58 +1334,76 @@ function setEnemyGroupFromSelection() {
 }
 
 function enemyMaxHp(e) {
-    let base = e.scaling ? deriveTrialMonsterStats(e, e.level ?? 100).maxHitpoints : e.maxHitpoints;
-    return base * groupHpMultiplier();
+    return monsterDerived(e.hrid, e.level ?? 100, groupHpMultiplier()).cd.maxHitpoints;
 }
 
-// Builds the full stat-block HTML for a single level-scaled trial monster spec.
-// Returned as a string so the group preview can expand one member at a time.
+// Turns the enemy group into the payload the worker expects: one entry per enemy,
+// each tagged trial:true with its data hrid, level, and a UNIQUE hrid so multiple
+// copies of the same monster stay separate in the per-enemy result breakdown.
+// levelOverride re-levels every enemy (used by Trial Mode per tier). Also fills
+// window.__enemyNames so the result view can label rows.
+function buildWorkerEnemies(specs, levelOverride) {
+    window.__enemyNames = {};
+    return specs.map((spec, i) => {
+        let level = levelOverride ?? spec.level ?? 100;
+        let uniqueHrid = spec.hrid + "#" + (i + 1);
+        window.__enemyNames[uniqueHrid] = spec.name || monsterName(spec.hrid);
+        return { trial: true, hrid: spec.hrid, level, name: spec.name || monsterName(spec.hrid), uniqueHrid };
+    });
+}
+
+// Builds the full stat-block HTML for a single enemy spec ({ hrid, level }),
+// reading the derived combatDetails from a real GroupBattleMonster so the
+// preview matches exactly what the sim uses. Returned as a string so the group
+// preview can expand one member at a time.
 function enemySpecStatsHtml(spec) {
     const hpMult = groupHpMultiplier();
     const styles = ["stab", "slash", "smash", "ranged", "magic"];
+    const level = spec.level ?? 100;
+    const { cd, abilities } = monsterDerived(spec.hrid, level, hpMult);
+    const cs = cd.combatStats;
     let tiles = [];
-    let levelsHtml = "";
-    let abilitiesHtml = "";
 
-    {
-        const level = spec.level ?? 100;
-        const derived = deriveTrialMonsterStats(spec, level);
+    tiles.push([t("combatStyle"), combatStyleName(cs.combatStyleHrid)]);
+    tiles.push([t("damageType"), damageTypeName(cs.damageType)]);
+    tiles.push([t("attackInterval"), (cs.attackInterval / 1e9).toFixed(3) + "s"]);
+    tiles.push([t("abilityHaste"), Math.round(cs.abilityHaste || 0)]);
+    if (cs.castSpeed) tiles.push([t("castSpeed"), (cs.castSpeed * 100).toFixed(0) + "%"]);
+    tiles.push([t("maxHitpoints") + ` (x${importedPlayers.length} players, +${((hpMult - 1) * 100).toFixed(0)}%)`, fmtNum(cd.maxHitpoints), true]);
+    tiles.push([t("maxManapoints"), fmtNum(cd.maxManapoints)]);
+    tiles.push([t("tenacity"), Math.round(cs.tenacity || 0)]);
+    tiles.push([t("threat"), Math.round(cd.totalThreat || 100)]);
+    tiles.push([t("armor"), Math.round(cd.totalArmor)]);
+    tiles.push([t("waterResistance"), Math.round(cd.totalWaterResistance)]);
+    tiles.push([t("natureResistance"), Math.round(cd.totalNatureResistance)]);
+    tiles.push([t("fireResistance"), Math.round(cd.totalFireResistance)]);
 
-        tiles.push([t("combatStyle"), combatStyleName(spec.combatStyleHrid)]);
-        tiles.push([t("damageType"), damageTypeName(spec.damageType)]);
-        tiles.push([t("attackInterval"), spec.attackIntervalSeconds + "s"]);
-        tiles.push([t("abilityHaste"), spec.abilityHaste]);
-        if (spec.castSpeed) tiles.push([t("castSpeed"), (spec.castSpeed * 100) + "%"]);
-        tiles.push([t("maxHitpoints") + ` (x${importedPlayers.length} players, +${((hpMult - 1) * 100).toFixed(0)}%)`, fmtNum(derived.maxHitpoints * hpMult), true]);
-        tiles.push([t("maxManapoints"), fmtNum(derived.maxManapoints * hpMult)]);
-        tiles.push([t("tenacity"), spec.tenacity]);
-        tiles.push([t("threat"), 100]);
-        tiles.push([t("armor"), Math.round(derived.totalArmor)]);
-        tiles.push([t("waterResistance"), Math.round(derived.totalWaterResistance)]);
-        tiles.push([t("natureResistance"), Math.round(derived.totalNatureResistance)]);
-        tiles.push([t("fireResistance"), Math.round(derived.totalFireResistance)]);
-
-        for (const style of styles) {
-            if (spec.accuracyBonusPct && spec.accuracyBonusPct[style] != null) {
-                let styleLabel = combatStyleName("/combat_styles/" + style);
-                tiles.push([styleLabel + " " + t("accuracy"), Math.round(derived.accuracyRating[style]), true]);
-                tiles.push([styleLabel + " " + t("maxDamage"), Math.round(derived.maxDamage[style]), true]);
-            }
-        }
-        for (const style of styles) {
+    // Accuracy/damage: only surface the styles the monster actually has a bonus
+    // in (its active style), matching the previous behaviour. Detect via a
+    // non-baseline rating.
+    for (const style of styles) {
+        if ((cs[style + "Accuracy"] || 0) > 0 || (cs[style + "Damage"] || 0) > 0) {
             let styleLabel = combatStyleName("/combat_styles/" + style);
-            tiles.push([styleLabel + " " + t("evasion"), Math.round(derived.evasionRating[style])]);
+            tiles.push([styleLabel + " " + t("accuracy"), Math.round(cd[style + "AccuracyRating"]), true]);
+            tiles.push([styleLabel + " " + t("maxDamage"), Math.round(cd[style + "MaxDamage"]), true]);
         }
+    }
+    for (const style of styles) {
+        let styleLabel = combatStyleName("/combat_styles/" + style);
+        tiles.push([styleLabel + " " + t("evasion"), Math.round(cd[style + "EvasionRating"])]);
+    }
 
-        levelsHtml = `<h4>Levels</h4><div class="detail-skills">${levelTilesHtml(derived.levels)}</div>`;
-        if (spec.abilities && spec.abilities.length) {
-            abilitiesHtml = `<h4>${escapeHtml(t("abilities"))}</h4><div class="detail-skills">` +
-                spec.abilities.map((a) => `<span class="chip">${escapeHtml(a.name)} <span class="dim">L${a.baseLevel}</span></span>`).join("") +
-                "</div>";
-        }
-        if (spec.weakPoints) {
-            abilitiesHtml += `<p class="hint" style="margin-top:8px;">${escapeHtml(spec.weakPoints)}</p>`;
-        }
+    const levels = {
+        stamina: cd.staminaLevel, intelligence: cd.intelligenceLevel, attack: cd.attackLevel,
+        melee: cd.meleeLevel, defense: cd.defenseLevel, ranged: cd.rangedLevel, magic: cd.magicLevel,
+    };
+    let levelsHtml = `<h4>Levels</h4><div class="detail-skills">${levelTilesHtml(levels)}</div>`;
+
+    let abilitiesHtml = "";
+    if (abilities.length) {
+        abilitiesHtml = `<h4>${escapeHtml(t("abilities"))}</h4><div class="detail-skills">` +
+            abilities.map((a) => `<span class="chip">${escapeHtml(abilityOrItemName(a.hrid))} <span class="dim">L${a.level}</span></span>`).join("") +
+            "</div>";
     }
 
     return '<div class="stat-grid">' + tiles.map(([label, value, hi]) =>
@@ -1408,15 +1439,14 @@ function renderEnemyPreview() {
     // Clickable roster of the group's monsters. Each entry previews one monster;
     // the active one shows its full stat block below.
     let cardsHtml = '<div class="preview-member-list">' + g.members.map((mem, i) => {
-        const m = trialMonsterPresets[mem.trialIndex];
         const active = i === selectedPreviewMemberIndex ? " active" : "";
         return `<button type="button" class="preview-member${active}" data-previewmember="${i}">
-            ${escapeHtml(m.name)}${mem.count > 1 ? ` <span class="dim">x${mem.count}</span>` : ""}
+            ${escapeHtml(monsterName(mem.hrid))}${mem.count > 1 ? ` <span class="dim">x${mem.count}</span>` : ""}
         </button>`;
     }).join("") + "</div>";
 
     const activeMem = g.members[selectedPreviewMemberIndex];
-    const activeSpec = trialSpecAtLevel(activeMem.trialIndex, level);
+    const activeSpec = trialSpecAtLevel(activeMem.hrid, level);
     const statsHtml = enemySpecStatsHtml(activeSpec);
 
     const container = document.getElementById("enemyPreviewStats");
@@ -1440,9 +1470,10 @@ function renderEnemyGroup() {
     }
     let html = `<table class="tbl"><thead><tr><th>#</th><th>${escapeHtml(t("monster"))}</th><th>${escapeHtml(t("style"))}</th><th>${escapeHtml(t("level"))}</th><th>${escapeHtml(t("hp"))}</th><th></th></tr></thead><tbody>`;
     enemyGroup.forEach((e, i) => {
-        let style = combatStyleName(e.combatStyleHrid);
-        html += `<tr><td>${i + 1}</td><td>${escapeHtml(e.name || t("custom"))}</td><td>${escapeHtml(style)}</td>
-            <td>${e.scaling ? (e.level ?? 100) : "-"}</td>
+        let styleHrid = combatMonsterDetailMap[e.hrid]?.combatDetails?.combatStats?.combatStyleHrids?.[0];
+        let style = combatStyleName(styleHrid);
+        html += `<tr><td>${i + 1}</td><td>${escapeHtml(e.name || monsterName(e.hrid))}</td><td>${escapeHtml(style)}</td>
+            <td>${e.level ?? 100}</td>
             <td>${fmtNum(enemyMaxHp(e))}</td>
             <td><button class="btn-x" data-removeenemy="${i}">x</button></td></tr>`;
     });
@@ -1462,8 +1493,10 @@ function renderEnemyGroup() {
 const LEVEL_SKILL_ORDER = ["stamina", "intelligence", "attack", "melee", "defense", "ranged", "magic"];
 
 function levelTilesHtml(levels) {
+    // Levels come from labyrinthScaleFactor math (e.g. 100 * 2.2), which can carry
+    // float noise like 220.00000000000003 — round for display.
     return LEVEL_SKILL_ORDER
-        .map((k) => `<span class="chip">${escapeHtml(skillName("/skills/" + k))} <span class="dim">${levels[k]}</span></span>`)
+        .map((k) => `<span class="chip">${escapeHtml(skillName("/skills/" + k))} <span class="dim">${Math.round(levels[k] || 0)}</span></span>`)
         .join("");
 }
 
@@ -1544,17 +1577,8 @@ function runBattle() {
     document.getElementById("runBattle").disabled = true;
     document.getElementById("battleStatus").textContent = t("simulating");
 
-    // Each enemy entry is a custom monster spec; wrap so the worker builds a CustomMonster.
-    // Give each a unique hrid so multiple copies are tracked separately.
-    let enemies = enemyGroup.map((spec, i) => {
-        let copy = structuredClone(spec);
-        copy.hrid = "/custom_monsters/e" + (i + 1) + "_" + (spec.name || "custom").toLowerCase().replace(/[^a-z0-9]+/g, "_");
-        return { custom: copy };
-    });
-
-    // Remember enemy display names keyed by hrid for the result view.
-    window.__enemyNames = {};
-    enemies.forEach((e) => (window.__enemyNames[e.custom.hrid] = e.custom.name));
+    // Build the worker enemy payload (real game monsters, unique hrids per copy).
+    let enemies = buildWorkerEnemies(enemyGroup);
 
     runBattleOnWorker({ players: playersToSim, enemies, timeCapSeconds })
         .then((simResult) => {
@@ -1668,14 +1692,8 @@ async function runTrialMode() {
             document.getElementById("trialStatus").textContent =
                 t("trialRunningTier", { tier, level });
 
-            // Re-level scaling enemies to this tier; give each a unique hrid.
-            let enemies = enemyGroup.map((spec, i) => {
-                let copy = structuredClone(spec);
-                if (copy.scaling) copy.level = level;
-                copy.hrid = "/custom_monsters/e" + (i + 1) + "_" +
-                    (spec.name || "custom").toLowerCase().replace(/[^a-z0-9]+/g, "_");
-                return { custom: copy };
-            });
+            // Re-level every enemy to this tier's level; unique hrids per copy.
+            let enemies = buildWorkerEnemies(enemyGroup, level);
 
             let simResult = await runBattleOnWorker({
                 players: playersToSim,
@@ -1874,11 +1892,13 @@ function fmtTime(ns) {
 // its helpers draw the same content into the modal without duplicating logic.
 const IDS_MAIN = {
     summary: "resultSummary", damageTotals: "damageTotals", damageTaken: "damageTaken",
+    healingDone: "healingDone",
     combatLog: "combatLog", logCount: "logCount", logFilter: "logFilter", logSearch: "logSearch",
     logHideAura: "logHideAura", logPlayer: "logPlayer",
 };
 const IDS_MODAL = {
     summary: "trialResultSummary", damageTotals: "trialDamageTotals", damageTaken: "trialDamageTaken",
+    healingDone: "trialHealingDone",
     combatLog: "trialCombatLog", logCount: "trialLogCount", logFilter: "trialLogFilter", logSearch: "trialLogSearch",
     logHideAura: "trialLogHideAura", logPlayer: "trialLogPlayer",
 };
@@ -1929,9 +1949,11 @@ function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
 
     document.getElementById(ids.summary).innerHTML = summary;
 
-    // Damage totals (per source) and damage taken (per target/player)
+    // Damage totals (per source), damage taken (per target/player), and
+    // healing done (per healer/player).
     renderDamageTotals(result, ids);
     renderDamageTaken(result, ids);
+    renderHealingDone(result, ids);
 
     // Combat log
     if (ids === IDS_MAIN) {
@@ -2035,6 +2057,91 @@ function renderDamageTaken(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let takenGroups = aggregateAttacks(result.battleLog, "target");
     renderExpandableDamageTable(ids.damageTaken, "damageTaken", takenGroups, dur, ids.damageTaken + "_dt", ids === IDS_MAIN);
+}
+
+// Groups "heal" log entries by the healer (the caster), and within each healer
+// by the healing ability/source - so the Healing Done table can show a per-
+// player total and expand to show which abilities did the healing.
+function aggregateHeals(battleLog) {
+    let groups = {};
+    for (const entry of battleLog || []) {
+        if (entry.kind !== "heal") continue;
+        // Older logs may lack a healer field; fall back to the healed unit.
+        let hrid = entry.healer || entry.unit;
+        let isPlayer = entry.healer != null ? !!entry.healerIsPlayer : !!entry.isPlayer;
+        let key = hrid + "|" + isPlayer;
+
+        if (!groups[key]) {
+            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, healed: 0, count: 0, byAbility: {} };
+        }
+        let g = groups[key];
+        g.healed += entry.amount;
+        g.count += 1;
+
+        let abilityKey = entry.healSource;
+        if (!g.byAbility[abilityKey]) {
+            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), healed: 0, count: 0 };
+        }
+        let a = g.byAbility[abilityKey];
+        a.healed += entry.amount;
+        a.count += 1;
+    }
+    return groups;
+}
+
+// Renders an expandable healing table (parallel to renderExpandableDamageTable):
+// one row per healer with total healed / heal count / HPS, expandable to a per-
+// ability breakdown.
+function renderHealingDone(result, ids = IDS_MAIN) {
+    let dur = result.battleDurationNs / ONE_SECOND || 1;
+    let groups = aggregateHeals(result.battleLog);
+    let showTitle = ids === IDS_MAIN;
+    let rowIdPrefix = ids.healingDone + "_hd";
+    const container = document.getElementById(ids.healingDone);
+    if (!container) return;
+
+    let rows = Object.values(groups).sort((a, b) => b.healed - a.healed);
+    if (!rows.length) {
+        container.innerHTML = `${showTitle ? `<h4>${escapeHtml(t("healingDone"))}</h4>` : ""}<div class="empty">${escapeHtml(t("noHealingDone"))}</div>`;
+        return;
+    }
+
+    let html = `${showTitle ? `<h4>${escapeHtml(t("healingDone"))}</h4>` : ""}<table class="tbl"><thead><tr>
+        <th>${escapeHtml(t("healer"))}</th><th>${escapeHtml(t("totalHealed"))}</th>
+        <th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
+    </tr></thead><tbody>`;
+
+    rows.forEach((r, i) => {
+        let rowId = rowIdPrefix + i;
+        html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}" data-detail-toggle="${rowId}">
+            <td>${escapeHtml(r.name)}</td><td>${Math.round(r.healed).toLocaleString()}</td>
+            <td>${r.count}</td><td>${(r.healed / dur).toFixed(1)}</td></tr>`;
+
+        let abilityRows = Object.values(r.byAbility).sort((a, b) => b.healed - a.healed);
+        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="4"><div class="detail-inner">
+            <table class="sub-tbl"><thead><tr>
+                <th>${escapeHtml(t("abilities"))}</th><th>${escapeHtml(t("totalHealed"))}</th>
+                <th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
+            </tr></thead><tbody>`;
+        for (const a of abilityRows) {
+            html += `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.healed).toLocaleString()}</td>
+                <td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`;
+        }
+        html += "</tbody></table></div></td></tr>";
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+
+    container.querySelectorAll("[data-detail-toggle]").forEach((row) => {
+        row.addEventListener("click", () => {
+            let id = row.dataset.detailToggle;
+            let detail = document.getElementById("detailrow-" + id);
+            let open = detail.style.display !== "none";
+            detail.style.display = open ? "none" : "table-row";
+            row.classList.toggle("open", !open);
+        });
+    });
 }
 
 // The ability/source hrids carried by a log entry, used to detect aura info.

@@ -1,5 +1,5 @@
 {
-  "_comment": "Predefined enemy groups for Group Battle. Each group's members reference a trial monster by hrid (see trialMonsterPresets.js) with a count. Selecting a group in the Build Enemy Group section adds all members (count copies each) to the enemy group.",
+  "_comment": "Predefined enemy groups for Group Battle. Each group's members reference a monster by its game-data hrid (see combatMonsterDetailMap.json) with a count. Selecting a group in the Select Enemy Group section fills the enemy group with all members (count copies each).",
   "groups": [
     {
       "name": "Trial Badger",
