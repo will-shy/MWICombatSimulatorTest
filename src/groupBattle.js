@@ -7,6 +7,7 @@ import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTrigg
 import combatTriggerConditionDetailMap from "./combatsimulator/data/combatTriggerConditionDetailMap.json";
 import combatTriggerComparatorDetailMap from "./combatsimulator/data/combatTriggerComparatorDetailMap.json";
 import trialMonsterPresets from "./combatsimulator/data/trialMonsterPresets.js";
+import monsterGroupsData from "./combatsimulator/data/monsterGroups.json";
 import { deriveTrialMonsterStats } from "./combatsimulator/trialMonsterScaling.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
@@ -35,7 +36,6 @@ const PREDEFINED_PRESETS = TEST_PLAYER_CTX.keys()
     .sort((a, b) => a.key.localeCompare(b.key));
 
 const ONE_SECOND = 1e9;
-const PRESET_STORAGE_KEY = "mwiGroupBattleMonsterPresets";
 // Handoff key read by the original simulator (main.js) to auto-import a preset.
 // Must match SOLO_IMPORT_HANDOFF_KEY in src/main.js.
 const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
@@ -46,14 +46,10 @@ let worker = new Worker(new URL("worker.js", import.meta.url));
 let importedPlayers = [];
 // OOM (out-of-mana blocked casts) totals from the most recent run, keyed by
 // player dto.hrid. Accumulated across all tiers in Trial Mode; single battle in
-// Single Boss. Shown as a badge on each roster card. Empty until a run happens.
+// Single Tier. Shown as a badge on each roster card. Empty until a run happens.
 let rosterOom = {};
-// Enemy group: array of custom monster specs (spec objects).
+// Enemy group: array of monster specs (spec objects) to fight.
 let enemyGroup = [];
-// Saved monster presets: array of spec objects.
-let presets = [];
-// Index of the preset currently loaded in the editor, or -1 for a new one.
-let editingPresetIndex = -1;
 
 // ------------------------------------------------------------------ Import ---
 
@@ -879,9 +875,6 @@ function refreshHpDependentViews() {
     if (document.getElementById("enemyPreviewPanel").style.display !== "none") {
         renderEnemyPreview();
     }
-    if (selectedTrialMonsterIndex != null && document.getElementById("trialStatusPreview")) {
-        renderTrialPreview();
-    }
 }
 
 // The five real combat styles map to a color; magic is further split by damage
@@ -1228,25 +1221,31 @@ function reindexPlayers() {
 
 // ------------------------------------------------------------------- Enemies -
 
-// Refresh the "add enemy" dropdown from saved presets.
-// The enemy dropdown lists every Trial Monster preset, then every custom preset,
-// each option value tagged "trial:<i>" or "custom:<i>" so addEnemy() knows which
-// list + whether a level applies.
+// Trial monster lookup by hrid, so predefined groups can reference monsters by
+// their hrid (see monsterGroups.json) instead of an array index.
+const trialMonsterByHrid = {};
+trialMonsterPresets.forEach((m, i) => { trialMonsterByHrid[m.hrid] = i; });
+
+// Predefined enemy groups (from monsterGroups.json). Each group is a named set
+// of trial monsters with counts; selecting one adds every member to the enemy
+// group. Members whose hrid is unknown are dropped (defensive against typos).
+const MONSTER_GROUPS = (monsterGroupsData.groups || []).map((g) => ({
+    name: g.name,
+    members: (g.members || [])
+        .filter((mem) => trialMonsterByHrid[mem.hrid] != null)
+        .map((mem) => ({ trialIndex: trialMonsterByHrid[mem.hrid], count: mem.count || 1 })),
+}));
+
+// Refresh the "add enemy" dropdown. Lists every predefined monster group; each
+// option value is tagged "group:<i>" so the selection resolves to a group.
 function refreshEnemySelect() {
     const select = document.getElementById("enemySelect");
     select.innerHTML = "";
 
-    trialMonsterPresets.forEach((m, i) => {
+    MONSTER_GROUPS.forEach((g, i) => {
         let opt = document.createElement("option");
-        opt.value = "trial:" + i;
-        opt.textContent = m.name;
-        select.appendChild(opt);
-    });
-
-    presets.forEach((p, i) => {
-        let opt = document.createElement("option");
-        opt.value = "custom:" + i;
-        opt.textContent = p.name + " (" + t("custom") + ")";
+        opt.value = "group:" + i;
+        opt.textContent = g.name;
         select.appendChild(opt);
     });
 
@@ -1264,11 +1263,10 @@ function initEnemyLevelSelect() {
     }
 }
 
-// Enables/disables the level dropdown depending on whether the selected monster
-// is a level-scaled Trial Monster or a fixed-stat custom preset. In Trial Mode
-// the tier is frozen to T1 regardless of the selected monster.
+// Enables/disables the level dropdown. Every enemy is a level-scaled monster
+// group, so the level selector is always usable outside Trial Mode. In Trial
+// Mode the tier is frozen to T1 and escalates automatically.
 function syncEnemyLevelSelect() {
-    const enemySelect = document.getElementById("enemySelect");
     const levelSelect = document.getElementById("enemyLevelSelect");
 
     if (currentBattleMode === "trialMode") {
@@ -1278,47 +1276,47 @@ function syncEnemyLevelSelect() {
         return;
     }
 
-    const isTrial = (enemySelect.value || "").startsWith("trial:");
-    levelSelect.disabled = !isTrial;
-    levelSelect.style.opacity = isTrial ? "1" : "0.5";
+    levelSelect.disabled = false;
+    levelSelect.style.opacity = "1";
 }
 
-// Resolves the currently selected #enemySelect option into a monster spec.
-// Returns null (and shows an error) if nothing usable is selected. Shared by
-// addEnemy() and the enemy preview panel so both stay in sync.
-function resolveSelectedEnemySpec() {
+// Builds a level-scaled trial monster spec (as added to the enemy group).
+function trialSpecAtLevel(trialIndex, level) {
+    const m = trialMonsterPresets[trialIndex];
+    if (!m) return null;
+    return Object.assign({ scaling: true, level }, m);
+}
+
+// Resolves the currently selected monster group into a FLAT list of monster
+// specs (each spec = one enemy): every member, count copies each. Returns []
+// (and shows an error) if nothing usable is selected.
+function resolveSelectedEnemySpecs() {
     const value = document.getElementById("enemySelect").value;
     if (!value) {
         showError(t("selectMonsterFirst"));
-        return null;
+        return [];
     }
 
-    const [kind, idxStr] = value.split(":");
-    const idx = Number(idxStr);
+    const idx = Number(value.split(":")[1]);
+    const g = MONSTER_GROUPS[idx];
+    if (!g) { showError(t("unknownMonsterGroup")); return []; }
 
-    if (kind === "trial") {
-        const m = trialMonsterPresets[idx];
-        if (!m) { showError(t("unknownTrialMonster")); return null; }
-        const level = Number(document.getElementById("enemyLevelSelect").value) || 100;
-        return Object.assign({ scaling: true, level }, m);
+    const level = Number(document.getElementById("enemyLevelSelect").value) || 100;
+    const specs = [];
+    for (const mem of g.members) {
+        const spec = trialSpecAtLevel(mem.trialIndex, level);
+        if (!spec) continue;
+        for (let c = 0; c < mem.count; c++) specs.push(spec);
     }
-    const p = presets[idx];
-    if (!p) { showError(t("unknownCustomPreset")); return null; }
-    return p;
+    return specs;
 }
 
-function addEnemy() {
-    const count = Math.max(1, Number(document.getElementById("enemyCountToAdd").value) || 1);
-    const spec = resolveSelectedEnemySpec();
-    if (!spec) return;
-
-    for (let i = 0; i < count; i++) {
-        if (enemyGroup.length >= 20) {
-            showError(t("maxEnemiesError"));
-            break;
-        }
-        enemyGroup.push(structuredClone(spec));
-    }
+// Replaces the enemy group with the currently selected monster group. Called on
+// load (default = first group) and whenever the selection or level changes, so
+// the enemy group always mirrors the dropdown — there is no manual add step.
+function setEnemyGroupFromSelection() {
+    const specs = resolveSelectedEnemySpecs();
+    enemyGroup = specs.map((spec) => structuredClone(spec));
     renderEnemyGroup();
 }
 
@@ -1327,26 +1325,18 @@ function enemyMaxHp(e) {
     return base * groupHpMultiplier();
 }
 
-// Renders the full stat preview for the currently selected #enemySelect
-// monster (trial or custom) into the Build Enemy Group panel.
-function renderEnemyPreview() {
-    const spec = resolveSelectedEnemySpec();
-    const panel = document.getElementById("enemyPreviewPanel");
-    if (!spec) {
-        panel.style.display = "none";
-        return;
-    }
-
+// Builds the full stat-block HTML for a single level-scaled trial monster spec.
+// Returned as a string so the group preview can expand one member at a time.
+function enemySpecStatsHtml(spec) {
     const hpMult = groupHpMultiplier();
     const styles = ["stab", "slash", "smash", "ranged", "magic"];
     let tiles = [];
     let levelsHtml = "";
     let abilitiesHtml = "";
 
-    if (spec.scaling) {
+    {
         const level = spec.level ?? 100;
         const derived = deriveTrialMonsterStats(spec, level);
-        document.getElementById("enemyPreviewName").textContent = spec.name + " (L" + level + ")";
 
         tiles.push([t("combatStyle"), combatStyleName(spec.combatStyleHrid)]);
         tiles.push([t("damageType"), damageTypeName(spec.damageType)]);
@@ -1380,40 +1370,64 @@ function renderEnemyPreview() {
                 spec.abilities.map((a) => `<span class="chip">${escapeHtml(a.name)} <span class="dim">L${a.baseLevel}</span></span>`).join("") +
                 "</div>";
         }
-    } else {
-        document.getElementById("enemyPreviewName").textContent = spec.name || t("custom");
-
-        tiles.push([t("combatStyle"), combatStyleName(spec.combatStyleHrid)]);
-        tiles.push([t("damageType"), damageTypeName(spec.damageType)]);
-        tiles.push([t("attackInterval"), (spec.attackIntervalSeconds ?? 3) + "s"]);
-        tiles.push([t("abilityHaste"), spec.abilityHaste ?? 0]);
-        if (spec.castSpeed) tiles.push([t("castSpeed"), (spec.castSpeed * 100) + "%"]);
-        tiles.push([t("maxHitpoints") + ` (x${importedPlayers.length} players, +${((hpMult - 1) * 100).toFixed(0)}%)`, fmtNum((spec.maxHitpoints ?? 110) * hpMult), true]);
-        tiles.push([t("maxManapoints"), fmtNum((spec.maxManapoints ?? 110) * hpMult)]);
-        tiles.push([t("tenacity"), spec.tenacity ?? 0]);
-        tiles.push([t("threat"), spec.threat ?? 100]);
-        tiles.push([t("armor"), Math.round(spec.totalArmor ?? 0)]);
-        tiles.push([t("waterResistance"), Math.round(spec.totalWaterResistance ?? 0)]);
-        tiles.push([t("natureResistance"), Math.round(spec.totalNatureResistance ?? 0)]);
-        tiles.push([t("fireResistance"), Math.round(spec.totalFireResistance ?? 0)]);
-
-        let activeStyle = (spec.combatStyleHrid || "/combat_styles/smash").split("/").pop();
-        let styleLabel = combatStyleName(spec.combatStyleHrid);
-        tiles.push([styleLabel + " " + t("accuracy"), spec.accuracyRating ?? 10, true]);
-        tiles.push([styleLabel + " " + t("maxDamage"), spec.maxDamage ?? 10, true]);
-
-        tiles.push([t("stabEvasion"), spec.stabEvasion ?? 10]);
-        tiles.push([t("slashEvasion"), spec.slashEvasion ?? 10]);
-        tiles.push([t("smashEvasion"), spec.smashEvasion ?? 10]);
-        tiles.push([t("rangedEvasion"), spec.rangedEvasion ?? 10]);
-        tiles.push([t("magicEvasion"), spec.magicEvasion ?? 10]);
+        if (spec.weakPoints) {
+            abilitiesHtml += `<p class="hint" style="margin-top:8px;">${escapeHtml(spec.weakPoints)}</p>`;
+        }
     }
 
-    let html = '<div class="stat-grid">' + tiles.map(([label, value, hi]) =>
+    return '<div class="stat-grid">' + tiles.map(([label, value, hi]) =>
         `<div class="stat-tile${hi ? " highlight" : ""}"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(String(value))}</div></div>`
     ).join("") + "</div>" + levelsHtml + abilitiesHtml;
+}
 
-    document.getElementById("enemyPreviewStats").innerHTML = html;
+// Which member of the currently previewed group is expanded. Reset whenever the
+// preview is (re)opened.
+let selectedPreviewMemberIndex = 0;
+
+// Renders the stat preview for the currently selected monster group into the
+// Build Enemy Group panel: a clickable list of the group's monsters, with the
+// active one's full stat block expanded below.
+function renderEnemyPreview() {
+    const value = document.getElementById("enemySelect").value;
+    const panel = document.getElementById("enemyPreviewPanel");
+    if (!value) {
+        showError(t("selectMonsterFirst"));
+        panel.style.display = "none";
+        return;
+    }
+
+    const idx = Number(value.split(":")[1]);
+    const g = MONSTER_GROUPS[idx];
+    if (!g) { showError(t("unknownMonsterGroup")); panel.style.display = "none"; return; }
+    const level = Number(document.getElementById("enemyLevelSelect").value) || 100;
+
+    document.getElementById("enemyPreviewName").textContent = g.name + " (L" + level + ")";
+
+    if (selectedPreviewMemberIndex >= g.members.length) selectedPreviewMemberIndex = 0;
+
+    // Clickable roster of the group's monsters. Each entry previews one monster;
+    // the active one shows its full stat block below.
+    let cardsHtml = '<div class="preview-member-list">' + g.members.map((mem, i) => {
+        const m = trialMonsterPresets[mem.trialIndex];
+        const active = i === selectedPreviewMemberIndex ? " active" : "";
+        return `<button type="button" class="preview-member${active}" data-previewmember="${i}">
+            ${escapeHtml(m.name)}${mem.count > 1 ? ` <span class="dim">x${mem.count}</span>` : ""}
+        </button>`;
+    }).join("") + "</div>";
+
+    const activeMem = g.members[selectedPreviewMemberIndex];
+    const activeSpec = trialSpecAtLevel(activeMem.trialIndex, level);
+    const statsHtml = enemySpecStatsHtml(activeSpec);
+
+    const container = document.getElementById("enemyPreviewStats");
+    container.innerHTML = cardsHtml + `<h4 style="margin-top:10px;">${escapeHtml(activeSpec.name)}</h4>` + statsHtml;
+    container.querySelectorAll("[data-previewmember]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            selectedPreviewMemberIndex = Number(btn.dataset.previewmember);
+            renderEnemyPreview();
+        });
+    });
+
     panel.style.display = "block";
     clearError();
 }
@@ -1443,28 +1457,7 @@ function renderEnemyGroup() {
     });
 }
 
-// ------------------------------------------------------------- Trial Monsters -
-
-let selectedTrialMonsterIndex = 0;
-
-function renderTrialMonsterList() {
-    const container = document.getElementById("trialMonsterList");
-    let html = "";
-    trialMonsterPresets.forEach((m, i) => {
-        html += `<div class="trial-card ${i === selectedTrialMonsterIndex ? "active" : ""}" data-trial="${i}">
-            <div class="tm-name">${escapeHtml(m.name)}</div>
-            <div class="tm-meta">${escapeHtml(combatStyleName(m.combatStyleHrid))} · ${escapeHtml(damageTypeName(m.damageType))}${m.spawnCount > 1 ? " · x" + m.spawnCount + " " + escapeHtml(t("perEncounter")) : ""}</div>
-        </div>`;
-    });
-    container.innerHTML = html;
-    container.querySelectorAll("[data-trial]").forEach((el) => {
-        el.addEventListener("click", () => {
-            selectedTrialMonsterIndex = Number(el.dataset.trial);
-            renderTrialMonsterList();
-            renderTrialPreview();
-        });
-    });
-}
+// ------------------------------------------------------- Monster stat helpers -
 
 const LEVEL_SKILL_ORDER = ["stamina", "intelligence", "attack", "melee", "defense", "ranged", "magic"];
 
@@ -1472,17 +1465,6 @@ function levelTilesHtml(levels) {
     return LEVEL_SKILL_ORDER
         .map((k) => `<span class="chip">${escapeHtml(skillName("/skills/" + k))} <span class="dim">${levels[k]}</span></span>`)
         .join("");
-}
-
-function initTrialLevelSelect() {
-    const select = document.getElementById("trialLevel");
-    select.innerHTML = "";
-    for (let lvl = 100; lvl <= 300; lvl += 10) {
-        let opt = document.createElement("option");
-        opt.value = String(lvl);
-        opt.textContent = "L" + lvl + " (T" + ((lvl - 100) / 10 + 1) + ")";
-        select.appendChild(opt);
-    }
 }
 
 // Monster HP scales +1% per player currently imported (see worker.js's
@@ -1493,274 +1475,11 @@ function groupHpMultiplier() {
     return 1 + 0.01 * importedPlayers.length;
 }
 
-function renderTrialPreview() {
-    const m = trialMonsterPresets[selectedTrialMonsterIndex];
-    const level = Number(document.getElementById("trialLevel").value) || 100;
-    const derived = deriveTrialMonsterStats(m, level);
-    const hpMult = groupHpMultiplier();
-
-    document.getElementById("trialPreviewName").textContent = m.name + " (L" + level + ")";
-    // weakPoints is free-form gameplay-tip text authored only in English in
-    // trialMonsterPresets.js; not translated (would need its own CN copy).
-    document.getElementById("trialWeakPoints").textContent = m.weakPoints || "";
-
-    let styles = ["stab", "slash", "smash", "ranged", "magic"];
-
-    let tiles = [];
-    tiles.push([t("combatStyle"), combatStyleName(m.combatStyleHrid)]);
-    tiles.push([t("damageType"), damageTypeName(m.damageType)]);
-    tiles.push([t("attackInterval"), m.attackIntervalSeconds + "s"]);
-    tiles.push([t("abilityHaste"), m.abilityHaste]);
-    if (m.castSpeed) tiles.push([t("castSpeed"), (m.castSpeed * 100) + "%"]);
-    tiles.push([t("maxHitpoints") + ` (x${importedPlayers.length} players, +${((hpMult - 1) * 100).toFixed(0)}%)`, fmtNum(derived.maxHitpoints * hpMult), true]);
-    tiles.push([t("maxManapoints"), fmtNum(derived.maxManapoints * hpMult)]);
-    tiles.push([t("tenacity"), m.tenacity]);
-    tiles.push([t("threat"), 100]);
-    tiles.push([t("armor"), Math.round(derived.totalArmor)]);
-    tiles.push([t("waterResistance"), Math.round(derived.totalWaterResistance)]);
-    tiles.push([t("natureResistance"), Math.round(derived.totalNatureResistance)]);
-    tiles.push([t("fireResistance"), Math.round(derived.totalFireResistance)]);
-
-    for (const style of styles) {
-        if (m.accuracyBonusPct && m.accuracyBonusPct[style] != null) {
-            let styleLabel = combatStyleName("/combat_styles/" + style);
-            tiles.push([styleLabel + " " + t("accuracy"), Math.round(derived.accuracyRating[style]), true]);
-            tiles.push([styleLabel + " " + t("maxDamage"), Math.round(derived.maxDamage[style]), true]);
-        }
-    }
-    for (const style of styles) {
-        let styleLabel = combatStyleName("/combat_styles/" + style);
-        tiles.push([styleLabel + " " + t("evasion"), Math.round(derived.evasionRating[style])]);
-    }
-
-    let html = '<div class="stat-grid">' + tiles.map(([label, value, hi]) =>
-        `<div class="stat-tile${hi ? " highlight" : ""}"><div class="stat-label">${escapeHtml(label)}</div><div class="stat-value">${escapeHtml(String(value))}</div></div>`
-    ).join("") + "</div>";
-
-    html += `<h4>Levels</h4><div class="detail-skills">` + levelTilesHtml(derived.levels) + "</div>";
-
-    if (m.abilities && m.abilities.length) {
-        html += `<h4>${escapeHtml(t("abilities"))}</h4><div class="detail-skills">` +
-            m.abilities.map((a) => `<span class="chip">${escapeHtml(a.name)} <span class="dim">L${a.baseLevel}</span></span>`).join("") +
-            "</div>";
-    }
-
-    document.getElementById("trialStatusPreview").innerHTML = html;
-}
-
-// Shortcut from the Presets tab preview: mirror the current selection into the
-// Battle tab's unified enemy selector, then reuse addEnemy() so there is one
-// code path for adding enemies to the group.
-function addTrialMonsterToGroup() {
-    const level = Number(document.getElementById("trialLevel").value) || 100;
-    const count = Math.max(1, Number(document.getElementById("trialCountToAdd").value) || 1);
-
-    document.getElementById("enemySelect").value = "trial:" + selectedTrialMonsterIndex;
-    document.getElementById("enemyLevelSelect").value = String(level);
-    document.getElementById("enemyCountToAdd").value = String(count);
-    syncEnemyLevelSelect();
-
-    addEnemy();
-    switchTab("battleTab");
-    document.getElementById("enemyGroup").scrollIntoView({ behavior: "smooth", block: "center" });
-}
-
-// ------------------------------------------------------------------- Presets -
-
-function loadPresets() {
-    try {
-        let raw = localStorage.getItem(PRESET_STORAGE_KEY);
-        presets = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-        presets = [];
-    }
-}
-
-function savePresetsToStorage() {
-    try {
-        localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(presets));
-    } catch (e) {
-        showError(t("couldNotSavePresets", { msg: e.message }));
-    }
-}
-
-function renderPresetList() {
-    document.getElementById("presetCount").textContent = presets.length;
-    const container = document.getElementById("presetList");
-    if (!presets.length) {
-        container.innerHTML = `<div class="empty">${escapeHtml(t("noPresetsYet"))}</div>`;
-        return;
-    }
-    let html = `<table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("combatStyle"))}</th><th>${escapeHtml(t("hp"))}</th><th>${escapeHtml(t("attackInterval"))}</th><th></th><th></th></tr></thead><tbody>`;
-    presets.forEach((p, i) => {
-        html += `<tr>
-            <td>${escapeHtml(p.name)}</td>
-            <td>${escapeHtml(combatStyleName(p.combatStyleHrid))}</td>
-            <td>${fmtNum(p.maxHitpoints)}</td>
-            <td>${(p.attackIntervalSeconds ?? 3)}s</td>
-            <td><button class="secondary" data-editpreset="${i}">${escapeHtml(t("edit"))}</button></td>
-            <td><button class="btn-x" data-delpreset="${i}">x</button></td>
-        </tr>`;
-    });
-    html += "</tbody></table>";
-    container.innerHTML = html;
-
-    container.querySelectorAll("[data-editpreset]").forEach((btn) => {
-        btn.addEventListener("click", () => loadPresetIntoEditor(Number(btn.dataset.editpreset)));
-    });
-    container.querySelectorAll("[data-delpreset]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            presets.splice(Number(btn.dataset.delpreset), 1);
-            savePresetsToStorage();
-            renderPresetList();
-            refreshEnemySelect();
-        });
-    });
-}
-
-// Map preset spec <-> editor form fields.
-const EDITOR_NUM_FIELDS = [
-    "abilityHaste", "accuracyRating", "maxDamage", "maxHitpoints", "maxManapoints",
-    "stabEvasion", "slashEvasion", "smashEvasion", "rangedEvasion", "magicEvasion",
-    "totalArmor", "totalWaterResistance", "totalNatureResistance", "totalFireResistance",
-    "tenacity", "threat",
-];
-
-function readEditor() {
-    let spec = {
-        name: document.getElementById("f_name").value.trim() || "Custom Monster",
-        combatStyleHrid: document.getElementById("f_combatStyleHrid").value,
-        damageType: document.getElementById("f_damageType").value,
-        attackIntervalSeconds: Number(document.getElementById("f_attackIntervalSeconds").value) || 3,
-        // Cast speed is shown as a percentage in the UI; store as a ratio.
-        castSpeed: (Number(document.getElementById("f_castSpeed").value) || 0) / 100,
-    };
-    for (const f of EDITOR_NUM_FIELDS) {
-        spec[f] = Number(document.getElementById("f_" + f).value) || 0;
-    }
-    return spec;
-}
-
-function loadPresetIntoEditor(index) {
-    editingPresetIndex = index;
-    let p = presets[index];
-    fillEditor(p);
-    switchTab("presetsTab");
-    setPresetStatus(t("editingPreset", { name: p.name }));
-}
-
-function fillEditor(spec) {
-    document.getElementById("f_name").value = spec.name || "";
-    document.getElementById("f_combatStyleHrid").value = spec.combatStyleHrid || "/combat_styles/smash";
-    document.getElementById("f_damageType").value = spec.damageType || "/damage_types/physical";
-    document.getElementById("f_attackIntervalSeconds").value = spec.attackIntervalSeconds ?? 3;
-    document.getElementById("f_castSpeed").value = ((spec.castSpeed ?? 0) * 100);
-    for (const f of EDITOR_NUM_FIELDS) {
-        document.getElementById("f_" + f).value = spec[f] ?? (f === "threat" ? 100 : 0);
-    }
-}
-
-function clearEditor() {
-    editingPresetIndex = -1;
-    fillEditor({ name: "", threat: 100, attackIntervalSeconds: 3, maxHitpoints: 110, maxManapoints: 110 });
-    setPresetStatus(t("newPreset"));
-}
-
-function savePreset() {
-    let spec = readEditor();
-    if (editingPresetIndex >= 0 && presets[editingPresetIndex]) {
-        presets[editingPresetIndex] = spec;
-    } else {
-        presets.push(spec);
-        editingPresetIndex = presets.length - 1;
-    }
-    savePresetsToStorage();
-    renderPresetList();
-    refreshEnemySelect();
-    setPresetStatus(t("savedPreset", { name: spec.name }));
-}
-
-function setPresetStatus(msg) {
-    document.getElementById("presetStatus").textContent = msg;
-}
-
-// Parse an in-game stat block (label: value per line) into a preset spec and
-// fill the editor. Understands K/M suffixes and %.
-function parseStatBlock(text) {
-    let spec = { threat: 100, attackIntervalSeconds: 3, maxHitpoints: 110, maxManapoints: 110 };
-
-    const num = (v) => {
-        v = v.trim().replace(/,/g, "");
-        let pct = v.endsWith("%");
-        v = v.replace("%", "").replace(/s$/, "").trim();
-        let mult = 1;
-        if (/k$/i.test(v)) { mult = 1e3; v = v.slice(0, -1); }
-        else if (/m$/i.test(v)) { mult = 1e6; v = v.slice(0, -1); }
-        let n = parseFloat(v) * mult;
-        return { n: isNaN(n) ? 0 : n, pct };
-    };
-
-    const styleMap = { ranged: "/combat_styles/ranged", magic: "/combat_styles/magic", smash: "/combat_styles/smash", slash: "/combat_styles/slash", stab: "/combat_styles/stab" };
-    const dmgMap = { physical: "/damage_types/physical", water: "/damage_types/water", nature: "/damage_types/nature", fire: "/damage_types/fire" };
-
-    let activeStyle = null;
-    let accByStyle = {};
-    let dmgByStyle = {};
-
-    for (let line of text.split("\n")) {
-        let idx = line.indexOf(":");
-        if (idx < 0) continue;
-        let label = line.slice(0, idx).trim().toLowerCase();
-        let value = line.slice(idx + 1).trim();
-        if (!value) continue;
-
-        if (label === "combat style") { activeStyle = styleMap[value.trim().toLowerCase()] || null; if (activeStyle) spec.combatStyleHrid = activeStyle; continue; }
-        if (label === "damage type") { spec.damageType = dmgMap[value.trim().toLowerCase()] || spec.damageType; continue; }
-        if (label === "attack interval") { spec.attackIntervalSeconds = num(value).n; continue; }
-        if (label === "cast speed") { let r = num(value); spec.castSpeed = r.pct ? r.n / 100 : r.n; continue; }
-        if (label === "ability haste") { spec.abilityHaste = num(value).n; continue; }
-        if (label === "max hitpoints") { spec.maxHitpoints = num(value).n; continue; }
-        if (label === "max manapoints") { spec.maxManapoints = num(value).n; continue; }
-        if (label === "armor") { spec.totalArmor = num(value).n; continue; }
-        if (label === "water resistance") { spec.totalWaterResistance = num(value).n; continue; }
-        if (label === "nature resistance") { spec.totalNatureResistance = num(value).n; continue; }
-        if (label === "fire resistance") { spec.totalFireResistance = num(value).n; continue; }
-        if (label === "tenacity") { spec.tenacity = num(value).n; continue; }
-        if (label === "threat") { spec.threat = num(value).n; continue; }
-
-        let evMatch = label.match(/^(stab|slash|smash|ranged|magic) evasion$/);
-        if (evMatch) { spec[evMatch[1] + "Evasion"] = num(value).n; continue; }
-
-        let accMatch = label.match(/^(stab|slash|smash|ranged|magic) accuracy$/);
-        if (accMatch) { accByStyle[accMatch[1]] = num(value).n; continue; }
-
-        let dmgMatch = label.match(/^(stab|slash|smash|ranged|magic) damage$/);
-        if (dmgMatch) { dmgByStyle[dmgMatch[1]] = num(value).n; continue; }
-        // "Defensive Damage" and anything else: ignored.
-    }
-
-    // Pick accuracy/max-damage for the active style (fall back to the only one present).
-    let styleKey = (spec.combatStyleHrid || "").split("/").pop();
-    spec.accuracyRating = accByStyle[styleKey] ?? Object.values(accByStyle)[0] ?? 10;
-    spec.maxDamage = dmgByStyle[styleKey] ?? Object.values(dmgByStyle)[0] ?? 10;
-
-    return spec;
-}
-
 function fmtNum(n) {
     if (n == null) return "-";
     if (n >= 1e6) return (n / 1e6).toFixed(n % 1e6 ? 1 : 0) + "M";
     if (n >= 1e3) return (n / 1e3).toFixed(n % 1e3 ? 1 : 0) + "K";
     return String(Math.round(n));
-}
-
-function switchTab(tabId) {
-    document.querySelectorAll(".tabpanel").forEach((el) => {
-        el.style.display = el.id === tabId ? "" : "none";
-    });
-    document.querySelectorAll(".tab").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.tab === tabId);
-    });
 }
 
 function switchSubTab(subTabId) {
@@ -1774,7 +1493,7 @@ function switchSubTab(subTabId) {
     });
 }
 
-// Battle-mode tabs (Single Boss / Trial Mode) inside the enemy card.
+// Battle-mode tabs (Single Tier / Trial Mode) inside the enemy card.
 // Trial Mode is the default.
 let currentBattleMode = "trialMode";
 function switchModeTab(modeTabId) {
@@ -2480,18 +2199,11 @@ function clearError() {
 // ---------------------------------------------------------------------- Init
 
 window.addEventListener("DOMContentLoaded", () => {
-    loadPresets();
-
     initEnemyLevelSelect();
     refreshEnemySelect();
     renderPlayerList();
-    renderEnemyGroup();
-    renderPresetList();
-    clearEditor();
-
-    initTrialLevelSelect();
-    renderTrialMonsterList();
-    renderTrialPreview();
+    // Default enemy group = the first predefined group (Trial Badger). Populated
+    // once the battle mode is applied below so the level is frozen correctly.
 
     // Re-render dynamic (JS-built) content when the language switcher fires,
     // since translated strings baked into HTML at render time don't update
@@ -2500,17 +2212,10 @@ window.addEventListener("DOMContentLoaded", () => {
         renderPredefinedPresets();
         renderPlayerList();
         renderEnemyGroup();
-        renderPresetList();
-        renderTrialMonsterList();
-        renderTrialPreview();
+        refreshEnemySelect();
         if (window.__lastBattleResult) {
             renderResult(window.__lastBattleResult, false);
         }
-    });
-
-    // Tabs
-    document.querySelectorAll(".tab").forEach((btn) => {
-        btn.addEventListener("click", () => switchTab(btn.dataset.tab));
     });
 
     // Import sub-tabs (Group Builder / Paste JSON). Scope to [data-subtab] so
@@ -2554,15 +2259,20 @@ window.addEventListener("DOMContentLoaded", () => {
     // clickable names + count inputs.
     renderPredefinedPresets();
 
-    // Enemy group
-    document.getElementById("addEnemy").addEventListener("click", addEnemy);
+    // Enemy group — the group mirrors the dropdown; changing the selection or
+    // level rebuilds it automatically (no manual add/clear step).
     document.getElementById("enemySelect").addEventListener("change", () => {
         syncEnemyLevelSelect();
-        // Selection changed - hide any stale preview until the user asks again.
-        document.getElementById("enemyPreviewPanel").style.display = "none";
+        // Selection changed - reset the expanded preview member.
+        selectedPreviewMemberIndex = 0;
+        setEnemyGroupFromSelection();
+        if (document.getElementById("enemyPreviewPanel").style.display !== "none") {
+            renderEnemyPreview();
+        }
     });
     document.getElementById("enemyLevelSelect").addEventListener("change", () => {
-        // Live-update the preview if it's already open for a Trial Monster.
+        setEnemyGroupFromSelection();
+        // Live-update the preview if it's already open.
         if (document.getElementById("enemyPreviewPanel").style.display !== "none") {
             renderEnemyPreview();
         }
@@ -2571,17 +2281,23 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("closeEnemyPreviewBtn").addEventListener("click", () => {
         document.getElementById("enemyPreviewPanel").style.display = "none";
     });
-    document.getElementById("clearEnemies").addEventListener("click", () => {
-        enemyGroup = [];
-        renderEnemyGroup();
-    });
 
-    // Battle mode tabs (Single Boss / Trial Mode)
+    // Battle mode tabs (Single Tier / Trial Mode). Switching modes can change
+    // the effective level (Trial Mode freezes to T1), so rebuild the group to
+    // match the new level.
     document.querySelectorAll(".subtab[data-modetab]").forEach((btn) => {
-        btn.addEventListener("click", () => switchModeTab(btn.dataset.modetab));
+        btn.addEventListener("click", () => {
+            switchModeTab(btn.dataset.modetab);
+            setEnemyGroupFromSelection();
+            if (document.getElementById("enemyPreviewPanel").style.display !== "none") {
+                renderEnemyPreview();
+            }
+        });
     });
-    // Apply the default mode (Trial) so the tier selector starts frozen.
+    // Apply the default mode (Trial) so the tier selector starts frozen, then
+    // populate the enemy group from the default selection (first group).
     switchModeTab(currentBattleMode);
+    setEnemyGroupFromSelection();
 
     // Battle
     document.getElementById("runBattle").addEventListener("click", runBattle);
@@ -2606,19 +2322,4 @@ window.addEventListener("DOMContentLoaded", () => {
             if (ov && ov.style.display !== "none") closeTrialResultModal();
         }
     });
-
-    // Presets
-    document.getElementById("savePresetBtn").addEventListener("click", savePreset);
-    document.getElementById("newPresetBtn").addEventListener("click", clearEditor);
-    document.getElementById("parsePasteBtn").addEventListener("click", () => {
-        let spec = parseStatBlock(document.getElementById("pasteBlock").value);
-        let nm = document.getElementById("pasteName").value.trim();
-        if (nm) spec.name = nm;
-        editingPresetIndex = -1;
-        fillEditor(spec);
-        setPresetStatus(t("parsedReview"));
-    });
-    // Trial monsters
-    document.getElementById("trialLevel").addEventListener("change", renderTrialPreview);
-    document.getElementById("addTrialMonsterBtn").addEventListener("click", addTrialMonsterToGroup);
 });

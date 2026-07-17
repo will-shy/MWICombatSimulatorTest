@@ -1,0 +1,38 @@
+{
+  "_comment": "Predefined enemy groups for Group Battle. Each group's members reference a trial monster by hrid (see trialMonsterPresets.js) with a count. Selecting a group in the Build Enemy Group section adds all members (count copies each) to the enemy group.",
+  "groups": [
+    {
+      "name": "Trial Badger",
+      "members": [
+        { "hrid": "/monsters/trial_badger", "count": 2 }
+      ]
+    },
+    {
+      "name": "Trial Chameleon",
+      "members": [
+        { "hrid": "/monsters/trial_chameleon", "count": 1 }
+      ]
+    },
+    {
+      "name": "Trial Jellyfish",
+      "members": [
+        { "hrid": "/monsters/trial_jellyfish", "count": 1 }
+      ]
+    },
+    {
+      "name": "Trial Hedgehog",
+      "members": [
+        { "hrid": "/monsters/trial_hedgehog", "count": 1 }
+      ]
+    },
+    {
+      "name": "Trial Swarm",
+      "members": [
+        { "hrid": "/monsters/trial_beetle", "count": 1 },
+        { "hrid": "/monsters/trial_dragonfly", "count": 1 },
+        { "hrid": "/monsters/trial_wasp", "count": 1 },
+        { "hrid": "/monsters/trial_firefly", "count": 1 }
+      ]
+    }
+  ]
+}
