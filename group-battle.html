@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MWI Group Battle Simulator (WIP) v0.3</title>
+    <title>MWI Group Battle Simulator (WIP) v0.4</title>
     <link rel="icon" href="data:," />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -226,24 +226,6 @@
         .tbl .sub-tbl { width: 100%; font-size: 11px; }
         .tbl .sub-tbl th, .tbl .sub-tbl td { border-bottom: 1px solid rgba(255,255,255,0.06); padding: 3px 6px; }
 
-        .tabbar {
-            display: flex;
-            gap: 4px;
-            padding: 0 20px;
-            background: var(--panel);
-            border-bottom: 1px solid var(--border);
-        }
-        .tab {
-            background: transparent;
-            color: var(--dim);
-            border: none;
-            border-bottom: 2px solid transparent;
-            border-radius: 0;
-            padding: 10px 16px;
-        }
-        .tab.active { color: var(--text); border-bottom-color: var(--accent); }
-        .tab:hover { filter: none; color: var(--text); }
-
         .subtabbar {
             display: flex;
             gap: 4px;
@@ -355,17 +337,25 @@
         }
         .ability-detail .tbl { margin-top: 4px; }
 
-        .trial-card {
+        /* Clickable list of a group's monsters in the enemy preview panel. */
+        .preview-member-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .preview-member {
             border: 1px solid var(--border);
             border-radius: 6px;
-            padding: 8px 10px;
-            margin-bottom: 6px;
+            padding: 6px 10px;
+            background: transparent;
+            color: var(--text);
+            font: inherit;
             cursor: pointer;
         }
-        .trial-card:hover { border-color: var(--accent); }
-        .trial-card.active { border-color: var(--accent); background: rgba(91,155,213,0.12); }
-        .trial-card .tm-name { font-weight: 600; }
-        .trial-card .tm-meta { font-size: 12px; color: var(--dim); }
+        .preview-member:hover { border-color: var(--accent); }
+        .preview-member.active { border-color: var(--accent); background: rgba(91,155,213,0.12); }
+        .preview-member .dim { color: var(--dim); }
 
         .stat-grid {
             display: grid;
@@ -573,7 +563,7 @@
     <header>
         <div class="header-left">
             <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator (WIP)</h1>
-            <div class="build-info" data-i18n="common:groupBattle.buildInfo">v0.3 · last modified 2026-07-16 17:39 UTC</div>
+            <div class="build-info" data-i18n="common:groupBattle.buildInfo">v0.4 · last modified 2026-07-17 01:14 UTC</div>
             <div class="disclaimer" data-i18n="common:groupBattle.disclaimer">For IC guild Arsenal internal use only.</div>
             <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
         </div>
@@ -587,11 +577,6 @@
             <li data-i18n-html data-i18n="common:groupBattle.rulesBannerEnrage">Monster <b>enrages after 10 minutes</b> in combat, then gains +10% damage and +10% accuracy for every additional 10 minutes alive (stacking up to +100%/+100% at 100 minutes).</li>
         </ul>
     </details>
-
-    <div class="tabbar">
-        <button class="tab active" data-tab="battleTab" data-i18n="common:groupBattle.tabBattle">Battle</button>
-        <button class="tab" data-tab="presetsTab" data-i18n="common:groupBattle.tabPresets">Monster Presets</button>
-    </div>
 
     <div id="errorBox"></div>
 
@@ -684,23 +669,19 @@
 
         <!-- Enemies -->
         <div class="card">
-            <h2>2. <span data-i18n="common:groupBattle.buildEnemyGroupTitle">Build Enemy Group</span></h2>
+            <h2>2. <span data-i18n="common:groupBattle.buildEnemyGroupTitle">Select Enemy Group</span></h2>
 
             <!-- Battle mode sub-tabs (top of section); Trial Mode is the default -->
             <div class="subtabbar">
                 <button class="subtab active" data-modetab="trialMode" data-i18n="common:groupBattle.modeTrial">Trial Mode</button>
-                <button class="subtab" data-modetab="singleBossMode" data-i18n="common:groupBattle.modeSingleBoss">Single Boss</button>
+                <button class="subtab" data-modetab="singleBossMode" data-i18n="common:groupBattle.modeSingleBoss">Single Tier</button>
             </div>
 
-            <p class="hint" data-i18n-html data-i18n="common:groupBattle.buildEnemyGroupHint">Pick a monster and (for Trial Monsters) its level, then add it to the group. Max 20 enemies.
-                Build custom presets in the <b>Monster Presets</b> tab.</p>
+            <p class="hint" data-i18n-html data-i18n="common:groupBattle.buildEnemyGroupHint">Pick a predefined monster group and its level — the enemy group updates automatically. Click <b>Preview</b> to review each monster in the group.</p>
             <div class="row">
                 <select id="enemySelect" style="min-width: 220px;"></select>
                 <select id="enemyLevelSelect" style="width: 110px;"></select>
-                <input type="number" id="enemyCountToAdd" value="1" min="1" max="20" style="width:70px;" title="How many copies to add" />
-                <button id="addEnemy" data-i18n="common:groupBattle.add">Add</button>
                 <button id="previewEnemyBtn" class="secondary" data-i18n="common:groupBattle.preview">Preview</button>
-                <button id="clearEnemies" class="secondary" data-i18n="common:groupBattle.clearAllEnemies">Clear all enemies</button>
             </div>
             <p class="hint" id="trialTierFrozenNote" style="display:none;" data-i18n="common:groupBattle.trialTierFrozen">Trial Mode always starts at T1 (L100) and escalates automatically — tier selection is disabled.</p>
             <div id="enemyPreviewPanel" style="display:none; margin-top:8px;">
@@ -714,7 +695,7 @@
 
             <h2 style="margin-top:18px;">3. <span data-i18n="common:groupBattle.battleSettingsTitle">Battle Settings</span></h2>
 
-            <!-- Single Boss mode (hidden by default; Trial Mode is the default) -->
+            <!-- Single Tier mode (hidden by default; Trial Mode is the default) -->
             <div id="singleBossMode" class="modepanel" style="display:none;">
                 <div class="row">
                     <label for="timeCap" data-i18n="common:groupBattle.timeCap">Time cap (seconds)</label>
@@ -777,119 +758,6 @@
         </div>
     </div>
     </div><!-- /battleTab -->
-
-    <!-- ======================= PRESETS TAB ======================= -->
-    <div id="presetsTab" class="tabpanel" style="display:none;">
-        <!-- Trial Monsters (built-in, level-scaled) -->
-        <div class="layout" style="grid-template-columns: 340px 1fr;">
-            <div class="card">
-                <h2 data-i18n="common:groupBattle.trialMonstersTitle">Trial Monsters</h2>
-                <p class="hint" data-i18n="common:groupBattle.trialMonstersHint">Built-in monsters that scale with level (T1 = L100 up to L300, step 10).
-                    Pick one and a level to preview its full status, then add it to the battle enemy group.</p>
-                <div id="trialMonsterList" class="scroll" style="max-height:520px;"></div>
-            </div>
-
-            <div class="card">
-                <h2><span data-i18n="common:groupBattle.statusPreviewTitle">Status Preview</span> — <span id="trialPreviewName">Trial Chameleon</span></h2>
-                <div class="row">
-                    <label for="trialLevel" data-i18n="common:groupBattle.level">Level</label>
-                    <select id="trialLevel"></select>
-                    <span class="hint" id="trialWeakPoints"></span>
-                </div>
-                <div id="trialStatusPreview"></div>
-                <div class="row" style="margin-top:10px;">
-                    <input type="number" id="trialCountToAdd" value="1" min="1" max="20" style="width:70px;" title="How many copies to add" />
-                    <button id="addTrialMonsterBtn" data-i18n="common:groupBattle.addToEnemyGroup">Add to Enemy Group →</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Paste importer + custom static presets -->
-        <div class="layout">
-            <div class="card">
-                <h2 data-i18n="common:groupBattle.importStatBlockTitle">Import from in-game stat block (custom, non-scaling)</h2>
-                <p class="hint" data-i18n="common:groupBattle.importStatBlockHint">
-                    For monsters NOT in the Trial Monsters list. Paste a stat block (label: value per line).
-                    Recognized labels: Combat Style, Damage Type, Attack Interval, Cast Speed, Ability Haste,
-                    Ranged/Magic/Stab/Slash/Smash Accuracy &amp; Damage, Max Hitpoints, Max Manapoints,
-                    Stab/Slash/Smash/Ranged/Magic Evasion, Armor, Water/Nature/Fire Resistance, Tenacity, Threat.
-                    Suffixes K/M and % are understood. "Defensive Damage" is a display-only value and is ignored.
-                    These presets are fixed at the stats you enter (no level scaling).
-                </p>
-                <div class="row">
-                    <label for="pasteName" data-i18n="common:groupBattle.presetName">Preset name</label>
-                    <input type="text" id="pasteName" data-i18n-placeholder="common:groupBattle.presetNamePlaceholder" placeholder="e.g. Custom Boss" style="min-width:220px;" />
-                </div>
-                <textarea id="pasteBlock" placeholder="Combat Style: Ranged&#10;Damage Type: Physical&#10;Attack Interval: 1.71s&#10;Max Hitpoints: 550K&#10;Ranged Accuracy: 506&#10;Ranged Damage: 385&#10;..."></textarea>
-                <div class="row">
-                    <button id="parsePasteBtn" data-i18n="common:groupBattle.parseAndFill">Parse &amp; fill editor →</button>
-                </div>
-            </div>
-
-            <!-- Saved presets -->
-            <div class="card">
-                <h2><span data-i18n="common:groupBattle.savedCustomPresetsTitle">Saved Custom Presets</span> (<span id="presetCount">0</span>)</h2>
-                <p class="hint" data-i18n="common:groupBattle.savedCustomPresetsHint">Presets are saved in your browser. Select one to edit, or add it to the battle enemy list.</p>
-                <div id="presetList" class="scroll"></div>
-            </div>
-        </div>
-
-        <!-- Editor -->
-        <div class="layout" style="grid-template-columns:1fr;">
-            <div class="card">
-                <h2 data-i18n="common:groupBattle.presetEditorTitle">Preset Editor</h2>
-                <div class="preset-grid">
-                    <label><span data-i18n="common:groupBattle.name">Name</span><input type="text" id="f_name" /></label>
-                    <label><span data-i18n="common:groupBattle.combatStyle">Combat Style</span>
-                        <select id="f_combatStyleHrid">
-                            <option value="/combat_styles/smash" data-i18n="combatStyleNames./combat_styles/smash">Smash</option>
-                            <option value="/combat_styles/slash" data-i18n="combatStyleNames./combat_styles/slash">Slash</option>
-                            <option value="/combat_styles/stab" data-i18n="combatStyleNames./combat_styles/stab">Stab</option>
-                            <option value="/combat_styles/ranged" data-i18n="combatStyleNames./combat_styles/ranged">Ranged</option>
-                            <option value="/combat_styles/magic" data-i18n="combatStyleNames./combat_styles/magic">Magic</option>
-                        </select>
-                    </label>
-                    <label><span data-i18n="common:groupBattle.damageType">Damage Type</span>
-                        <select id="f_damageType">
-                            <option value="/damage_types/physical" data-i18n="damageTypeNames./damage_types/physical">Physical</option>
-                            <option value="/damage_types/water" data-i18n="damageTypeNames./damage_types/water">Water</option>
-                            <option value="/damage_types/nature" data-i18n="damageTypeNames./damage_types/nature">Nature</option>
-                            <option value="/damage_types/fire" data-i18n="damageTypeNames./damage_types/fire">Fire</option>
-                        </select>
-                    </label>
-                    <label><span data-i18n="common:groupBattle.attackIntervalS">Attack Interval (s)</span><input type="number" step="0.01" id="f_attackIntervalSeconds" value="3" /></label>
-                    <label><span data-i18n="common:groupBattle.castSpeedPct">Cast Speed (%)</span><input type="number" step="0.1" id="f_castSpeed" value="0" /></label>
-                    <label><span data-i18n="common:groupBattle.abilityHaste">Ability Haste</span><input type="number" id="f_abilityHaste" value="0" /></label>
-
-                    <label><span data-i18n="common:groupBattle.accuracyActiveStyle">Accuracy (active style)</span><input type="number" id="f_accuracyRating" value="10" /></label>
-                    <label><span data-i18n="common:groupBattle.maxDamageActiveStyle">Max Damage (active style)</span><input type="number" id="f_maxDamage" value="10" /></label>
-
-                    <label><span data-i18n="common:groupBattle.maxHitpoints">Max Hitpoints</span><input type="number" id="f_maxHitpoints" value="110" /></label>
-                    <label><span data-i18n="common:groupBattle.maxManapoints">Max Manapoints</span><input type="number" id="f_maxManapoints" value="110" /></label>
-
-                    <label><span data-i18n="common:groupBattle.stabEvasion">Stab Evasion</span><input type="number" id="f_stabEvasion" value="10" /></label>
-                    <label><span data-i18n="common:groupBattle.slashEvasion">Slash Evasion</span><input type="number" id="f_slashEvasion" value="10" /></label>
-                    <label><span data-i18n="common:groupBattle.smashEvasion">Smash Evasion</span><input type="number" id="f_smashEvasion" value="10" /></label>
-                    <label><span data-i18n="common:groupBattle.rangedEvasion">Ranged Evasion</span><input type="number" id="f_rangedEvasion" value="10" /></label>
-                    <label><span data-i18n="common:groupBattle.magicEvasion">Magic Evasion</span><input type="number" id="f_magicEvasion" value="10" /></label>
-
-                    <label><span data-i18n="common:groupBattle.armor">Armor</span><input type="number" id="f_totalArmor" value="0" /></label>
-                    <label><span data-i18n="common:groupBattle.waterResistance">Water Resistance</span><input type="number" id="f_totalWaterResistance" value="0" /></label>
-                    <label><span data-i18n="common:groupBattle.natureResistance">Nature Resistance</span><input type="number" id="f_totalNatureResistance" value="0" /></label>
-                    <label><span data-i18n="common:groupBattle.fireResistance">Fire Resistance</span><input type="number" id="f_totalFireResistance" value="0" /></label>
-
-                    <label><span data-i18n="common:groupBattle.tenacity">Tenacity</span><input type="number" id="f_tenacity" value="0" /></label>
-                    <label><span data-i18n="common:groupBattle.threat">Threat</span><input type="number" id="f_threat" value="100" /></label>
-                </div>
-                <div class="row" style="margin-top:12px;">
-                    <button id="savePresetBtn" data-i18n="common:groupBattle.savePreset">Save preset</button>
-                    <button id="newPresetBtn" class="secondary" data-i18n="common:groupBattle.clearEditor">Clear editor</button>
-                    <span id="presetStatus" class="hint"></span>
-                </div>
-            </div>
-        </div>
-    </div><!-- /presetsTab -->
-
     <!-- Player detail modal -->
     <div id="playerModalOverlay" class="modal-overlay" style="display:none;">
         <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="playerModalTitle">

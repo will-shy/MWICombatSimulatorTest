@@ -7,7 +7,7 @@
 
 const en = {
     pageTitle: "MWI Group Battle Simulator (WIP)",
-    buildInfo: "v0.3 · last modified 2026-07-16 17:39 UTC",
+    buildInfo: "v0.4 · last modified 2026-07-17 01:14 UTC",
     disclaimer: "For IC guild Arsenal internal use only.",
     backToStandard: "← Back to standard simulator",
     tabBattle: "Battle",
@@ -69,8 +69,8 @@ const en = {
     noCombatEquipment: "No combat equipment.",
     noAbilities: "No abilities.",
 
-    buildEnemyGroupTitle: "Build Enemy Group",
-    buildEnemyGroupHint: "Pick a monster and (for Trial Monsters) its level, then add it to the group. Max 20 enemies. Build custom presets in the <b>Monster Presets</b> tab.",
+    buildEnemyGroupTitle: "Select Enemy Group",
+    buildEnemyGroupHint: "Pick a predefined monster group and its level — the enemy group updates automatically. Click <b>Preview</b> to review each monster in the group.",
     add: "Add",
     clearAllEnemies: "Clear all enemies",
     noEnemiesAdded: "No enemies added yet.",
@@ -84,7 +84,7 @@ const en = {
     simulating: "Simulating...",
 
     // Trial Mode
-    modeSingleBoss: "Single Boss",
+    modeSingleBoss: "Single Tier",
     modeTrial: "Trial Mode",
     trialModeHint: "Runs the enemy group above at escalating tiers — T1 (L100), T2 (L110), … — always starting from T1 (the per-enemy level is ignored). After each cleared tier all players recover to full HP/MP and the next tier begins. The run ends on a wipe, an inconclusive tier, or when the total time budget is used up.",
     trialTimeCap: "Total time budget (seconds)",
@@ -177,10 +177,9 @@ const en = {
     savePreset: "Save preset",
     clearEditor: "Clear editor",
 
-    selectMonsterFirst: "Select a monster first.",
+    selectMonsterFirst: "Select a monster group first.",
     maxEnemiesError: "Maximum 20 enemies in a group.",
-    unknownTrialMonster: "Unknown Trial Monster.",
-    unknownCustomPreset: "Unknown custom preset.",
+    unknownMonsterGroup: "Unknown monster group.",
     importAtLeastOnePlayer: "Import at least one player.",
     addAtLeastOneEnemy: "Add at least one enemy.",
     noPlayerDataFound: "No player data found in the import.",
@@ -253,7 +252,7 @@ const en = {
 
 const zh = {
     pageTitle: "MWI 团队战斗模拟器 (WIP)",
-    buildInfo: "v0.3 · 最后修改 2026-07-16 17:39 UTC",
+    buildInfo: "v0.4 · 最后修改 2026-07-17 01:14 UTC",
     disclaimer: "仅供 IC 公会 Arsenal 内部使用。",
     backToStandard: "← 返回标准模拟器",
     tabBattle: "战斗",
@@ -276,8 +275,8 @@ const zh = {
     noCombatEquipment: "无战斗装备。",
     noAbilities: "无技能。",
 
-    buildEnemyGroupTitle: "构建敌方队伍",
-    buildEnemyGroupHint: "选择一个怪物，并为试炼怪物选择等级，然后添加到队伍中。最多 20 只。可在<b>怪物预设</b>标签页中创建自定义预设。",
+    buildEnemyGroupTitle: "选择敌方队伍",
+    buildEnemyGroupHint: "选择一个预设怪物组及其等级 —— 敌方队伍会自动更新。点击<b>预览</b>可查看组内每个怪物。",
     add: "添加",
     clearAllEnemies: "清除所有敌人",
     noEnemiesAdded: "尚未添加敌人。",
@@ -355,10 +354,9 @@ const zh = {
     savePreset: "保存预设",
     clearEditor: "清空编辑器",
 
-    selectMonsterFirst: "请先选择一个怪物。",
+    selectMonsterFirst: "请先选择一个怪物组。",
     maxEnemiesError: "队伍中最多 20 名敌人。",
-    unknownTrialMonster: "未知的试炼怪物。",
-    unknownCustomPreset: "未知的自定义预设。",
+    unknownMonsterGroup: "未知的怪物组。",
     importAtLeastOnePlayer: "请至少导入一名玩家。",
     addAtLeastOneEnemy: "请至少添加一名敌人。",
     noPlayerDataFound: "导入内容中未找到玩家数据。",
@@ -471,7 +469,7 @@ const zh = {
     equipmentSetsLoadedWithErrors: "已加载装备套装，但有 {{count}} 个无法读取：\n{{errors}}",
 
     // Trial Mode
-    modeSingleBoss: "单一 Boss",
+    modeSingleBoss: "单一层级",
     modeTrial: "试炼模式",
     trialModeHint: "以递增的层级运行上方的敌人组——T1（L100）、T2（L110）……始终从 T1 开始（忽略单个敌人的等级）。每清除一层后，所有玩家的生命/魔力恢复满，然后进入下一层。当出现团灭、某层无法分出胜负，或总时间预算耗尽时，运行结束。",
     trialTimeCap: "总时间预算（秒）",
