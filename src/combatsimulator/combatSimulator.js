@@ -1281,6 +1281,8 @@ class CombatSimulator extends EventTarget {
 
         ability.lastUsed = this.simulationTime;
 
+        this.simResult.addAbilityCast(source, ability);
+
         let haste = source.combatDetails.combatStats.abilityHaste;
         let cooldownDuration = ability.cooldownDuration;
         if (haste > 0) {
