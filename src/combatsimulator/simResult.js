@@ -7,6 +7,11 @@ class SimResult {
         this.encounters = 0;
         this.attacks = {};
         this.consumablesUsed = {};
+        // Per-cast counter for every ability use (damaging or not), keyed by
+        // caster hrid then ability hrid. Unlike `attacks` (which only records
+        // damaging hits/misses) this counts a cast exactly once regardless of
+        // how many effects/targets it has, so buffs and heals are included too.
+        this.abilityCastCounts = {};
         this.hitpointsGained = {};
         this.manapointsGained = {};
         this.debuffOnLevelGap = {};
@@ -182,6 +187,21 @@ class SimResult {
 
     addEncounterEnd() {
         this.encounters++;
+    }
+
+    // Records one cast of `ability` by `unit`, regardless of whether it deals
+    // damage. Call exactly once per successful cast (see tryUseAbility) so
+    // buffs/heals get a real per-cast count instead of being invisible to the
+    // Damage Done table.
+    addAbilityCast(unit, ability) {
+        const abilityHrid = ability.hrid ?? ability;
+        if (!this.abilityCastCounts[unit.hrid]) {
+            this.abilityCastCounts[unit.hrid] = {};
+        }
+        if (!this.abilityCastCounts[unit.hrid][abilityHrid]) {
+            this.abilityCastCounts[unit.hrid][abilityHrid] = 0;
+        }
+        this.abilityCastCounts[unit.hrid][abilityHrid] += 1;
     }
 
     addAttack(source, target, ability, hit) {

@@ -201,6 +201,7 @@ const en = {
     damageTaken: "Damage Taken",
     source: "Source",
     totalDmg: "Total Dmg",
+    castCount: "Casts",
     hits: "Hits",
     dps: "DPS",
     healingDone: "Healing Done",

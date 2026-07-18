@@ -1977,19 +1977,52 @@ function aggregateAttacks(battleLog, groupBy) {
         let key = hrid + "|" + isPlayer;
 
         if (!groups[key]) {
-            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, byAbility: {} };
+            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
         }
         let g = groups[key];
         if (isHit) { g.dmg += entry.hit; g.hits += 1; } else { g.misses += 1; }
+        g.casts += 1;
 
         let abilityKey = entry.ability;
         if (!g.byAbility[abilityKey]) {
-            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), dmg: 0, hits: 0, misses: 0 };
+            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), dmg: 0, hits: 0, misses: 0, casts: 0 };
         }
         let a = g.byAbility[abilityKey];
         if (isHit) { a.dmg += entry.hit; a.hits += 1; } else { a.misses += 1; }
+        a.casts += 1;
     }
     return groups;
+}
+
+// Folds in cast counts for abilities that never appear in the attack log
+// (pure buffs/heals/revives - see SimResult.addAbilityCast) so the Damage
+// Done table lists every ability a unit cast, not just the damaging ones.
+// Only meaningful for the "source" grouping (Damage Done); cast counts are
+// keyed by caster, so they have no place in a "target" (Damage Taken) table.
+function mergeAbilityCastCounts(groups, result) {
+    for (const [casterHrid, castsByAbility] of Object.entries(result.abilityCastCounts || {})) {
+        for (const [abilityHrid, casts] of Object.entries(castsByAbility)) {
+            // Find the existing group for this caster (may be keyed by either
+            // isPlayer value; a caster is consistently one or the other).
+            let key = Object.keys(groups).find((k) => k.startsWith(casterHrid + "|"));
+            let isPlayer = key ? groups[key].isPlayer : casterHrid.startsWith("player");
+            if (!key) {
+                key = casterHrid + "|" + isPlayer;
+                groups[key] = { name: nameFor(casterHrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
+            }
+            let g = groups[key];
+
+            if (!g.byAbility[abilityHrid]) {
+                g.byAbility[abilityHrid] = { name: abilityOrItemName(abilityHrid), dmg: 0, hits: 0, misses: 0, casts: 0 };
+            } else if (g.byAbility[abilityHrid].casts > 0) {
+                // This ability already has attack-log entries (it deals damage),
+                // so its casts are already counted - don't double count.
+                continue;
+            }
+            g.byAbility[abilityHrid].casts += casts;
+            g.casts += casts;
+        }
+    }
 }
 
 function accuracyPct(hits, misses) {
@@ -2005,7 +2038,7 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
     let rows = Object.values(groups).sort((a, b) => b.dmg - a.dmg);
     let html = `${showTitle ? `<h4>${escapeHtml(t(titleKey))}</h4>` : ""}<table class="tbl"><thead><tr>
         <th>${escapeHtml(t("source"))}</th><th>${escapeHtml(t("totalDmg"))}</th>
-        <th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
+        <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
     </tr></thead><tbody>`;
 
     rows.forEach((r, i) => {
@@ -2013,18 +2046,18 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
         let acc = accuracyPct(r.hits, r.misses);
         html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}" data-detail-toggle="${rowId}">
             <td>${escapeHtml(r.name)}</td><td>${Math.round(r.dmg).toLocaleString()}</td>
-            <td>${r.hits}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
+            <td>${r.casts}</td><td>${r.hits}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
 
-        let abilityRows = Object.values(r.byAbility).sort((a, b) => b.dmg - a.dmg);
-        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="5"><div class="detail-inner">
+        let abilityRows = Object.values(r.byAbility).sort((a, b) => b.dmg - a.dmg || b.casts - a.casts);
+        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="6"><div class="detail-inner">
             <table class="sub-tbl"><thead><tr>
                 <th>${escapeHtml(t("abilities"))}</th><th>${escapeHtml(t("totalDmg"))}</th>
-                <th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
+                <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
             </tr></thead><tbody>`;
         for (const a of abilityRows) {
             let aAcc = accuracyPct(a.hits, a.misses);
             html += `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.dmg).toLocaleString()}</td>
-                <td>${a.hits}</td><td>${aAcc}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`;
+                <td>${a.casts}</td><td>${a.hits}</td><td>${aAcc}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`;
         }
         html += "</tbody></table></div></td></tr>";
     });
@@ -2047,6 +2080,7 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
 function renderDamageTotals(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let doneGroups = aggregateAttacks(result.battleLog, "source");
+    mergeAbilityCastCounts(doneGroups, result);
     // rowIdPrefix must be unique per container so both tables (and the modal's
     // own tables) can be open simultaneously without colliding detail-row IDs.
     // The modal wraps each section in its own <details> summary, so skip the h4.
@@ -2056,7 +2090,42 @@ function renderDamageTotals(result, ids = IDS_MAIN) {
 function renderDamageTaken(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let takenGroups = aggregateAttacks(result.battleLog, "target");
+    mergeSelfInflictedDamage(takenGroups, result);
     renderExpandableDamageTable(ids.damageTaken, "damageTaken", takenGroups, dur, ids.damageTaken + "_dt", ids === IDS_MAIN);
+}
+
+// Folds in self-inflicted HP costs (e.g. Insanity's 30% current-HP spend) as
+// Damage Taken. These never go through the normal attack pipeline - the caster
+// just loses HP directly (SimResult.addHitpointsSpent) - so without this
+// they're invisible here even though they're a real, often large, HP cost.
+// Cast count comes from abilityCastCounts (the caster of a spend-hp ability
+// is also its "victim"); every cast always succeeds, so hits == casts.
+function mergeSelfInflictedDamage(groups, result) {
+    for (const [victimHrid, spentByAbility] of Object.entries(result.hitpointsSpent || {})) {
+        for (const [abilityHrid, totalSpent] of Object.entries(spentByAbility)) {
+            if (totalSpent <= 0) continue;
+
+            let key = Object.keys(groups).find((k) => k.startsWith(victimHrid + "|"));
+            let isPlayer = key ? groups[key].isPlayer : victimHrid.startsWith("player");
+            if (!key) {
+                key = victimHrid + "|" + isPlayer;
+                groups[key] = { name: nameFor(victimHrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
+            }
+            let g = groups[key];
+            let casts = result.abilityCastCounts?.[victimHrid]?.[abilityHrid] || 0;
+
+            if (!g.byAbility[abilityHrid]) {
+                g.byAbility[abilityHrid] = { name: abilityOrItemName(abilityHrid), dmg: 0, hits: 0, misses: 0, casts: 0 };
+            }
+            let a = g.byAbility[abilityHrid];
+            a.dmg += totalSpent;
+            a.hits += casts;
+            a.casts += casts;
+            g.dmg += totalSpent;
+            g.hits += casts;
+            g.casts += casts;
+        }
+    }
 }
 
 // Groups "heal" log entries by the healer (the caster), and within each healer
@@ -2072,7 +2141,7 @@ function aggregateHeals(battleLog) {
         let key = hrid + "|" + isPlayer;
 
         if (!groups[key]) {
-            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, healed: 0, count: 0, byAbility: {} };
+            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, healed: 0, count: 0, casts: 0, byAbility: {} };
         }
         let g = groups[key];
         g.healed += entry.amount;
@@ -2080,7 +2149,7 @@ function aggregateHeals(battleLog) {
 
         let abilityKey = entry.healSource;
         if (!g.byAbility[abilityKey]) {
-            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), healed: 0, count: 0 };
+            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), healed: 0, count: 0, casts: 0 };
         }
         let a = g.byAbility[abilityKey];
         a.healed += entry.amount;
@@ -2089,12 +2158,33 @@ function aggregateHeals(battleLog) {
     return groups;
 }
 
+// Folds true per-cast counts (SimResult.addAbilityCast, keyed by caster then
+// ability) into the healer groups from aggregateHeals. "count" above is how
+// many times a target was healed - for an allAllies heal that's once per
+// living ally per cast, so it overcounts casts. "casts" is the real number of
+// times the healer cast the spell, regardless of how many allies it touched.
+// Sources with no matching cast record (regen, lifesteal, consumables - none
+// of which go through tryUseAbility) are simply left with casts = 0.
+function mergeHealCastCounts(groups, result) {
+    for (const [casterHrid, castsByAbility] of Object.entries(result.abilityCastCounts || {})) {
+        for (const [abilityHrid, casts] of Object.entries(castsByAbility)) {
+            let key = Object.keys(groups).find((k) => k.startsWith(casterHrid + "|"));
+            if (!key) continue; // caster never appears in the heal log - not a heal ability
+            let g = groups[key];
+            if (!g.byAbility[abilityHrid]) continue; // this ability of theirs never healed anyone
+            g.byAbility[abilityHrid].casts += casts;
+            g.casts += casts;
+        }
+    }
+}
+
 // Renders an expandable healing table (parallel to renderExpandableDamageTable):
 // one row per healer with total healed / heal count / HPS, expandable to a per-
 // ability breakdown.
 function renderHealingDone(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let groups = aggregateHeals(result.battleLog);
+    mergeHealCastCounts(groups, result);
     let showTitle = ids === IDS_MAIN;
     let rowIdPrefix = ids.healingDone + "_hd";
     const container = document.getElementById(ids.healingDone);
@@ -2108,24 +2198,24 @@ function renderHealingDone(result, ids = IDS_MAIN) {
 
     let html = `${showTitle ? `<h4>${escapeHtml(t("healingDone"))}</h4>` : ""}<table class="tbl"><thead><tr>
         <th>${escapeHtml(t("healer"))}</th><th>${escapeHtml(t("totalHealed"))}</th>
-        <th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
+        <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
     </tr></thead><tbody>`;
 
     rows.forEach((r, i) => {
         let rowId = rowIdPrefix + i;
         html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}" data-detail-toggle="${rowId}">
             <td>${escapeHtml(r.name)}</td><td>${Math.round(r.healed).toLocaleString()}</td>
-            <td>${r.count}</td><td>${(r.healed / dur).toFixed(1)}</td></tr>`;
+            <td>${r.casts}</td><td>${r.count}</td><td>${(r.healed / dur).toFixed(1)}</td></tr>`;
 
         let abilityRows = Object.values(r.byAbility).sort((a, b) => b.healed - a.healed);
-        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="4"><div class="detail-inner">
+        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="5"><div class="detail-inner">
             <table class="sub-tbl"><thead><tr>
                 <th>${escapeHtml(t("abilities"))}</th><th>${escapeHtml(t("totalHealed"))}</th>
-                <th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
+                <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
             </tr></thead><tbody>`;
         for (const a of abilityRows) {
             html += `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.healed).toLocaleString()}</td>
-                <td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`;
+                <td>${a.casts}</td><td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`;
         }
         html += "</tbody></table></div></td></tr>";
     });
