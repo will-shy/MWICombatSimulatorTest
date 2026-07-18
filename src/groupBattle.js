@@ -570,11 +570,11 @@ function buildRoster() {
 // excluded from later auras (one aura per player). The chosen aura OVERRIDES the
 // player's original aura ability (or takes an empty ability slot).
 const AURA_ASSIGNMENTS = [
-    { hrid: "/abilities/fierce_aura", inputId: "auraLvlFierce", skill: "attackLevel" },
+    { hrid: "/abilities/fierce_aura", inputId: "auraLvlFierce", skill: "meleeLevel" },
     { hrid: "/abilities/mystic_aura", inputId: "auraLvlMystic", skill: "magicLevel" },
     { hrid: "/abilities/critical_aura", inputId: "auraLvlCrit", skill: "rangedLevel" },
     { hrid: "/abilities/guardian_aura", inputId: "auraLvlGuardian", skill: "defenseLevel" },
-    { hrid: "/abilities/speed_aura", inputId: "auraLvlSpeed", skill: "meleeLevel" },
+    { hrid: "/abilities/speed_aura", inputId: "auraLvlSpeed", skill: "attackLevel" },
 ];
 
 // Replace/insert an aura ability in a player's DTO ability list. Prefers to
@@ -1922,8 +1922,18 @@ function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
     let summary = `<div class="summary-row">${outcomeLabels[result.battleOutcome] || result.battleOutcome}</div>`;
     summary += `<div class="summary-row"><b>${escapeHtml(t("battleDuration"))}</b> ${fmtTime(result.battleDurationNs)}</div>`;
 
-    // Player final states (incl. OOM = ability casts blocked by lack of mana)
+    // Enemy final states shown first (monsters always lead the results),
+    // then player final states (incl. OOM = ability casts blocked by mana).
     let oomMap = result.playerOomCastCount || {};
+    summary += `<div class="final-states"><h4>${escapeHtml(t("enemies"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th></tr></thead><tbody>`;
+    for (const es of result.enemyFinalState || []) {
+        let dead = es.currentHitpoints <= 0;
+        summary += `<tr class="src-enemy ${dead ? "dead" : ""}">
+            <td>${escapeHtml(nameFor(es.hrid, false))}</td>
+            <td>${Math.round(es.currentHitpoints)}/${es.maxHitpoints}</td></tr>`;
+    }
+    summary += "</tbody></table></div>";
+
     summary += `<div class="final-states"><h4>${escapeHtml(t("players"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th><th>${escapeHtml(t("mp"))}</th><th>${escapeHtml(t("deaths"))}</th><th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th></tr></thead><tbody>`;
     for (const ps of result.playerFinalState || []) {
         let deaths = (result.deaths && result.deaths[ps.hrid]) || 0;
@@ -1935,15 +1945,6 @@ function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
             <td>${Math.round(ps.currentManapoints)}/${ps.maxManapoints}</td>
             <td>${deaths}</td>
             <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${oom}</td></tr>`;
-    }
-    summary += "</tbody></table></div>";
-
-    summary += `<div class="final-states"><h4>${escapeHtml(t("enemies"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th></tr></thead><tbody>`;
-    for (const es of result.enemyFinalState || []) {
-        let dead = es.currentHitpoints <= 0;
-        summary += `<tr class="${dead ? "dead" : ""}">
-            <td>${escapeHtml(nameFor(es.hrid, false))}</td>
-            <td>${Math.round(es.currentHitpoints)}/${es.maxHitpoints}</td></tr>`;
     }
     summary += "</tbody></table></div>";
 
@@ -2035,7 +2036,11 @@ function accuracyPct(hits, misses) {
 // showTitle=false omits the <h4> heading (used when the section already has a
 // collapsible <summary> providing the title, as in the trial modal).
 function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPrefix, showTitle = true) {
-    let rows = Object.values(groups).sort((a, b) => b.dmg - a.dmg);
+    // Monsters always lead the table, then sorted by damage within each group.
+    let rows = Object.values(groups).sort((a, b) => {
+        if (a.isPlayer !== b.isPlayer) return a.isPlayer ? 1 : -1;
+        return b.dmg - a.dmg;
+    });
     let html = `${showTitle ? `<h4>${escapeHtml(t(titleKey))}</h4>` : ""}<table class="tbl"><thead><tr>
         <th>${escapeHtml(t("source"))}</th><th>${escapeHtml(t("totalDmg"))}</th>
         <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>
@@ -2044,8 +2049,10 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
     rows.forEach((r, i) => {
         let rowId = rowIdPrefix + i;
         let acc = accuracyPct(r.hits, r.misses);
-        html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}" data-detail-toggle="${rowId}">
-            <td>${escapeHtml(r.name)}</td><td>${Math.round(r.dmg).toLocaleString()}</td>
+        let displayName = r.auraHrid ? `${r.name} (${abilityOrItemName(r.auraHrid)})` : r.name;
+        let auraCls = r.auraHrid ? " has-aura" : "";
+        html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}${auraCls}" data-detail-toggle="${rowId}">
+            <td>${escapeHtml(displayName)}</td><td>${Math.round(r.dmg).toLocaleString()}</td>
             <td>${r.casts}</td><td>${r.hits}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
 
         let abilityRows = Object.values(r.byAbility).sort((a, b) => b.dmg - a.dmg || b.casts - a.casts);
@@ -2077,10 +2084,34 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
     });
 }
 
+// Auras worth calling out next to a player's name in Damage Done - the
+// "buff/support" auras a player might be assigned (see AURA_ASSIGNMENTS),
+// excluding Insanity and Revive since those aren't the kind of aura-carrier
+// role this highlight is meant to surface.
+const NAME_TAG_AURA_HRIDS = new Set(
+    [...AURA_ABILITY_HRIDS].filter((h) => h !== "/abilities/insanity" && h !== "/abilities/revive")
+);
+
+// Tags each Damage Done group with the (first, if somehow more than one)
+// non-insanity/revive aura its caster cast during the battle, so the row can
+// be highlighted and labeled "PlayerName (Aura)". Players only - trial/enemy
+// monsters can carry abilities that share an hrid with a player aura (e.g. a
+// monster's own "fierce_aura"-alike attack), and this tag is meant to call
+// out the roster's aura-carrier role, not enemy abilities.
+function tagAuraCasters(groups, result) {
+    for (const [casterHrid, castsByAbility] of Object.entries(result.abilityCastCounts || {})) {
+        let key = Object.keys(groups).find((k) => k.startsWith(casterHrid + "|"));
+        if (!key || !groups[key].isPlayer) continue;
+        let auraHrid = Object.keys(castsByAbility).find((h) => NAME_TAG_AURA_HRIDS.has(h));
+        if (auraHrid) groups[key].auraHrid = auraHrid;
+    }
+}
+
 function renderDamageTotals(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let doneGroups = aggregateAttacks(result.battleLog, "source");
     mergeAbilityCastCounts(doneGroups, result);
+    tagAuraCasters(doneGroups, result);
     // rowIdPrefix must be unique per container so both tables (and the modal's
     // own tables) can be open simultaneously without colliding detail-row IDs.
     // The modal wraps each section in its own <details> summary, so skip the h4.

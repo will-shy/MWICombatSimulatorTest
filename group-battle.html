@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MWI Group Battle Simulator (WIP) v0.4</title>
+    <title>MWI Group Battle Simulator (WIP) v0.5</title>
     <link rel="icon" href="data:," />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -22,6 +22,8 @@
             --win: #4caf50;
             --lose: #e05252;
             --draw: #d4a13a;
+            --aura: #f0c250;
+            --enemy: #ff5c5c;
         }
 
         * { box-sizing: border-box; }
@@ -149,7 +151,8 @@
         .tbl th { color: var(--dim); font-weight: 600; }
         .tbl tr.dead td { color: var(--lose); text-decoration: line-through; }
         .tbl .src-player td:first-child { color: var(--accent); }
-        .tbl .src-enemy td:first-child { color: var(--draw); }
+        .tbl .src-enemy td:first-child { color: var(--enemy); }
+        .tbl tr.has-aura td:first-child { color: var(--aura); font-weight: 600; }
         .name-edit { width: 130px; padding: 2px 4px; }
 
         .empty { color: var(--dim); font-style: italic; padding: 8px 0; }
@@ -563,7 +566,7 @@
     <header>
         <div class="header-left">
             <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator (WIP)</h1>
-            <div class="build-info" data-i18n="common:groupBattle.buildInfo">v0.4 · last modified 2026-07-17 01:14 UTC</div>
+            <div class="build-info" data-i18n="common:groupBattle.buildInfo">v0.5 · last modified 2026-07-18 UTC</div>
             <div class="disclaimer" data-i18n="common:groupBattle.disclaimer">For IC guild Arsenal internal use only.</div>
             <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
         </div>
