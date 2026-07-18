@@ -7,7 +7,7 @@
 
 const en = {
     pageTitle: "MWI Group Battle Simulator (WIP)",
-    buildInfo: "v0.4 · last modified 2026-07-17 01:14 UTC",
+    buildInfo: "v0.5 · last modified 2026-07-18 UTC",
     disclaimer: "For IC guild Arsenal internal use only.",
     backToStandard: "← Back to standard simulator",
     tabBattle: "Battle",
@@ -42,7 +42,7 @@ const en = {
     predefinedPresetsTitle: "Predefined presets",
     predefinedPresetsHint: "Built-in role rosters. Fixed — cannot be edited. Click a role name to review it.",
     auraSectionTitle: "Auras",
-    auraSectionHint: "On build, each aura is auto-assigned to the roster member with the highest matching skill (Fierce→Attack, Mystic→Magic, Crit→Ranged, Guardian→Defense, Speed→Melee) — one aura per player — overriding that player's original aura.",
+    auraSectionHint: "On build, each aura is auto-assigned to the roster member with the highest matching skill (Fierce→Melee, Mystic→Magic, Crit→Ranged, Guardian→Defense, Speed→Attack) — one aura per player — overriding that player's original aura.",
     auraFierce: "Fierce",
     auraMystic: "Mystic",
     auraCrit: "Crit",
