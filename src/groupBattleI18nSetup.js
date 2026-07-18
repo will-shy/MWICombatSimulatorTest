@@ -7,7 +7,7 @@
 
 const en = {
     pageTitle: "MWI Group Battle Simulator (WIP)",
-    buildInfo: "v0.5 · last modified 2026-07-18 UTC",
+    buildInfo: "v0.6 · last modified 2026-07-18 UTC",
     disclaimer: "For IC guild Arsenal internal use only.",
     backToStandard: "← Back to standard simulator",
     tabBattle: "Battle",
@@ -259,7 +259,7 @@ const en = {
 
 const zh = {
     pageTitle: "MWI 团队战斗模拟器 (WIP)",
-    buildInfo: "v0.4 · 最后修改 2026-07-17 01:14 UTC",
+    buildInfo: "v0.6 · 最后修改 2026-07-18 UTC",
     disclaimer: "仅供 IC 公会 Arsenal 内部使用。",
     backToStandard: "← 返回标准模拟器",
     tabBattle: "战斗",
@@ -384,6 +384,7 @@ const zh = {
     damageDone: "造成的伤害",
     source: "来源",
     totalDmg: "总伤害",
+    castCount: "施放次数",
     hits: "命中次数",
     dps: "每秒伤害",
     healingDone: "治疗量",
@@ -459,7 +460,7 @@ const zh = {
     predefinedPresetsTitle: "预定义预设",
     predefinedPresetsHint: "内置角色队伍。固定——不可编辑。点击角色名称查看。",
     auraSectionTitle: "光环",
-    auraSectionHint: "构建时，每个光环自动分配给对应技能最高的队员（狂暴→攻击，秘法→魔法，暴击→远程，守护→防御，迅捷→近战）——每人一个光环——覆盖该玩家原有的光环。",
+    auraSectionHint: "构建时，每个光环自动分配给对应技能最高的队员（狂暴→近战，秘法→魔法，暴击→远程，守护→防御，迅捷→攻击）——每人一个光环——覆盖该玩家原有的光环。",
     auraFierce: "狂暴",
     auraMystic: "秘法",
     auraCrit: "暴击",
