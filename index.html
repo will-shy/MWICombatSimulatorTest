@@ -115,9 +115,6 @@
 
 <body class="p-3">
     <div class="container-fluid">
-        <div class="d-flex justify-content-start mb-2">
-            <a href="group-battle.html" class="btn btn-outline-primary btn-sm" data-i18n="common:controls.goGroupBattle">⚔ Group Battle Simulator →</a>
-        </div>
         <ul class="nav nav-tabs" id="playerTab" role="tablist">
             <li class="nav-item">
                 <a contenteditable="true" class="nav-link active" id="player1-tab" data-bs-toggle="tab" href="#player1" role="tab" aria-controls="player1" aria-selected="true">Player 1</a>
@@ -212,17 +209,41 @@
                             </button>
                         </div>
                         <!-- #endregion -->
-                        <!-- #region Labyrinth Upgrades -->
+                        <!-- #region Labyrinth Upgrades and Shrines -->
                         <div class="row mb-3">
-                            <b data-i18n="common:labyrinthUpgrades">Labyrinth Upgrades</b>
+                            <div class="col">
+                                <div class="accordion">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button id="buttonLabyrinthUpgradesAccordion" class="accordion-button collapsed"
+                                                type="button" data-bs-toggle="collapse"
+                                                data-bs-target="#collapseLabyrinthUpgrades" style="padding: 0.5em">
+                                                <b data-i18n="common:labyrinthUpgrades">Labyrinth Upgrades</b>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseLabyrinthUpgrades" class="accordion-collapse collapse">
+                                            <div class="accordion-body" style="padding: 0.5em">
+                                                <div id="labyrinthUpgradesList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button id="buttonShrinesAccordion" class="accordion-button collapsed"
+                                                type="button" data-bs-toggle="collapse"
+                                                data-bs-target="#collapseShrines" style="padding: 0.5em">
+                                                <b data-i18n="common:shrines">Shrines</b>
+                                            </button>
+                                        </h2>
+                                        <div id="collapseShrines" class="accordion-collapse collapse">
+                                            <div class="accordion-body" style="padding: 0.5em">
+                                                <div id="shrinesList"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div id="labyrinthUpgradesList"></div>
-                        <!-- #endregion -->
-                        <!-- #region Shrines -->
-                        <div class="row mb-3">
-                            <b data-i18n="common:shrines">Shrines</b>
-                        </div>
-                        <div id="shrinesList"></div>
                         <!-- #endregion -->
                         <div class="row">
                             <b data-i18n="common:priceSettings.title">Price Settings</b>
