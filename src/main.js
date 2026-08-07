@@ -6,6 +6,7 @@ import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
 import Ability from "./combatsimulator/ability.js";
 import Consumable from "./combatsimulator/consumable.js";
 import HouseRoom from "./combatsimulator/houseRoom"
+import Achievement from "./combatsimulator/achievement.js";
 import Shrine from "./combatsimulator/shrine.js";
 import LabyrinthUpgrade from "./combatsimulator/labyrinthUpgrade.js";
 import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTriggerDependencyDetailMap.json";
@@ -170,6 +171,7 @@ function initHouseRoomsModal() {
             let inputValue = e.target.value;
             const hrid = e.target.dataset.houseHrid;
             player.houseRooms[hrid] = parseInt(inputValue);
+            updateUI();
         });
 
         levelCol.appendChild(levelInput);
@@ -414,6 +416,7 @@ function initAchievementsModal(){
             }
             cardStatics.dataset.checked = cardStatics.dataset.checked == "true" ? "false" : "true";
             refreshAchievementStatics();
+            updateUI();
         });
         cardHeader.appendChild(cardStatics);
 
@@ -437,6 +440,7 @@ function initAchievementsModal(){
                 player.achievements[hrid] = e.target.checked;
 
                 refreshAchievementStatics();
+                updateUI();
             });
             formCheck.appendChild(input);
 
@@ -592,11 +596,17 @@ function changeEquipmentSetListener() {
 // #region Combat Stats
 
 // The stats panel renders from the main thread copy of the player, which carries no combat buffs
-// of its own - the worker builds those. Rebuild just the levelled bonuses into it so the panel
-// reacts to shrine and labyrinth levels. Rebuilt from scratch every time because addPermanentBuff
-// accumulates. Labyrinth upgrades are included only while a labyrinth sim is selected, matching
-// the gating in worker.js, so the panel shows what the simulation would actually use.
-function applyLevelledBonusBuffsForDisplay() {
+// of its own - the worker builds those inside Player.createFromDTO. Rebuild them here so the panel
+// shows the same numbers the simulation uses. Rebuilt from scratch every time because
+// addPermanentBuff accumulates.
+//
+// House rooms and achievements are held on this player as plain maps rather than as HouseRoom and
+// Achievement objects, so their buffs are constructed here rather than through
+// generatePermanentBuffs(), which expects the object form and would throw on the plain maps.
+//
+// Labyrinth upgrades are included only while a labyrinth sim is selected, matching the gating in
+// worker.js.
+function applyDisplayBuffs() {
     let buffs = Shrine.buffsFromLevels(player.shrines);
 
     let simLabyrinthToggle = document.getElementById("simLabyrinthToggle");
@@ -604,6 +614,14 @@ function applyLevelledBonusBuffsForDisplay() {
     if (simLabyrinthToggle?.checked || simAllLabyrinthsToggle?.checked) {
         buffs = buffs.concat(LabyrinthUpgrade.buffsFromLevels(player.labyrinthUpgrades));
     }
+
+    for (const [hrid, level] of Object.entries(player.houseRooms ?? {})) {
+        if (houseRoomDetailMap[hrid] && level > 0) {
+            buffs = buffs.concat(new HouseRoom(hrid, level).buffs);
+        }
+    }
+
+    buffs = buffs.concat(new Achievement(player.achievements ?? {}).buffs);
 
     player.permanentBuffs = {};
     for (const buff of buffs) {
@@ -613,7 +631,7 @@ function applyLevelledBonusBuffsForDisplay() {
 }
 
 function updateCombatStatsUI() {
-    applyLevelledBonusBuffsForDisplay();
+    applyDisplayBuffs();
     player.updateCombatDetails();
 
     let combatStyleElement = document.getElementById("combatStat_combatStyleHrid");
