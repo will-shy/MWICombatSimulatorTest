@@ -1,0 +1,74 @@
+{
+    "/labyrinth_upgrades/combat_damage": {
+        "hrid": "/labyrinth_upgrades/combat_damage",
+        "name": "Combat Damage",
+        "sortIndex": 1,
+        "maxLevel": 12,
+        "buffs": [
+            {
+                "uniqueHrid": "/buff_uniques/labyrinth_upgrade_combat_damage",
+                "typeHrid": "/buff_types/damage",
+                "ratioBoost": 0.01,
+                "ratioBoostLevelBonus": 0.01,
+                "flatBoost": 0,
+                "flatBoostLevelBonus": 0,
+                "startTime": "0001-01-01T00:00:00Z",
+                "duration": 0
+            }
+        ]
+    },
+    "/labyrinth_upgrades/attack_speed": {
+        "hrid": "/labyrinth_upgrades/attack_speed",
+        "name": "Attack Speed",
+        "sortIndex": 2,
+        "maxLevel": 12,
+        "buffs": [
+            {
+                "uniqueHrid": "/buff_uniques/labyrinth_upgrade_attack_speed",
+                "typeHrid": "/buff_types/attack_speed",
+                "ratioBoost": 0.01,
+                "ratioBoostLevelBonus": 0.01,
+                "flatBoost": 0,
+                "flatBoostLevelBonus": 0,
+                "startTime": "0001-01-01T00:00:00Z",
+                "duration": 0
+            }
+        ]
+    },
+    "/labyrinth_upgrades/cast_speed": {
+        "hrid": "/labyrinth_upgrades/cast_speed",
+        "name": "Cast Speed",
+        "sortIndex": 3,
+        "maxLevel": 12,
+        "buffs": [
+            {
+                "uniqueHrid": "/buff_uniques/labyrinth_upgrade_cast_speed",
+                "typeHrid": "/buff_types/cast_speed",
+                "ratioBoost": 0,
+                "ratioBoostLevelBonus": 0,
+                "flatBoost": 0.01,
+                "flatBoostLevelBonus": 0.01,
+                "startTime": "0001-01-01T00:00:00Z",
+                "duration": 0
+            }
+        ]
+    },
+    "/labyrinth_upgrades/critical_rate": {
+        "hrid": "/labyrinth_upgrades/critical_rate",
+        "name": "Critical Rate",
+        "sortIndex": 4,
+        "maxLevel": 12,
+        "buffs": [
+            {
+                "uniqueHrid": "/buff_uniques/labyrinth_upgrade_critical_rate",
+                "typeHrid": "/buff_types/critical_rate",
+                "ratioBoost": 0,
+                "ratioBoostLevelBonus": 0,
+                "flatBoost": 0.01,
+                "flatBoostLevelBonus": 0.01,
+                "startTime": "0001-01-01T00:00:00Z",
+                "duration": 0
+            }
+        ]
+    }
+}

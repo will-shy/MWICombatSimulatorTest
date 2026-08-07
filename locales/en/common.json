@@ -122,5 +122,19 @@
   },
   "simLabyrinth": "Sim Labyrinth",
   "simAllLabyrinths": "Sim All Labyrinths",
-  "roomLevel": "Room Level"
+  "roomLevel": "Room Level",
+  "labyrinthUpgrades": "Labyrinth Upgrades",
+  "labyrinthUpgradeNames": {
+    "/labyrinth_upgrades/combat_damage": "Combat Damage",
+    "/labyrinth_upgrades/attack_speed": "Attack Speed",
+    "/labyrinth_upgrades/cast_speed": "Cast Speed",
+    "/labyrinth_upgrades/critical_rate": "Critical Rate"
+  },
+  "shrines": "Shrines",
+  "shrineNames": {
+    "/shrines/force": "Shrine of Force",
+    "/shrines/tempo": "Shrine of Tempo",
+    "/shrines/spirit": "Shrine of Spirit",
+    "/shrines/scholar": "Shrine of Scholar"
+  }
 }

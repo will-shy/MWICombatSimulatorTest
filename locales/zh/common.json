@@ -120,5 +120,19 @@
     },
     "simLabyrinth" : "模拟迷宫",
     "simAllLabyrinths" : "模拟所有迷宫",
-    "roomLevel" : "房间等级"
+    "roomLevel" : "房间等级",
+    "labyrinthUpgrades" : "迷宫升级",
+    "labyrinthUpgradeNames" : {
+        "/labyrinth_upgrades/combat_damage" : "战斗伤害",
+        "/labyrinth_upgrades/attack_speed" : "攻击速度",
+        "/labyrinth_upgrades/cast_speed" : "施法速度",
+        "/labyrinth_upgrades/critical_rate" : "暴击率"
+    },
+    "shrines" : "神龛",
+    "shrineNames" : {
+        "/shrines/force" : "力量神龛",
+        "/shrines/tempo" : "节奏神龛",
+        "/shrines/spirit" : "精神神龛",
+        "/shrines/scholar" : "学者神龛"
+    }
 }

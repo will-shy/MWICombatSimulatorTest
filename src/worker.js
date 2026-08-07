@@ -2,6 +2,8 @@ import CombatSimulator from "./combatsimulator/combatSimulator";
 import Player from "./combatsimulator/player";
 import Zone from "./combatsimulator/zone";
 import Labyrinth from "./combatsimulator/labyrinth";
+import LabyrinthUpgrade from "./combatsimulator/labyrinthUpgrade";
+import Shrine from "./combatsimulator/shrine";
 import Monster from "./combatsimulator/monster";
 import GroupBattleMonster from "./combatsimulator/groupBattleMonster";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
@@ -160,7 +162,15 @@ onmessage = async function (event) {
             for (let i = 0; i < playersData.length; i++) {
                 let currentPlayer = Player.createFromDTO(structuredClone(playersData[i]));
                 currentPlayer.zoneBuffs = zone?.buffs || labyrinth?.buffs || [];
-                currentPlayer.extraBuffs = extraBuffs;
+                // Shrines and labyrinth upgrades are per-player; labyrinth upgrades only take
+                // effect inside a labyrinth, shrines apply to all combat.
+                let playerBuffs = extraBuffs.concat(Shrine.buffsFromLevels(currentPlayer.shrines));
+                if (labyrinth) {
+                    playerBuffs = playerBuffs.concat(
+                        LabyrinthUpgrade.buffsFromLevels(currentPlayer.labyrinthUpgrades)
+                    );
+                }
+                currentPlayer.extraBuffs = playerBuffs;
                 players.push(currentPlayer);
             }
             let simulationTimeLimit = event.data.simulationTimeLimit;

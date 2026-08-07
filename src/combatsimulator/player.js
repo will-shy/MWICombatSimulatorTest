@@ -19,6 +19,9 @@ class Player extends CombatUnit {
         "/equipment_types/back": null,
     };
 
+    labyrinthUpgrades = {};
+    shrines = {};
+
     constructor() {
         super();
 
@@ -53,6 +56,9 @@ class Player extends CombatUnit {
         });
 
         player.achievements = new Achievement(dto.achievements);
+
+        player.labyrinthUpgrades = dto.labyrinthUpgrades ?? {};
+        player.shrines = dto.shrines ?? {};
 
         player.debuffOnLevelGap = dto.debuffOnLevelGap;
 
