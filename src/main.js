@@ -17,6 +17,8 @@ import combatStyleDetailMap from "./combatsimulator/data/combatStyleDetailMap.js
 import openableLootDropMap from "./combatsimulator/data/openableLootDropMap.json";
 import achievementTierMap from "./combatsimulator/data/achievementTierDetailMap.json"
 import achievementDetailMap from "./combatsimulator/data/achievementDetailMap.json"
+import labyrinthUpgradeDetailMap from "./combatsimulator/data/labyrinthUpgradeDetailMap.json"
+import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json"
 
 import patchNote from "../patchNote.json";
 
@@ -175,6 +177,163 @@ function initHouseRoomsModal() {
     }
 
     houseRoomsList.replaceChildren(...newChildren);
+}
+
+// Permanent per-player bonuses entered as a level per entry, each backed by a detail map that
+// turns that level into buffs. Both sections share the same UI, save and load handling.
+const LEVELLED_BONUS_SECTIONS = [
+    {
+        listElementId: "labyrinthUpgradesList",
+        detailMap: labyrinthUpgradeDetailMap,
+        playerKey: "labyrinthUpgrades",
+        hridAttribute: "data-labyrinth-upgrade-hrid",
+        i18nPrefix: "common:labyrinthUpgradeNames.",
+    },
+    {
+        listElementId: "shrinesList",
+        detailMap: shrineDetailMap,
+        playerKey: "shrines",
+        hridAttribute: "data-shrine-hrid",
+        i18nPrefix: "common:shrineNames.",
+    },
+];
+
+function initLevelledBonusSections() {
+    for (const section of LEVELLED_BONUS_SECTIONS) {
+        let list = document.getElementById(section.listElementId);
+        let newChildren = [];
+        let entries = Object.values(section.detailMap).sort((a, b) => a.sortIndex - b.sortIndex);
+        player[section.playerKey] = {};
+
+        for (const entry of entries) {
+            player[section.playerKey][entry.hrid] = 0;
+
+            let row = createElement("div", "row mb-2");
+
+            let nameCol = createElement("div", "col-md-6 col-form-label", entry.name);
+            nameCol.setAttribute("data-i18n", section.i18nPrefix + entry.hrid);
+            row.appendChild(nameCol);
+
+            let levelCol = createElement("div", "col-md-6");
+            let levelInput = createLevelledBonusInput(section, entry);
+
+            levelInput.addEventListener("input", function (e) {
+                let level = Number(e.target.value) || 0;
+                level = Math.max(0, Math.min(entry.maxLevel, Math.floor(level)));
+                player[section.playerKey][entry.hrid] = level;
+                cacheLevelledBonusesForCharacter();
+            });
+
+            levelCol.appendChild(levelInput);
+            row.appendChild(levelCol);
+
+            newChildren.push(row);
+        }
+
+        list.replaceChildren(...newChildren);
+    }
+
+    // Restore whatever was cached for the character currently shown on the active tab.
+    loadLevelledBonusesIntoUI(null);
+    initCharacterNameListeners();
+}
+
+function createLevelledBonusInput(section, entry) {
+    let levelInput = document.createElement("input");
+    levelInput.className = "form-control";
+    levelInput.type = "number";
+    levelInput.placeholder = 0;
+    levelInput.min = 0;
+    levelInput.max = entry.maxLevel;
+    levelInput.step = 1;
+    levelInput.setAttribute(section.hridAttribute, entry.hrid);
+
+    return levelInput;
+}
+
+// Writes the levels held in `set` into both the UI fields and player state, defaulting anything
+// missing to 0 so that sets saved before these sections existed still load cleanly. A set that
+// carries no levels at all for a section falls back to whatever is cached for the character,
+// which is what keeps these values across a set imported straight from the game.
+function loadLevelledBonusesIntoUI(set, playerId = currentPlayerTabId) {
+    const cached = getCachedLevelledBonuses(playerId);
+
+    for (const section of LEVELLED_BONUS_SECTIONS) {
+        const levels = set?.[section.playerKey] ?? cached?.[section.playerKey];
+        for (const entry of Object.values(section.detailMap)) {
+            const field = document.querySelector('[' + section.hridAttribute + '="' + entry.hrid + '"]');
+            const level = Number(levels?.[entry.hrid]) || 0;
+            if (field) {
+                field.value = level > 0 ? level : '';
+            }
+            player[section.playerKey][entry.hrid] = level;
+        }
+    }
+
+    cacheLevelledBonusesForCharacter(playerId);
+}
+
+// Levelled bonuses belong to a character rather than to a gear set, so they are cached under the
+// character name typed into the player tab and survive reloads and set imports.
+const CHARACTER_BONUS_CACHE_KEY = "characterLevelledBonuses";
+
+function getCharacterName(playerId) {
+    const tab = document.getElementById("player" + playerId + "-tab");
+    return tab ? tab.textContent.trim() : "";
+}
+
+function loadCharacterBonusCache() {
+    try {
+        return JSON.parse(localStorage.getItem(CHARACTER_BONUS_CACHE_KEY)) ?? {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveCharacterBonusCache(cache) {
+    try {
+        localStorage.setItem(CHARACTER_BONUS_CACHE_KEY, JSON.stringify(cache));
+    } catch (e) {
+        console.log("Could not cache levelled bonuses: " + e);
+    }
+}
+
+function getCachedLevelledBonuses(playerId) {
+    const name = getCharacterName(playerId);
+    return name ? loadCharacterBonusCache()[name] ?? null : null;
+}
+
+function cacheLevelledBonusesForCharacter(playerId = currentPlayerTabId) {
+    const name = getCharacterName(playerId);
+    if (!name) {
+        return;
+    }
+
+    let cache = loadCharacterBonusCache();
+    let entry = {};
+    for (const section of LEVELLED_BONUS_SECTIONS) {
+        entry[section.playerKey] = { ...player[section.playerKey] };
+    }
+    cache[name] = entry;
+    saveCharacterBonusCache(cache);
+}
+
+// Renaming a tab re-points it at a different character: adopt that character's cached bonuses if
+// we have seen them before, otherwise claim the new name for the levels already on screen.
+function initCharacterNameListeners() {
+    for (const tab of document.querySelectorAll('#playerTab .nav-link')) {
+        tab.addEventListener("blur", function () {
+            const playerId = tab.getAttribute("href").substring(7);
+            if (playerId !== currentPlayerTabId) {
+                return;
+            }
+            if (getCachedLevelledBonuses(playerId)) {
+                loadLevelledBonusesIntoUI(null, playerId);
+            } else {
+                cacheLevelledBonusesForCharacter(playerId);
+            }
+        });
+    }
 }
 
 function createHouseInput(hrid) {
@@ -3202,6 +3361,8 @@ function parsePlayerJson(playerJson, hrid) {
         abilities: [],
         ...playerJson.player,
         houseRooms: playerJson.houseRooms,
+        labyrinthUpgrades: playerJson.labyrinthUpgrades,
+        shrines: playerJson.shrines,
     };
     playerData.equipment = {};
     const triggerMap = playerJson.triggerMap;
@@ -3795,6 +3956,8 @@ function getEquipmentSetFromUI() {
 
     equipmentSet.houseRooms = player.houseRooms;
     equipmentSet.achievements = player.achievements;
+    equipmentSet.labyrinthUpgrades = player.labyrinthUpgrades;
+    equipmentSet.shrines = player.shrines;
 
     return equipmentSet;
 }
@@ -3923,6 +4086,8 @@ function loadEquipmentSetIntoUI(equipmentSet) {
         }
     }
     refreshAchievementStatics();
+
+    loadLevelledBonusesIntoUI(equipmentSet);
 
     updateState();
     updateUI();
@@ -4065,7 +4230,9 @@ function doSoloExport() {
         zone: zoneSelect.value,
         simulationTime: simulationTimeInput.value,
         houseRooms: player.houseRooms,
-        achievements: player.achievements
+        achievements: player.achievements,
+        labyrinthUpgrades: player.labyrinthUpgrades,
+        shrines: player.shrines
     };
     try {
         navigator.clipboard.writeText(JSON.stringify(state)).then(() => alert("Current set has been copied to clipboard."));
@@ -4237,6 +4404,8 @@ function doSoloImport() {
     }
     refreshAchievementStatics();
 
+    loadLevelledBonusesIntoUI(importSet);
+
     if ("zone" in importSet) {
         let zoneSelect = document.getElementById("selectZone");
         zoneSelect.value = importSet["zone"];
@@ -4294,7 +4463,9 @@ function savePreviousPlayer(playerId) {
         zone: zoneSelect.value,
         simulationTime: simulationTimeInput.value,
         houseRooms: player.houseRooms,
-        achievements: player.achievements
+        achievements: player.achievements,
+        labyrinthUpgrades: player.labyrinthUpgrades,
+        shrines: player.shrines
     };
     try {
         playerDataMap[playerId] = JSON.stringify(state);
@@ -4438,6 +4609,8 @@ function updateNextPlayer(currentPlayerNumber) {
         }
     }
     refreshAchievementStatics();
+
+    loadLevelledBonusesIntoUI(importSet, currentPlayerNumber);
 }
 
 function showErrorModal(error) {
@@ -4843,6 +5016,7 @@ function updateContent() {
 initEquipmentSection();
 initHouseRoomsModal();
 initAchievementsModal();
+initLevelledBonusSections();
 initLevelSection();
 initFoodSection();
 initDrinksSection();
