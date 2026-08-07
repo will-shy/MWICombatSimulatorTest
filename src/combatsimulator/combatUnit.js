@@ -184,11 +184,11 @@ class CombatUnit {
         let maxHitpointsRatioBoost = this.getBuffBoost("/buff_types/max_hitpoints").ratioBoost;
         let maxManapointsRatioBoost = this.getBuffBoost("/buff_types/max_manapoints").ratioBoost;
 
-        this.combatDetails.maxHitpoints = Math.floor(
+        this.combatDetails.maxHitpoints = Math.ceil(
             (10 * (10 + this.combatDetails.staminaLevel) + this.combatDetails.combatStats.maxHitpoints)
             * (1 + this.combatDetails.combatStats.maxHitpointsRatio + maxHitpointsRatioBoost)
         );
-        this.combatDetails.maxManapoints = Math.floor(
+        this.combatDetails.maxManapoints = Math.ceil(
             (10 * (10 + this.combatDetails.intelligenceLevel) + this.combatDetails.combatStats.maxManapoints)
             * (1 + this.combatDetails.combatStats.maxManapointsRatio + maxManapointsRatioBoost)
         );
