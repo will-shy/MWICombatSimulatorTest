@@ -11,6 +11,7 @@ import monsterGroupsData from "./combatsimulator/data/monsterGroups.json";
 import GroupBattleMonster from "./combatsimulator/groupBattleMonster.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
 
 // Auto-load every predefined preset from the testPlayers folder. Each JSON file
 // is one solo-export; the preset's display name is derived from the filename
@@ -866,8 +867,9 @@ function renderDetailedStatus(container, dto) {
     container.innerHTML = html;
 }
 
-// Re-renders anything whose displayed monster HP depends on the current
-// player count (enemy group table already added, and any open preview).
+// Re-renders anything whose displayed monster stats depend on the current
+// player count — max HP, attack interval, cast speed and ability haste all scale
+// with roster size (enemy group table already added, and any open preview).
 function refreshHpDependentViews() {
     if (enemyGroup.length) {
         renderEnemyGroup();
@@ -1292,10 +1294,11 @@ function trialSpecAtLevel(hrid, level) {
 
 // Builds a real GroupBattleMonster at the given level and returns its derived
 // combatDetails + abilities. Used by the preview and the enemy-group HP column
-// so they show EXACTLY what the sim uses (no parallel stat formula). hpMult lets
-// the HP tiles reflect the +1%/player group scaling.
-function monsterDerived(hrid, level, hpMult = 1) {
-    const m = new GroupBattleMonster(hrid, level, { hpMultiplier: hpMult });
+// so they show EXACTLY what the sim uses (no parallel stat formula). `scaling`
+// is a groupBattleScaling() result, so the tiles reflect the per-player group
+// scaling (max HP, attack speed, cast speed, ability haste).
+function monsterDerived(hrid, level, scaling = {}) {
+    const m = new GroupBattleMonster(hrid, level, scaling);
     m.updateCombatDetails();
     return { cd: m.combatDetails, abilities: m.abilities.filter(Boolean) };
 }
@@ -1334,7 +1337,7 @@ function setEnemyGroupFromSelection() {
 }
 
 function enemyMaxHp(e) {
-    return monsterDerived(e.hrid, e.level ?? 100, groupHpMultiplier()).cd.maxHitpoints;
+    return monsterDerived(e.hrid, e.level ?? 100, groupScaling()).cd.maxHitpoints;
 }
 
 // Turns the enemy group into the payload the worker expects: one entry per enemy,
@@ -1357,19 +1360,40 @@ function buildWorkerEnemies(specs, levelOverride) {
 // preview matches exactly what the sim uses. Returned as a string so the group
 // preview can expand one member at a time.
 function enemySpecStatsHtml(spec) {
-    const hpMult = groupHpMultiplier();
+    const scaling = groupScaling();
     const styles = ["stab", "slash", "smash", "ranged", "magic"];
     const level = spec.level ?? 100;
-    const { cd, abilities } = monsterDerived(spec.hrid, level, hpMult);
+    const { cd, abilities } = monsterDerived(spec.hrid, level, scaling);
     const cs = cd.combatStats;
     let tiles = [];
 
+    // Tiles the party size scales carry a "(xN players, +X)" suffix so it is
+    // obvious which numbers move with the roster.
+    const players = importedPlayers.length;
+    const partyTag = (bonus) => " " + t("partyScalingTag", { players, bonus });
+
     tiles.push([t("combatStyle"), combatStyleName(cs.combatStyleHrid)]);
     tiles.push([t("damageType"), damageTypeName(cs.damageType)]);
-    tiles.push([t("attackInterval"), (cs.attackInterval / 1e9).toFixed(3) + "s"]);
-    tiles.push([t("abilityHaste"), Math.round(cs.abilityHaste || 0)]);
-    if (cs.castSpeed) tiles.push([t("castSpeed"), (cs.castSpeed * 100).toFixed(0) + "%"]);
-    tiles.push([t("maxHitpoints") + ` (x${importedPlayers.length} players, +${((hpMult - 1) * 100).toFixed(0)}%)`, fmtNum(cd.maxHitpoints), true]);
+    // Attack interval gets its own tag: the roster raises attack SPEED, which
+    // lowers the interval — "+60%" on an interval tile would read backwards.
+    tiles.push([
+        t("attackInterval") + " " + t("partyScalingTagAtkSpeed", {
+            players,
+            bonus: `${(scaling.attackSpeedBonus * 100).toFixed(0)}%`,
+        }),
+        (cs.attackInterval / 1e9).toFixed(3) + "s",
+    ]);
+    tiles.push([
+        t("abilityHaste") + partyTag(scaling.abilityHasteBonus),
+        Math.round(cs.abilityHaste || 0),
+    ]);
+    if (cs.castSpeed) {
+        tiles.push([
+            t("castSpeed") + partyTag(`${(scaling.castSpeedBonus * 100).toFixed(0)}%`),
+            (cs.castSpeed * 100).toFixed(0) + "%",
+        ]);
+    }
+    tiles.push([t("maxHitpoints") + partyTag(`${((scaling.hpMultiplier - 1) * 100).toFixed(0)}%`), fmtNum(cd.maxHitpoints), true]);
     tiles.push([t("maxManapoints"), fmtNum(cd.maxManapoints)]);
     tiles.push([t("tenacity"), Math.round(cs.tenacity || 0)]);
     tiles.push([t("threat"), Math.round(cd.totalThreat || 100)]);
@@ -1397,7 +1421,7 @@ function enemySpecStatsHtml(spec) {
         stamina: cd.staminaLevel, intelligence: cd.intelligenceLevel, attack: cd.attackLevel,
         melee: cd.meleeLevel, defense: cd.defenseLevel, ranged: cd.rangedLevel, magic: cd.magicLevel,
     };
-    let levelsHtml = `<h4>Levels</h4><div class="detail-skills">${levelTilesHtml(levels)}</div>`;
+    let levelsHtml = `<h4>${escapeHtml(t("levels"))}</h4><div class="detail-skills">${levelTilesHtml(levels)}</div>`;
 
     let abilitiesHtml = "";
     if (abilities.length) {
@@ -1500,12 +1524,12 @@ function levelTilesHtml(levels) {
         .join("");
 }
 
-// Monster HP scales +1% per player currently imported (see worker.js's
-// start_battle handler, which applies the same formula with the real battle
-// roster). Previews use the current import count so the number shown matches
-// what a battle would actually run with.
-function groupHpMultiplier() {
-    return 1 + 0.01 * importedPlayers.length;
+// Party-size scaling for the currently imported roster (+1% max HP, +2% attack
+// speed, +2% cast speed, +2 ability haste per player). worker.js's start_battle
+// handler calls the same helper with the real battle roster, so the previewed
+// numbers match what a battle would actually run with.
+function groupScaling() {
+    return groupBattleScaling(importedPlayers.length);
 }
 
 function fmtNum(n) {

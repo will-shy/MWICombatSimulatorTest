@@ -7,7 +7,7 @@
 
 const en = {
     pageTitle: "MWI Group Battle Simulator (WIP)",
-    buildInfo: "last modified 2026-07-18 UTC",
+    buildInfo: "last modified 2026-08-13 UTC",
     disclaimer: "For IC guild Arsenal internal use only.",
     backToStandard: "← Back to standard simulator",
     tabBattle: "Battle",
@@ -231,7 +231,11 @@ const en = {
 
     rulesBannerTitle: "Group Battle Rules:",
     rulesBannerNoFoodDrink: "No food or drink consumables are used — all players get a flat <b>+3 percentage points</b> added to HP regen and MP regen instead (e.g. 1% → 4%).",
-    rulesBannerMonsterHp: "Monster max HP is increased by <b>+1% per player</b> in the group.",
+    rulesBannerMonsterScaling: "Monsters scale with the group size — per player in the group they gain <b>+1% max HP</b>, <b>+2% attack speed</b>, <b>+2% cast speed</b> and <b>+2 ability haste</b>.",
+    // Suffixes on enemy-preview stat tiles that the roster size scales.
+    partyScalingTag: "(x{{players}} players, +{{bonus}})",
+    partyScalingTagAtkSpeed: "(x{{players}} players, +{{bonus}} atk speed)",
+    levels: "Levels",
     rulesBannerEnrage: "Monster <b>enrages after 10 minutes</b> in combat, then gains +10% damage and +10% accuracy for every additional 10 minutes alive (stacking up to +100%/+100% at 100 minutes).",
 
     testImportTitle: "Test Import",
@@ -259,7 +263,7 @@ const en = {
 
 const zh = {
     pageTitle: "MWI 团队战斗模拟器 (WIP)",
-    buildInfo: "最后修改 2026-07-18 UTC",
+    buildInfo: "最后修改 2026-08-13 UTC",
     disclaimer: "仅供 IC 公会 Arsenal 内部使用。",
     backToStandard: "← 返回标准模拟器",
     tabBattle: "战斗",
@@ -414,7 +418,10 @@ const zh = {
 
     rulesBannerTitle: "团队战斗规则：",
     rulesBannerNoFoodDrink: "团队战斗中不使用任何食物或饮品——所有玩家改为获得固定 <b>+3 个百分点</b> 的生命回复和魔力回复加成（例如 1% → 4%）。",
-    rulesBannerMonsterHp: "怪物最大生命值会根据队伍人数增加 <b>每人 +1%</b>。",
+    rulesBannerMonsterScaling: "怪物属性随队伍人数提升——每有 1 名玩家，怪物获得 <b>+1% 最大生命</b>、<b>+2% 攻击速度</b>、<b>+2% 施法速度</b> 和 <b>+2 技能急速</b>。",
+    partyScalingTag: "（{{players}} 名玩家，+{{bonus}}）",
+    partyScalingTagAtkSpeed: "（{{players}} 名玩家，+{{bonus}} 攻击速度）",
+    levels: "等级",
     rulesBannerEnrage: "怪物在战斗 <b>10 分钟后进入狂暴</b>，此后每多存活 10 分钟再获得 +10% 伤害与 +10% 命中（最多叠加至 100 分钟时的 +100%/+100%）。",
 
     testImportTitle: "测试导入",

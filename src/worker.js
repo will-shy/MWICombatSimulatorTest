@@ -7,6 +7,7 @@ import Shrine from "./combatsimulator/shrine";
 import Monster from "./combatsimulator/monster";
 import GroupBattleMonster from "./combatsimulator/groupBattleMonster";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
 
 
 class SimulationManager {
@@ -211,8 +212,10 @@ onmessage = async function (event) {
                 battlePlayers.push(currentPlayer);
             }
 
-            // Monster HP scales +1% per player in the group (see group-battle.html banner).
-            const hpMultiplier = 1 + 0.01 * battlePlayers.length;
+            // Monsters scale with the group size: +1% max HP, +2% attack speed,
+            // +2% cast speed and +2 ability haste per player (see the group-battle.html
+            // rules banner). Shared with the UI preview via groupBattleScaling().
+            const partyScaling = groupBattleScaling(battlePlayers.length);
 
             let fixedEnemies = event.data.enemies.map((enemy) => {
                 if (enemy.trial) {
@@ -220,7 +223,7 @@ onmessage = async function (event) {
                     // level (100..300). uniqueHrid keeps duplicates (e.g. 2x Trial
                     // Badger) as separate rows in the per-enemy result breakdown.
                     return new GroupBattleMonster(enemy.hrid, enemy.level || 100, {
-                        hpMultiplier,
+                        ...partyScaling,
                         uniqueHrid: enemy.uniqueHrid,
                         displayName: enemy.name,
                     });

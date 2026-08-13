@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MWI Group Battle Simulator (WIP) v0.7</title>
+    <title>MWI Group Battle Simulator (WIP) v0.8</title>
     <link rel="icon" href="data:," />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -566,7 +566,7 @@
     <header>
         <div class="header-left">
             <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator (WIP)</h1>
-            <div class="build-info"><span id="buildVersion">v0.7</span> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-07-18 UTC</span></div>
+            <div class="build-info"><span id="buildVersion">v0.8</span> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-08-13 UTC</span></div>
             <div class="disclaimer" data-i18n="common:groupBattle.disclaimer">For IC guild Arsenal internal use only.</div>
             <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
         </div>
@@ -576,7 +576,7 @@
         <summary><b data-i18n="common:groupBattle.rulesBannerTitle">Group Battle Rules:</b></summary>
         <ul>
             <li data-i18n-html data-i18n="common:groupBattle.rulesBannerNoFoodDrink">No food or drink consumables are used — all players get a flat <b>+3 percentage points</b> added to HP regen and MP regen instead (e.g. 1% → 4%).</li>
-            <li data-i18n-html data-i18n="common:groupBattle.rulesBannerMonsterHp">Monster max HP is increased by <b>+1% per player</b> in the group.</li>
+            <li data-i18n-html data-i18n="common:groupBattle.rulesBannerMonsterScaling">Monsters scale with the group size — per player in the group they gain <b>+1% max HP</b>, <b>+2% attack speed</b>, <b>+2% cast speed</b> and <b>+2 ability haste</b>.</li>
             <li data-i18n-html data-i18n="common:groupBattle.rulesBannerEnrage">Monster <b>enrages after 10 minutes</b> in combat, then gains +10% damage and +10% accuracy for every additional 10 minutes alive (stacking up to +100%/+100% at 100 minutes).</li>
         </ul>
     </details>
@@ -632,7 +632,7 @@
                 <div class="row" style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border);">
                     <b data-i18n="common:groupBattle.auraSectionTitle">Auras</b>
                 </div>
-                <p class="hint" data-i18n="common:groupBattle.auraSectionHint">On build, each aura is auto-assigned to the roster member with the highest matching skill (Fierce→Attack, Mystic→Magic, Crit→Ranged, Guardian→Defense, Speed→Melee) — one aura per player — overriding that player's original aura.</p>
+                <p class="hint" data-i18n="common:groupBattle.auraSectionHint">On build, each aura is auto-assigned to the roster member with the highest matching skill (Fierce→Melee, Mystic→Magic, Crit→Ranged, Guardian→Defense, Speed→Attack) — one aura per player — overriding that player's original aura.</p>
                 <div class="row aura-levels">
                     <label for="auraLvlFierce" data-i18n="common:groupBattle.auraFierce">Fierce</label>
                     <input type="number" id="auraLvlFierce" value="30" min="20" style="width:60px;" />

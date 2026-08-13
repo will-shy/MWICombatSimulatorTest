@@ -12,7 +12,7 @@ import Monster from "./monster";
 //      re-reads combatMonsterDetailMap[this.hrid] on every call, so we cannot
 //      simply rename hrid. We keep the real data hrid in `dataHrid` and swap it
 //      in for the duration of the base derivation, restoring the unique hrid.
-//   2. Group HP rule: monster max HP/MP is +1% per player. Re-applied after every
+//   2. Party-size scaling. See applyPartyScaling() below. Re-applied after every
 //      re-derivation (reset() calls updateCombatDetails()).
 //
 // `roomLevel` is the trial "level" (100..300); difficultyTier is always 0, which
@@ -29,6 +29,9 @@ class GroupBattleMonster extends Monster {
             this.name = options.displayName;
         }
         this.hpMultiplier = options.hpMultiplier ?? 1;
+        this.attackSpeedBonus = options.attackSpeedBonus ?? 0;
+        this.castSpeedBonus = options.castSpeedBonus ?? 0;
+        this.abilityHasteBonus = options.abilityHasteBonus ?? 0;
     }
 
     updateCombatDetails() {
@@ -40,11 +43,37 @@ class GroupBattleMonster extends Monster {
         super.updateCombatDetails();
         this.hrid = uniqueHrid;
 
-        // Group-battle HP rule: +1% max HP/MP per player. Applied after the base
-        // derivation so it survives every reset()/re-derive.
+        this.applyPartyScaling();
+    }
+
+    // Group-battle party-size rules, applied AFTER the base derivation so they
+    // survive every reset()/re-derive. Monster.updateCombatDetails() re-copies
+    // combatStats from the game data (and zero-fills anything missing) on every
+    // call, so these bonuses are re-applied to fresh values and never accumulate.
+    //
+    // Each bonus is applied the same way the engine applies that stat's own
+    // buffs, so the result matches what an equivalent buff would produce:
+    //   - attack speed: a separate divisor on attackInterval, mirroring the
+    //     attack-speed buff handling in combatUnit.js:288-292.
+    //   - cast speed:   additive into combatStats.castSpeed, mirroring the
+    //     cast-speed buff handling in combatUnit.js:351.
+    //   - ability haste: additive flat points; consumed later as
+    //     cooldown * 100 / (100 + haste) (ability.js:192-196).
+    applyPartyScaling() {
+        let combatStats = this.combatDetails.combatStats;
+
+        // HP only — max MP is deliberately NOT scaled by party size.
         if (this.hpMultiplier !== 1) {
             this.combatDetails.maxHitpoints = Math.floor(this.combatDetails.maxHitpoints * this.hpMultiplier);
-            this.combatDetails.maxManapoints = Math.floor(this.combatDetails.maxManapoints * this.hpMultiplier);
+        }
+        if (this.attackSpeedBonus) {
+            combatStats.attackInterval /= 1 + this.attackSpeedBonus;
+        }
+        if (this.castSpeedBonus) {
+            combatStats.castSpeed += this.castSpeedBonus;
+        }
+        if (this.abilityHasteBonus) {
+            combatStats.abilityHaste += this.abilityHasteBonus;
         }
     }
 }
