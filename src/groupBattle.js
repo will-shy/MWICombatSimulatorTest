@@ -12,6 +12,7 @@ import GroupBattleMonster from "./combatsimulator/groupBattleMonster.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
 import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
+import changelogData from "./combatsimulator/data/changelogGroupBattle.json";
 
 // Auto-load every predefined preset from the testPlayers folder. Each JSON file
 // is one solo-export; the preset's display name is derived from the filename
@@ -1892,6 +1893,62 @@ function closeTrialResultModal() {
     if (overlay) overlay.style.display = "none";
 }
 
+// ----------------------------------------------------------------- Changelog -
+// Rendered from data/changelogGroupBattle.json into the modal behind the header
+// version badge. The JSON's key order is the display order (newest first), and
+// the version matching #buildVersion is tagged as "current".
+
+// Notes are authored per language ("en"/"zh"); fall back to en for any language
+// without its own array so a new locale never renders an empty changelog.
+function changelogNotes(entry) {
+    let lang = "en";
+    if (typeof i18next !== "undefined" && i18next.language) {
+        lang = String(i18next.language).toLowerCase().startsWith("zh") ? "zh" : "en";
+    }
+    let notes = entry[lang];
+    if (!Array.isArray(notes) || !notes.length) {
+        notes = entry.en;
+    }
+    return Array.isArray(notes) ? notes : [];
+}
+
+function renderChangelog() {
+    const body = document.getElementById("changelogModalBody");
+    if (!body) return;
+
+    const currentVersion = (document.getElementById("buildVersion")?.textContent || "").trim();
+
+    // "_comment" is documentation for maintainers, not a version - skip it.
+    const html = Object.entries(changelogData)
+        .filter(([version, entry]) => version !== "_comment" && entry && typeof entry === "object")
+        .map(([version, entry]) => {
+            const notes = changelogNotes(entry)
+                .map((n) => `<li>${escapeHtml(n)}</li>`)
+                .join("");
+            const isCurrent = version === currentVersion ? " current" : "";
+            return `<div class="changelog-entry${isCurrent}">
+                <h4 class="changelog-ver">${escapeHtml(version)}
+                    <span class="changelog-date">${escapeHtml(entry.date || "")}</span>
+                </h4>
+                <ul class="changelog-notes">${notes}</ul>
+            </div>`;
+        })
+        .join("");
+
+    body.innerHTML = html || `<div class="empty">${escapeHtml(t("noChangelog"))}</div>`;
+}
+
+function openChangelogModal() {
+    renderChangelog();
+    document.getElementById("changelogModalOverlay").style.display = "flex";
+    document.getElementById("changelogModalClose").focus();
+}
+
+function closeChangelogModal() {
+    const overlay = document.getElementById("changelogModalOverlay");
+    if (overlay) overlay.style.display = "none";
+}
+
 // ------------------------------------------------------------------- Results
 
 function nameFor(hrid, isPlayer) {
@@ -2465,6 +2522,10 @@ window.addEventListener("DOMContentLoaded", () => {
         renderPlayerList();
         renderEnemyGroup();
         refreshEnemySelect();
+        // Changelog notes are per-language; re-render if it's currently open.
+        if (document.getElementById("changelogModalOverlay")?.style.display !== "none") {
+            renderChangelog();
+        }
         if (window.__lastBattleResult) {
             renderResult(window.__lastBattleResult, false);
         }
@@ -2476,6 +2537,19 @@ window.addEventListener("DOMContentLoaded", () => {
     // and hide every .subtabpanel, including the Group Builder).
     document.querySelectorAll(".subtab[data-subtab]").forEach((btn) => {
         btn.addEventListener("click", () => switchSubTab(btn.dataset.subtab));
+    });
+
+    // Changelog modal, opened by the header version badge.
+    document.getElementById("buildVersion").addEventListener("click", openChangelogModal);
+    document.getElementById("changelogModalClose").addEventListener("click", closeChangelogModal);
+    document.getElementById("changelogModalOverlay").addEventListener("click", (ev) => {
+        if (ev.target.id === "changelogModalOverlay") closeChangelogModal();
+    });
+    document.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") {
+            let ov = document.getElementById("changelogModalOverlay");
+            if (ov && ov.style.display !== "none") closeChangelogModal();
+        }
     });
 
     // Player detail modal: close via ✕, clicking the backdrop, or Esc.

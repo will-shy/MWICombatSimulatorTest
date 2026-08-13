@@ -1,0 +1,122 @@
+{
+  "_comment": "Changelog for the Group Battle page, shown by clicking the version badge in the header. Newest version FIRST - render order follows key order. Each entry: date (YYYY-MM-DD) plus parallel en/zh note arrays; the renderer picks the array matching the active language and falls back to en. Add a new block here whenever #buildVersion in group-battle.html is bumped.",
+  "v0.9": {
+    "date": "2026-08-13",
+    "en": [
+      "The version number in the header is now clickable and opens this changelog."
+    ],
+    "zh": [
+      "点击页首的版本号即可打开本更新日志。"
+    ]
+  },
+  "v0.8": {
+    "date": "2026-08-13",
+    "en": [
+      "Monsters now scale with party size: +1% max HP, +2% attack speed, +2% cast speed and +2 ability haste per player.",
+      "Max MP no longer scales with party size.",
+      "Updated trial monster data: slower attacks and casts, no ability haste, and more HP on Trial Badger, Chameleon and Jellyfish.",
+      "The separate HP and speed rules are merged into a single monster scaling rule in the rules banner.",
+      "The enemy preview now marks which stats the roster size scales."
+    ],
+    "zh": [
+      "怪物属性随队伍人数提升：每名玩家 +1% 最大生命、+2% 攻击速度、+2% 施法速度、+2 技能急速。",
+      "最大魔力不再随队伍人数提升。",
+      "更新试炼怪物数据：攻击与施法变慢、移除技能急速，试炼獾/变色龙/水母的生命值提高。",
+      "规则栏中原本分开的生命与速度规则合并为单条怪物缩放规则。",
+      "敌人预览会标出哪些属性随队伍人数变化。"
+    ]
+  },
+  "v0.7": {
+    "date": "2026-07-18",
+    "en": [
+      "Version number moved out of the translated build-info text."
+    ],
+    "zh": [
+      "版本号从可翻译的构建信息文本中拆分出来。"
+    ]
+  },
+  "v0.6": {
+    "date": "2026-07-18",
+    "en": [
+      "Chinese locale synced with the recent aura and cast-count changes."
+    ],
+    "zh": [
+      "同步中文本地化，补上光环与施放次数相关的改动。"
+    ]
+  },
+  "v0.5": {
+    "date": "2026-07-18",
+    "en": [
+      "Fixed aura skill mapping: Fierce Aura → Melee, Speed Aura → Attack (previously reversed).",
+      "Players carrying a support aura are labelled \"Name (Aura)\" in Damage Done.",
+      "Monsters always sort first in the damage tables and the end-of-battle summary.",
+      "Enemy names are now shown in red.",
+      "Ability cast counts are tracked, including non-damaging abilities, along with self-inflicted HP costs.",
+      "Trial monsters are now built directly from the real game data (stats, ability levels, enrage).",
+      "Added the Healing Done table."
+    ],
+    "zh": [
+      "修正光环与技能的对应关系：狂暴光环 → 近战，迅捷光环 → 攻击（此前颠倒）。",
+      "伤害统计中为携带辅助光环的玩家标注“名称（光环）”。",
+      "怪物在伤害统计与战斗结算摘要中始终排在最前。",
+      "敌人名称改为红色显示。",
+      "记录技能施放次数（包含无伤害技能）以及自身承受的生命消耗。",
+      "试炼怪物改为直接使用游戏数据构建（属性、技能等级、狂暴）。",
+      "新增治疗统计表。"
+    ]
+  },
+  "v0.4": {
+    "date": "2026-07-17",
+    "en": [
+      "Added predefined enemy groups (Trial Badger x2, Chameleon, Jellyfish, Hedgehog, Swarm).",
+      "Section 2 became a dropdown-driven \"Select Enemy Group\", with a per-monster stat preview.",
+      "Removed the Monster Presets page.",
+      "Battle mode \"Single Boss\" renamed to \"Single Tier\"."
+    ],
+    "zh": [
+      "新增预设敌人组合（试炼獾 x2、变色龙、水母、刺猬、虫群）。",
+      "第 2 部分改为下拉选择“选择敌人组合”，并可逐个预览怪物属性。",
+      "移除怪物预设页面。",
+      "战斗模式“单一首领”更名为“单一层级”。"
+    ]
+  },
+  "v0.3": {
+    "date": "2026-07-17",
+    "en": [
+      "Aura auto-assignment, with a configurable level per aura.",
+      "Predefined presets are auto-loaded from the data/testPlayers folder.",
+      "Added an out-of-mana (OOM) tracker, shown on roster cards and per trial tier."
+    ],
+    "zh": [
+      "光环自动分配，可分别设置各光环等级。",
+      "预设角色从 data/testPlayers 目录自动加载。",
+      "新增缺蓝（OOM）统计，显示在角色卡与各层级结果中。"
+    ]
+  },
+  "v0.2": {
+    "date": "2026-07-16",
+    "en": [
+      "Roster shown as style/aura colour-coded cards with HP/MP bars; click a card for details and export.",
+      "Build a roster from predefined presets and saved equipment sets.",
+      "Added Trial Mode: escalating tiers on a shared time budget.",
+      "Combat log filters, and a per-tier combat detail modal.",
+      "Full English/Chinese localisation."
+    ],
+    "zh": [
+      "队伍以按战斗风格/光环着色的卡片展示，附生命/魔力条；点击卡片查看详情与导出。",
+      "可从预设角色与已保存的装备套装构建队伍。",
+      "新增试炼模式：逐层递增，共享总时间预算。",
+      "战斗日志支持筛选，并可查看每层的完整战斗详情。",
+      "完整的中英文本地化。"
+    ]
+  },
+  "v0.1": {
+    "date": "2026-07-16",
+    "en": [
+      "First version of the Group Battle page."
+    ],
+    "zh": [
+      "团队战斗页面初版。"
+    ]
+  }
+}

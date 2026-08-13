@@ -236,6 +236,9 @@ const en = {
     partyScalingTag: "(x{{players}} players, +{{bonus}})",
     partyScalingTagAtkSpeed: "(x{{players}} players, +{{bonus}} atk speed)",
     levels: "Levels",
+    changelogTitle: "Changelog",
+    changelogTooltip: "View changelog",
+    noChangelog: "No changelog entries.",
     rulesBannerEnrage: "Monster <b>enrages after 10 minutes</b> in combat, then gains +10% damage and +10% accuracy for every additional 10 minutes alive (stacking up to +100%/+100% at 100 minutes).",
 
     testImportTitle: "Test Import",
@@ -422,6 +425,9 @@ const zh = {
     partyScalingTag: "（{{players}} 名玩家，+{{bonus}}）",
     partyScalingTagAtkSpeed: "（{{players}} 名玩家，+{{bonus}} 攻击速度）",
     levels: "等级",
+    changelogTitle: "更新日志",
+    changelogTooltip: "查看更新日志",
+    noChangelog: "暂无更新日志。",
     rulesBannerEnrage: "怪物在战斗 <b>10 分钟后进入狂暴</b>，此后每多存活 10 分钟再获得 +10% 伤害与 +10% 命中（最多叠加至 100 分钟时的 +100%/+100%）。",
 
     testImportTitle: "测试导入",
@@ -548,6 +554,9 @@ function applyStaticTranslations() {
     });
     document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
         el.placeholder = i18next.t(el.getAttribute("data-i18n-placeholder"));
+    });
+    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+        el.title = i18next.t(el.getAttribute("data-i18n-title"));
     });
     document.title = i18next.t("common:groupBattle.pageTitle");
 }
