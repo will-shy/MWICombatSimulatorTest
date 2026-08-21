@@ -5,10 +5,10 @@
 // English-only by project convention for new group-battle features.
 import {
     PRESET_LIST, PRESETS, MONSTER_GROUPS, ABILITY_LIST,
-    enemyPreview, buildStyle,
+    enemyPreview, buildStyle, presetKit,
 } from "./combatsimulator/skillLab.js";
 
-const STORE_KEY = "mwiSkillLabConfig";
+const STORE_KEY = "mwiSkillLabConfigV2";
 const ABILITY_BY_HRID = ABILITY_LIST.reduce((acc, a) => (acc[a.hrid] = a, acc), {});
 
 const STYLE_COLORS = {
@@ -33,11 +33,11 @@ function defaultState() {
         level: 160,
         runs: 3,
         timeCapSeconds: 3600,
-        infiniteMana: true,
+        infiniteMana: false,
         noPlayerDamage: true,
         auras: true,
         auraLevel: 25,
-        nextId: 4,
+        nextId: 9,
         squads: [
             {
                 id: 1, label: "Melee", presetId: pick("smash_T95", "smash_insanity"), count: 14,
@@ -61,12 +61,22 @@ function defaultState() {
                     A("/abilities/entangle", 60),
                 ],
             },
-        ],
-        supports: [
-            { presetId: pick("wark", PRESET_LIST[0].id), count: 2 },
-            { presetId: pick("nature_healer_revive", PRESET_LIST[0].id), count: 8 },
+            // Support squads: fight normally (their debuffs and Mana Spring's mana
+            // feed benefit the raid) but their damage is excluded from the analysis.
+            // Kits prefill from the preset and stay editable — the Water squad's
+            // Mana Spring level lives right in its slot list.
+            supportSquad(4, "Tank", "wark", 2),
+            supportSquad(5, "Nature Support", "nature_healer_revive", 6),
+            supportSquad(6, "Water Support", "water_insanity", 2),
+            supportSquad(7, "Stab Support", "stab_insanity", 2),
+            supportSquad(8, "Bow Support", "bow_insanity", 2),
         ],
     };
+}
+
+function supportSquad(id, label, presetId, count) {
+    const pid = pick(presetId, PRESET_LIST[0].id);
+    return { id, label, presetId: pid, count, support: true, kit: presetKit(pid) };
 }
 
 function pick(...ids) {
@@ -83,7 +93,6 @@ function loadState() {
         const parsed = JSON.parse(raw);
         // Drop anything referencing a preset that no longer exists.
         parsed.squads = (parsed.squads || []).filter((s) => PRESETS[s.presetId]);
-        parsed.supports = (parsed.supports || []).filter((s) => PRESETS[s.presetId]);
         if (!parsed.squads.length) return defaultState();
         return { ...defaultState(), ...parsed };
     } catch (e) {
@@ -108,9 +117,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => (
 const fmt = (n, d = 0) => Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
 
 function partySize() {
-    const dps = state.squads.reduce((s, q) => s + (Number(q.count) || 0), 0);
-    const sup = state.supports.reduce((s, q) => s + (Number(q.count) || 0), 0);
-    return dps + sup;
+    return state.squads.reduce((s, q) => s + (Number(q.count) || 0), 0);
 }
 
 function styleName(hrid) {
@@ -209,14 +216,18 @@ function renderSquads() {
     host.innerHTML = state.squads.map((squad, idx) => {
         const style = buildStyle(squad.presetId);
         const color = STYLE_COLORS[style] || "#9aa0aa";
-        const baseline = state.squads.findIndex((s) => s.presetId === squad.presetId);
+        const baseline = state.squads.findIndex((s) => s.presetId === squad.presetId && !!s.support === !!squad.support);
         const isVariant = baseline !== idx;
         return `
-        <div class="squad" data-idx="${idx}" style="border-left-color:${color}">
+        <div class="squad${squad.support ? " is-support" : ""}" data-idx="${idx}" style="border-left-color:${color}">
             <div class="squad-head">
                 <input class="squad-label" data-field="label" value="${esc(squad.label)}" aria-label="Squad name">
+                ${squad.support ? '<span class="tag support">support</span>' : ""}
                 ${isVariant ? '<span class="tag variant">variant</span>' : ""}
                 <span class="grow"></span>
+                <label class="inline" title="A support squad fights normally — its debuffs and mana feeds help the raid — but its damage is excluded from the analysis, and auras are carried by supports first.">
+                    <input type="checkbox" data-field="support"${squad.support ? " checked" : ""}> support
+                </label>
                 <label class="inline">build
                     <select data-field="presetId">
                         ${PRESET_LIST.map((p) => `<option value="${esc(p.id)}"${p.id === squad.presetId ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
@@ -245,17 +256,6 @@ function renderSquads() {
     }).join("");
 }
 
-function renderSupports() {
-    el("supportList").innerHTML = state.supports.map((sup, idx) => `
-        <div class="support" data-idx="${idx}">
-            <select data-field="presetId">
-                ${PRESET_LIST.map((p) => `<option value="${esc(p.id)}"${p.id === sup.presetId ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
-            </select>
-            <input type="number" min="0" max="100" data-field="count" value="${Number(sup.count) || 0}">
-            <button type="button" class="btn small danger" data-act="remove">✕</button>
-        </div>`).join("");
-}
-
 function renderOptions() {
     el("optInfiniteMana").checked = !!state.infiniteMana;
     el("optNoDamage").checked = !!state.noPlayerDamage;
@@ -268,7 +268,6 @@ function renderOptions() {
 function renderAll() {
     renderEnemy();
     renderSquads();
-    renderSupports();
     renderOptions();
 }
 
@@ -278,12 +277,15 @@ function renderResult(agg) {
     if (!agg) { el("resultPanel").style.display = "none"; return; }
     el("resultPanel").style.display = "block";
 
-    const totalDmg = agg.squads.reduce((s, q) => s + q.dmg, 0) || 1;
+    // Analysis covers non-support squads only; supports render dimmed below it.
+    const dpsSquads = agg.squads.filter((q) => !q.support);
+    const supSquads = agg.squads.filter((q) => q.support);
+    const totalDmg = dpsSquads.reduce((s, q) => s + q.dmg, 0) || 1;
     const timedOut = agg.outcomes.some((o) => o === "timeout");
 
-    const baselineFor = (idx) => {
-        const q = agg.squads[idx];
-        const first = agg.squads.findIndex((s) => s.presetId === q.presetId);
+    const baselineFor = (q) => {
+        const idx = agg.squads.indexOf(q);
+        const first = agg.squads.findIndex((s) => s.presetId === q.presetId && !!s.support === !!q.support);
         return first === idx ? null : agg.squads[first];
     };
 
@@ -307,8 +309,9 @@ function renderResult(agg) {
                 </tr>
             </thead>
             <tbody>
-                ${agg.squads.map((q, idx) => {
-                    const base = baselineFor(idx);
+                ${[...dpsSquads, ...supSquads].map((q) => {
+                    const idx = agg.squads.indexOf(q);
+                    const base = baselineFor(q);
                     const style = buildStyle(q.presetId);
                     const color = STYLE_COLORS[style] || "#9aa0aa";
                     const hit = q.hits + q.misses ? q.hits / (q.hits + q.misses) : 0;
@@ -318,14 +321,15 @@ function renderResult(agg) {
                         const cls = pct > 0.5 ? "good" : pct < -0.5 ? "bad" : "dim";
                         delta = `<span class="${cls}">${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%</span> <span class="dim">vs ${esc(base.label)}</span>`;
                     }
+                    const shareCell = q.support ? '<span class="dim">excluded</span>' : `${(q.dmg / totalDmg * 100).toFixed(1)}%`;
                     return `
-                    <tr class="squad-row" data-idx="${idx}">
-                        <td><span class="dot" style="background:${color}"></span>${esc(q.label)}</td>
+                    <tr class="squad-row${q.support ? " support-row" : ""}" data-idx="${idx}">
+                        <td><span class="dot" style="background:${color}"></span>${esc(q.label)}${q.support ? ' <span class="tag support">support</span>' : ""}</td>
                         <td class="dim">${esc(PRESETS[q.presetId] ? PRESETS[q.presetId].name : q.presetId)}</td>
                         <td>${q.n}</td>
-                        <td><b>${fmt(q.dps, 1)}</b></td>
-                        <td>${fmt(q.pctPerMin, 2)}</td>
-                        <td class="dim">${(q.dmg / totalDmg * 100).toFixed(1)}%</td>
+                        <td>${q.support ? `<span class="dim">${fmt(q.dps, 1)}</span>` : `<b>${fmt(q.dps, 1)}</b>`}</td>
+                        <td>${q.support ? `<span class="dim">${fmt(q.pctPerMin, 2)}</span>` : fmt(q.pctPerMin, 2)}</td>
+                        <td class="dim">${shareCell}</td>
                         <td class="dim">${(hit * 100).toFixed(0)}%</td>
                         <td class="dim">${fmt(q.oom)}</td>
                         <td>${delta}</td>
@@ -336,7 +340,7 @@ function renderResult(agg) {
                 }).join("")}
             </tbody>
         </table>
-        <p class="hint">Click a row for its ability breakdown. <b>%HP / min</b> is the whole squad's share of the group's HP pool per minute; <b>DPS / player</b> is one player's damage per second. Squads sharing a build are compared against the first of that build.</p>`;
+        <p class="hint">Click a row for its ability breakdown. <b>%HP / min</b> is the whole squad's share of the group's HP pool per minute; <b>DPS / player</b> is one player's damage per second. <b>Share</b> covers non-support squads only — support squads fight and debuff, but their damage is excluded from the analysis. Squads sharing a build are compared against the first of that build.</p>`;
 
     el("resultTable").querySelectorAll(".squad-row").forEach((row) => {
         row.addEventListener("click", () => {
@@ -408,9 +412,9 @@ function run() {
             squads: state.squads.map((s) => ({
                 id: s.id, label: s.label, presetId: s.presetId,
                 count: Number(s.count) || 0,
+                support: !!s.support,
                 kit: (s.kit || []).map((slot) => (slot && slot.hrid ? { hrid: slot.hrid, level: Number(slot.level) || 1 } : null)),
             })),
-            supports: state.supports.map((s) => ({ presetId: s.presetId, count: Number(s.count) || 0 })),
             options: {
                 infiniteMana: !!state.infiniteMana,
                 noPlayerDamage: !!state.noPlayerDamage,
@@ -457,7 +461,13 @@ function onSquadInput(e) {
     const field = e.target.dataset.field;
 
     if (field === "label") squad.label = e.target.value;
-    else if (field === "presetId") squad.presetId = e.target.value;
+    else if (field === "support") squad.support = e.target.checked;
+    else if (field === "presetId") {
+        squad.presetId = e.target.value;
+        // A support squad runs its preset's own kit by default; refresh it so the
+        // slots show what the new preset actually casts.
+        if (squad.support) squad.kit = presetKit(squad.presetId);
+    }
     else if (field === "count") squad.count = Math.max(0, Number(e.target.value) || 0);
     else if (field === "slotHrid") {
         const i = Number(e.target.dataset.slot);
@@ -478,7 +488,7 @@ function onSquadInput(e) {
     }
     saveState();
     if (field === "count") renderEnemy();
-    if (field === "presetId" || field === "slotHrid") { renderSquads(); renderEnemy(); }
+    if (field === "presetId" || field === "slotHrid" || field === "support") { renderSquads(); renderEnemy(); }
 }
 
 function onSquadClick(e) {
@@ -501,31 +511,12 @@ function onSquadClick(e) {
             label: squad.label + " B",
             presetId: squad.presetId,
             count: take,
+            support: !!squad.support,
             kit: (squad.kit || []).map((s) => (s ? { ...s } : null)),
         });
     }
     saveState();
     renderSquads();
-    renderEnemy();
-}
-
-function onSupportInput(e) {
-    const row = e.target.closest(".support");
-    if (!row) return;
-    const sup = state.supports[Number(row.dataset.idx)];
-    if (!sup) return;
-    if (e.target.dataset.field === "presetId") sup.presetId = e.target.value;
-    if (e.target.dataset.field === "count") sup.count = Math.max(0, Number(e.target.value) || 0);
-    saveState();
-    renderEnemy();
-}
-
-function onSupportClick(e) {
-    const btn = e.target.closest("button[data-act='remove']");
-    if (!btn) return;
-    state.supports.splice(Number(btn.closest(".support").dataset.idx), 1);
-    saveState();
-    renderSupports();
     renderEnemy();
 }
 
@@ -539,21 +530,13 @@ document.addEventListener("DOMContentLoaded", () => {
     el("squadList").addEventListener("change", onSquadInput);
     el("squadList").addEventListener("click", onSquadClick);
 
-    el("supportList").addEventListener("input", onSupportInput);
-    el("supportList").addEventListener("change", onSupportInput);
-    el("supportList").addEventListener("click", onSupportClick);
-
     el("addSquad").addEventListener("click", () => {
         state.squads.push({
             id: state.nextId++, label: "Squad " + (state.squads.length + 1),
-            presetId: PRESET_LIST[0].id, count: 0,
+            presetId: PRESET_LIST[0].id, count: 0, support: false,
             kit: [null, null, null, null, null],
         });
         saveState(); renderSquads(); renderEnemy();
-    });
-    el("addSupport").addEventListener("click", () => {
-        state.supports.push({ presetId: PRESET_LIST[0].id, count: 0 });
-        saveState(); renderSupports(); renderEnemy();
     });
 
     el("optInfiniteMana").addEventListener("change", (e) => { state.infiniteMana = e.target.checked; saveState(); });

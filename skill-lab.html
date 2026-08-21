@@ -170,6 +170,11 @@
         }
 
         .tag.variant { background: #3b3524; color: var(--aura); }
+        .tag.support { background: #253242; color: var(--accent); }
+
+        .squad.is-support { opacity: 0.88; }
+
+        tbody tr.support-row td { opacity: 0.75; }
 
         .slots { display: flex; flex-direction: column; gap: 5px; }
 
@@ -184,9 +189,6 @@
 
         .slot-meta { font-size: 11px; color: var(--dim); }
         .slot-warn { font-size: 11px; color: var(--draw); margin-left: 8px; cursor: help; }
-
-        .support { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-        .support select { flex: 1 1 auto; max-width: 260px; }
 
         /* ----------------------------------------------------------- results */
 
@@ -266,8 +268,11 @@
             completion. Squads sharing the same build are compared against the first of that build, so the
             workflow for <b>“what if 5 of our 14 crossbows swapped skills?”</b> is: press <b>＋ variant</b> on that
             squad, change the copy's kit, and read the <b>vs baseline</b> column.
-            This is a damage bench, not a survival test — by default nobody takes damage and nobody runs out of mana,
-            so the numbers isolate the kit. Slot 0 is the special/aura slot.
+            Squads marked <b>support</b> fight normally — their debuffs and Mana Spring's mana feed benefit the whole
+            raid — but their damage is excluded from the analysis, and the five raid auras go to support members first.
+            Mana is real by default (watch the <b>blocked casts</b> column); tick <b>infinite mana</b> to isolate a kit
+            from its mana cost. Players never take damage — this is a damage bench, not a survival test.
+            Slot 0 is the special/aura slot.
         </p>
 
         <div id="errorBox"></div>
@@ -286,15 +291,6 @@
                 </div>
 
                 <div class="card">
-                    <h2>Support placeholders</h2>
-                    <p class="card-hint">Tanks and healers that deal <b>exactly zero damage</b> but still count toward
-                        party-size scaling and carry the auras. Use these to model the real raid size without letting
-                        support damage pollute the comparison.</p>
-                    <div id="supportList"></div>
-                    <button type="button" class="btn small" id="addSupport">＋ add placeholder row</button>
-                </div>
-
-                <div class="card">
                     <h2>Options</h2>
                     <div class="row" style="margin-bottom:10px">
                         <label class="inline"><input type="checkbox" id="optInfiniteMana"> infinite mana</label>
@@ -308,8 +304,8 @@
                         <label class="inline">runs (seeds) <input type="number" id="runCount" min="1" max="10"></label>
                         <label class="inline">time cap (s) <input type="number" id="timeCap" min="60" max="14400" step="60" style="width:84px"></label>
                     </div>
-                    <p class="card-hint" style="margin:12px 0 0">Auras go on the support placeholders when there are any,
-                        otherwise on the highest-skill damage dealers, which costs those players a slot. More runs
+                    <p class="card-hint" style="margin:12px 0 0">Auras go to support-squad members when any exist,
+                        otherwise to the highest-skill damage dealers, which costs those players a slot. More runs
                         average out roll luck; three is usually enough to separate kits more than 2% apart.</p>
                 </div>
             </div>
@@ -318,8 +314,10 @@
                 <div class="card">
                     <h2>Squads</h2>
                     <p class="card-hint">Each squad is N identical players. <b>＋ variant</b> moves up to 5 players into a
-                        copy of the squad so party size stays fixed. A ⚠ on a slot means that ability resolves on a
-                        different combat style's accuracy and damage than the squad's weapon — usually a trap.</p>
+                        copy of the squad so party size stays fixed. The <b>support</b> checkbox keeps a squad fighting
+                        (debuffs and mana feeds still land) while excluding its damage from the analysis — its kit stays
+                        editable, e.g. the Water squad's Mana Spring level. A ⚠ on a slot means that ability resolves on
+                        a different combat style's accuracy and damage than the squad's weapon — usually a trap.</p>
                     <div id="squadList"></div>
                     <div class="row" style="margin-top:4px">
                         <button type="button" class="btn small" id="addSquad">＋ add squad</button>

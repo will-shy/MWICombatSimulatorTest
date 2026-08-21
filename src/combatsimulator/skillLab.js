@@ -2,9 +2,12 @@
 //
 // Runs one fixed trial-group encounter and reports damage per *squad* (a group of
 // identical players), so two squads on the same preset with different ability kits
-// can be compared directly. This is deliberately not a survival simulation: the
-// point is to isolate damage output, so the caller can switch off player damage
-// intake and mana limits.
+// can be compared directly. A squad marked `support: true` fights normally — its
+// attacks land, so its debuffs (armor shred, evasion cuts, Mana Spring's mana feed)
+// benefit the raid — but the caller treats its damage as out-of-scope for the
+// comparison. This is deliberately not a survival simulation: the point is to
+// isolate damage output, so the caller can switch off player damage intake and,
+// optionally, mana limits.
 //
 // Everything here mirrors the group-battle path (worker.js "start_battle"): real
 // Player objects, zone buffs from /actions/combat/fly, GROUP_BATTLE_REGEN_BUFFS,
@@ -14,7 +17,6 @@ import Player from "./player.js";
 import Ability from "./ability.js";
 import Zone from "./zone.js";
 import CombatSimulator from "./combatSimulator.js";
-import CombatUtilities from "./combatUtilities.js";
 import GroupBattleMonster from "./groupBattleMonster.js";
 import groupBattleScaling from "./data/groupBattleScaling.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./data/groupBattleBuffs.js";
@@ -44,6 +46,18 @@ export const PRESETS = PRESET_CTX.keys().reduce((acc, file) => {
 }, {});
 
 export const PRESET_LIST = Object.values(PRESETS).sort((a, b) => a.name.localeCompare(b.name));
+
+// A preset's own ability list as a length-5 kit ({hrid, level}|null), so the UI
+// can prefill a squad's slots with what the build actually runs.
+export function presetKit(presetId) {
+    const preset = PRESETS[presetId];
+    if (!preset) return [null, null, null, null, null];
+    const kit = [0, 1, 2, 3, 4].map((i) => {
+        const a = (preset.export.abilities || [])[i];
+        return a && a.abilityHrid ? { hrid: a.abilityHrid, level: Number(a.level) || 1 } : null;
+    });
+    return kit;
+}
 
 // ------------------------------------------------------------------ monsters --
 
@@ -199,13 +213,14 @@ function setPlayerAura(dto, auraHrid, level) {
     dto.abilities[idx] = auraDto;
 }
 
-// Auras land on the support placeholders when there are any — they contribute no
-// damage, so spending their slots costs nothing. With no supports in the roster
-// they fall back to the highest-skill damage dealers, which does cost those
-// players an ability slot (exactly like the group-battle page's auto-assign).
+// Auras land on support-squad members when there are any — their damage is
+// excluded from the analysis, so spending their slots costs the comparison
+// nothing. With no support squads they fall back to the highest-skill damage
+// dealers, which does cost those players an ability slot (exactly like the
+// group-battle page's auto-assign).
 function assignAuras(roster, level) {
-    const pool = roster.some((r) => r.inert)
-        ? roster.map((r, i) => ({ r, i })).filter((x) => x.r.inert)
+    const pool = roster.some((r) => r.support)
+        ? roster.map((r, i) => ({ r, i })).filter((x) => x.r.support)
         : roster.map((r, i) => ({ r, i }));
     const used = new Set();
     for (const aura of AURA_ASSIGNMENTS) {
@@ -222,23 +237,6 @@ function assignAuras(roster, level) {
 }
 
 // -------------------------------------------------------------------- engine --
-
-// Support placeholders must contribute exactly zero damage. Their attacks are
-// nulled at the one place all damage flows through, which also removes their
-// thorns and retaliation, while leaving their buffs and auras intact.
-const NO_HIT = {
-    damageDone: 0, didHit: false, thornDamageDone: 0, thornType: undefined,
-    retaliationDamageDone: 0, lifeStealHeal: 0, hpDrain: 0, manaLeechMana: 0, isCrit: false,
-};
-
-if (!CombatUtilities.__skillLabPatched) {
-    const original = CombatUtilities.processAttack.bind(CombatUtilities);
-    CombatUtilities.processAttack = function (source, target, abilityEffect = null) {
-        if (source && source.__inert) return { ...NO_HIT };
-        return original(source, target, abilityEffect);
-    };
-    CombatUtilities.__skillLabPatched = true;
-}
 
 // Deterministic RNG so a config always produces the same numbers, and so two
 // kits can be compared on identical rolls.
@@ -303,37 +301,43 @@ function mergeInto(acc, part) {
  *
  * config = {
  *   groupName, level,
- *   squads:  [{ id, label, presetId, count, kit }],   // kit = 5 × {hrid,level}|null
- *   supports:[{ presetId, count }],                   // damage-inert placeholders
+ *   squads:  [{ id, label, presetId, count, kit, support }], // kit = 5 × {hrid,level}|null
+ *   supports:[{ presetId, count }],   // legacy shorthand: support squads on the preset's own kit
  *   options: { infiniteMana, noPlayerDamage, auras, auraLevel, timeCapSeconds },
  *   seed
  * }
+ *
+ * `support: true` squads fight normally (debuffs land, mana feeds flow) but are
+ * flagged in the result so the caller can exclude their damage from the analysis.
  */
 export async function runSkillLab(config) {
     const opts = config.options || {};
     const level = Number(config.level) || 100;
     const seed = Number(config.seed) || 1;
 
+    const squads = (config.squads || []).slice();
+    // Legacy shorthand: bare {presetId, count} supports become support squads
+    // running the preset's own ability kit.
+    for (const [i, sup] of (config.supports || []).entries()) {
+        if (!PRESETS[sup.presetId]) continue;
+        squads.push({
+            id: "support-" + i, label: PRESETS[sup.presetId].name,
+            presetId: sup.presetId, count: sup.count, kit: null, support: true,
+        });
+    }
+
     const roster = [];
     let n = 0;
-    for (const squad of config.squads || []) {
+    for (const squad of squads) {
         const preset = PRESETS[squad.presetId];
         if (!preset) throw new Error("Unknown build: " + squad.presetId);
         const count = Math.max(0, Math.floor(Number(squad.count) || 0));
         for (let i = 0; i < count; i++) {
             roster.push({
                 squadId: squad.id,
-                inert: false,
+                support: !!squad.support,
                 dto: soloExportToDTO(preset.export, "player" + ++n, squad.kit),
             });
-        }
-    }
-    for (const sup of config.supports || []) {
-        const preset = PRESETS[sup.presetId];
-        if (!preset) continue;
-        const count = Math.max(0, Math.floor(Number(sup.count) || 0));
-        for (let i = 0; i < count; i++) {
-            roster.push({ squadId: null, inert: true, dto: soloExportToDTO(preset.export, "player" + ++n, null) });
         }
     }
     if (!roster.length) throw new Error("The roster is empty — give at least one squad a count above zero.");
@@ -348,7 +352,6 @@ export async function runSkillLab(config) {
             const p = Player.createFromDTO(structuredClone(r.dto));
             p.zoneBuffs = zone.buffs;
             p.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
-            if (r.inert) p.__inert = true;
             if (opts.noPlayerDamage || opts.infiniteMana) {
                 const base = p.updateCombatDetails.bind(p);
                 p.updateCombatDetails = function () {
@@ -381,18 +384,18 @@ export async function runSkillLab(config) {
         const seconds = res.battleDurationNs / 1e9;
         const totalHp = (res.enemyFinalState || []).reduce((s, e) => s + e.maxHitpoints, 0);
 
-        const squads = (config.squads || []).map((squad) => ({
+        const squadResults = squads.map((squad) => ({
             id: squad.id,
             label: squad.label,
             presetId: squad.presetId,
+            support: !!squad.support,
             kit: (squad.kit || []).filter((s) => s && s.hrid),
             n: 0, dmg: 0, hits: 0, misses: 0, oom: 0,
             perAbility: {}, perTarget: {}, casts: {},
         }));
-        const bySquad = new Map(squads.map((s) => [s.id, s]));
+        const bySquad = new Map(squadResults.map((s) => [s.id, s]));
 
         for (const r of roster) {
-            if (r.inert) continue;
             const bucket = bySquad.get(r.squadId);
             if (!bucket) continue;
             bucket.n += 1;
@@ -409,14 +412,14 @@ export async function runSkillLab(config) {
             seconds,
             totalHp,
             partySize: players.length,
-            supportCount: roster.filter((r) => r.inert).length,
+            supportCount: roster.filter((r) => r.support).length,
             maxEnrage: res.maxEnrageStack,
             enemies: (res.enemyFinalState || []).map((e) => ({
                 hrid: e.hrid,
                 maxHitpoints: e.maxHitpoints,
                 currentHitpoints: e.currentHitpoints,
             })),
-            squads,
+            squads: squadResults,
         };
     } finally {
         Math.random = realRandom;
@@ -432,7 +435,8 @@ export function aggregateRuns(runs) {
     const squads = first.squads.map((s0, idx) => {
         const parts = runs.map((r) => r.squads[idx]);
         const acc = {
-            id: s0.id, label: s0.label, presetId: s0.presetId, kit: s0.kit, n: s0.n,
+            id: s0.id, label: s0.label, presetId: s0.presetId, support: !!s0.support,
+            kit: s0.kit, n: s0.n,
             dmg: 0, hits: 0, misses: 0, oom: 0, perAbility: {}, perTarget: {}, casts: {},
         };
         for (const p of parts) {
