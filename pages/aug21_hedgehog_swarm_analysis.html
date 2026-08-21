@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hedgehog &amp; Hedgehog Trial Board</title>
+<style>
+:root {
+  color-scheme: light;
+  --ground:#F4F6F4; --surface:#FBFCFB; --ink:#131A18; --muted:#59645F;
+  --data:#00875F; --flag:#B26A00; --rule:#DDE3E0; --track:#E4E9E6;
+  --row:rgba(0,135,95,.035);
+  --display:"Superclarendon","Rockwell","Bookman Old Style",Georgia,serif;
+  --body:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:"SF Mono","SFMono-Regular","Cascadia Mono",Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground:#0D1211; --surface:#161C1B; --ink:#E7EDEA; --muted:#93A09B;
+    --data:#3FC08D; --flag:#E0A93F; --rule:#26302D; --track:#212A28;
+    --row:rgba(63,192,141,.045);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:#0D1211; --surface:#161C1B; --ink:#E7EDEA; --muted:#93A09B;
+  --data:#3FC08D; --flag:#E0A93F; --rule:#26302D; --track:#212A28;
+  --row:rgba(63,192,141,.045);
+}
+
+* { box-sizing:border-box; }
+body {
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--body); font-size:15px; line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap { max-width:1120px; margin:0 auto; padding:0 24px 96px; }
+a { color:var(--data); }
+:focus-visible { outline:2px solid var(--data); outline-offset:2px; }
+
+/* ---------- masthead ---------- */
+header.mast { padding:56px 0 28px; border-bottom:2px solid var(--ink); }
+.eyebrow {
+  font-family:var(--mono); font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 14px;
+}
+h1 {
+  font-family:var(--display); font-weight:400; font-size:clamp(30px,5vw,48px);
+  line-height:1.06; letter-spacing:-.01em; margin:0; text-wrap:balance;
+}
+.standfirst { margin:16px 0 0; max-width:62ch; color:var(--muted); }
+.standfirst strong { color:var(--ink); font-weight:600; }
+
+/* ---------- section furniture ---------- */
+section { margin-top:60px; }
+h2 {
+  font-family:var(--display); font-weight:400; font-size:26px; margin:0 0 6px;
+  letter-spacing:-.005em;
+}
+.lede { margin:0 0 22px; color:var(--muted); max-width:66ch; font-size:14px; }
+h3 {
+  font-family:var(--display); font-weight:400; font-size:19px;
+  margin:38px 0 4px; display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+}
+h3 .count { font-family:var(--mono); font-size:11.5px; color:var(--muted); letter-spacing:.04em; }
+
+/* ---------- factor board ---------- */
+.board { border-top:1px solid var(--rule); }
+.frow {
+  display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(120px,3fr) 58px 92px 74px;
+  align-items:center; gap:14px; padding:9px 0;
+  border-bottom:1px solid var(--rule);
+}
+.frow.support { opacity:.72; }
+.fname { font-size:14px; font-weight:550; }
+.fname em { display:block; font-style:normal; font-size:11.5px; color:var(--muted); font-weight:400; }
+.meter { position:relative; height:16px; background:var(--track); }
+.meter .fill { position:absolute; inset:0 auto 0 0; background:var(--data);
+               border-radius:0 4px 4px 0; }
+.meter .cap { position:absolute; top:-4px; bottom:-4px; right:0; width:2px; background:var(--ink); }
+.fnum { font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:14px;
+        text-align:right; }
+.dots { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.05em;
+        white-space:nowrap; }
+.dots .on { color:var(--data); }
+.dots.assumed .word { color:var(--flag); }
+.fsample { font-family:var(--mono); font-size:11.5px; color:var(--muted); text-align:right;
+           font-variant-numeric:tabular-nums; }
+.fhead { border-bottom:1px solid var(--ink); }
+.fhead > * { font-family:var(--mono); font-size:10px; letter-spacing:.13em;
+             text-transform:uppercase; color:var(--muted); font-weight:400; }
+.fhead .fnum, .fhead .fsample { text-align:right; }
+
+/* ---------- nav ---------- */
+nav.jump { display:flex; flex-wrap:wrap; gap:6px; margin:22px 0 0; }
+nav.jump a {
+  font-family:var(--mono); font-size:11.5px; text-decoration:none; color:var(--muted);
+  border:1px solid var(--rule); padding:4px 9px; background:var(--surface);
+}
+nav.jump a:hover { color:var(--data); border-color:var(--data); }
+
+/* ---------- player tables ---------- */
+.note {
+  border-left:2px solid var(--flag); padding:7px 0 7px 12px; margin:10px 0 14px;
+  font-size:13px; color:var(--muted); max-width:78ch;
+}
+.note strong { color:var(--ink); font-weight:600; }
+.scroll { overflow-x:auto; border-bottom:1px solid var(--rule); }
+table { width:100%; border-collapse:collapse; font-size:13.5px; }
+thead th {
+  font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted); font-weight:400; text-align:right; padding:8px 10px;
+  border-bottom:1px solid var(--ink); white-space:nowrap;
+}
+thead th.l { text-align:left; }
+tbody td { padding:6px 10px; border-bottom:1px solid var(--rule); text-align:right;
+           white-space:nowrap; }
+tbody td.l { text-align:left; }
+tbody tr:nth-child(odd) { background:var(--row); }
+.rk { font-family:var(--mono); font-size:11.5px; color:var(--muted); width:1%; }
+.pl { font-weight:550; }
+.n { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+.dim { color:var(--muted); }
+.sc { display:flex; align-items:center; justify-content:flex-end; gap:9px; }
+.sc .bar { width:64px; height:8px; background:var(--track); position:relative; flex:none; }
+.sc .bar i { position:absolute; inset:0 auto 0 0; background:var(--data);
+             border-radius:0 3px 3px 0; }
+.sc .v { font-family:var(--mono); font-variant-numeric:tabular-nums; width:44px;
+         text-align:right; }
+.bosstag { font-family:var(--mono); font-size:11px; color:var(--muted); }
+
+/* ---------- caveats ---------- */
+.caveats { display:grid; gap:1px; background:var(--rule); border:1px solid var(--rule); }
+.caveats > div { background:var(--surface); padding:18px 20px; }
+.caveats h4 { font-family:var(--display); font-weight:400; font-size:16px; margin:0 0 5px; }
+.caveats p { margin:0; font-size:13.5px; color:var(--muted); }
+.caveats code { font-family:var(--mono); font-size:12px; color:var(--ink); }
+
+footer { margin-top:56px; padding-top:18px; border-top:1px solid var(--rule);
+         font-family:var(--mono); font-size:11.5px; color:var(--muted); }
+
+/* ---------- tooltip ---------- */
+#tip {
+  position:fixed; z-index:9; pointer-events:none; opacity:0; transition:opacity .12s;
+  background:var(--ink); color:var(--surface); padding:6px 9px; font-size:12px;
+  font-family:var(--mono); max-width:260px; line-height:1.4;
+}
+#tip.on { opacity:1; }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+@media (max-width:640px) {
+  .frow { grid-template-columns:minmax(110px,1fr) minmax(80px,2fr) 46px 62px; }
+  .fsample { display:none; }
+  .fhead .fsample { display:none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="mast">
+<p class="eyebrow">Guild trial &middot; 21 Aug 2026 &middot; 103 members</p>
+<h1>Hedgehog &amp; Hedgehog Trial Board</h1>
+<p class="standfirst">Two parties, two bosses, no shared members &mdash; so raw damage from the Hedgehog sheet cannot be compared to the Hedgehog sheet until each build’s boss penalty is measured. <strong>Factors below are estimated with level controls; player scores use observed damage only</strong>, so gear, enhancement, consumables and play all count.</p>
+</header>
+<section id="factors">
+<h2>Boss normalisation factors</h2>
+<p class="lede">Each track is the build’s damage on its own boss. The filled bar is what survives on Hedgehog; the empty remainder is the loss. Factors come from <span class="n">exp(median Hedgehog residual &minus; median Hedgehog residual)</span> after controlling for main attribute and attack level, over every player — no one is trimmed, because one-sided trimming of a treatment group biases exactly the quantity being measured.</p>
+<div class="board">
+<div class="frow fhead"><div>Build</div><div>Damage retained on Hedgehog</div><div class="fnum">Factor</div><div>Confidence</div><div class="fsample">Hgh / Bdg</div></div>
+<div class="frow"><div class="fname">Crossbow</div><div class="meter" data-tip="Crossbow &middot; 0.85 of its Hedgehog damage survives on Hedgehog &middot; 9 Hedgehog / 14 Hedgehog players &middot; good"><div class="fill" style="width:85.0%"></div><div class="cap"></div></div><div class="fnum">0.85</div><div><span class="dots"><span class="on">●●●</span> <span class="word">good</span></span></div><div class="fsample">9 / 14</div></div>
+<div class="frow"><div class="fname">Stab</div><div class="meter" data-tip="Stab &middot; 0.84 of its Hedgehog damage survives on Hedgehog &middot; 4 Hedgehog / 1 Hedgehog players &middot; weak"><div class="fill" style="width:84.0%"></div><div class="cap"></div></div><div class="fnum">0.84</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">4 / 1</div></div>
+<div class="frow"><div class="fname">Bow</div><div class="meter" data-tip="Bow &middot; 0.67 of its Hedgehog damage survives on Hedgehog &middot; 1 Hedgehog / 2 Hedgehog players &middot; weak"><div class="fill" style="width:67.0%"></div><div class="cap"></div></div><div class="fnum">0.67</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">1 / 2</div></div>
+<div class="frow"><div class="fname">Fire</div><div class="meter" data-tip="Fire &middot; 0.59 of its Hedgehog damage survives on Hedgehog &middot; 0 Hedgehog / 3 Hedgehog players &middot; assumed"><div class="fill" style="width:59.0%"></div><div class="cap"></div></div><div class="fnum">0.59</div><div><span class="dots assumed">○○○ <span class="word">assumed</span></span></div><div class="fsample">0 / 3</div></div>
+<div class="frow"><div class="fname">Flex DPS</div><div class="meter" data-tip="Flex DPS &middot; 0.59 of its Hedgehog damage survives on Hedgehog &middot; 0 Hedgehog / 3 Hedgehog players &middot; assumed"><div class="fill" style="width:59.0%"></div><div class="cap"></div></div><div class="fnum">0.59</div><div><span class="dots assumed">○○○ <span class="word">assumed</span></span></div><div class="fsample">0 / 3</div></div>
+<div class="frow"><div class="fname">Nature DPS</div><div class="meter" data-tip="Nature DPS &middot; 0.59 of its Hedgehog damage survives on Hedgehog &middot; 0 Hedgehog / 8 Hedgehog players &middot; assumed"><div class="fill" style="width:59.0%"></div><div class="cap"></div></div><div class="fnum">0.59</div><div><span class="dots assumed">○○○ <span class="word">assumed</span></span></div><div class="fsample">0 / 8</div></div>
+<div class="frow"><div class="fname">Slash</div><div class="meter" data-tip="Slash &middot; 0.59 of its Hedgehog damage survives on Hedgehog &middot; 2 Hedgehog / 2 Hedgehog players &middot; weak"><div class="fill" style="width:59.0%"></div><div class="cap"></div></div><div class="fnum">0.59</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">2 / 2</div></div>
+<div class="frow"><div class="fname">Smash</div><div class="meter" data-tip="Smash &middot; 0.49 of its Hedgehog damage survives on Hedgehog &middot; 24 Hedgehog / 7 Hedgehog players &middot; good"><div class="fill" style="width:49.0%"></div><div class="cap"></div></div><div class="fnum">0.49</div><div><span class="dots"><span class="on">●●●</span> <span class="word">good</span></span></div><div class="fsample">24 / 7</div></div>
+<div class="frow"><div class="fname">Water</div><div class="meter" data-tip="Water &middot; 0.32 of its Hedgehog damage survives on Hedgehog &middot; 3 Hedgehog / 2 Hedgehog players &middot; weak"><div class="fill" style="width:32.0%"></div><div class="cap"></div></div><div class="fnum">0.32</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">3 / 2</div></div>
+<div class="frow support"><div class="fname">Nature Support<em>support &mdash; damage incidental</em></div><div class="meter" data-tip="Nature Support &middot; 0.52 of its Hedgehog damage survives on Hedgehog &middot; 5 Hedgehog / 6 Hedgehog players &middot; fair"><div class="fill" style="width:52.0%"></div><div class="cap"></div></div><div class="fnum">0.52</div><div><span class="dots"><span class="on">●●</span>○ <span class="word">fair</span></span></div><div class="fsample">5 / 6</div></div>
+<div class="frow support"><div class="fname">Wark<em>support &mdash; damage incidental</em></div><div class="meter" data-tip="Wark &middot; 0.32 of its Hedgehog damage survives on Hedgehog &middot; 2 Hedgehog / 1 Hedgehog players &middot; weak"><div class="fill" style="width:32.0%"></div><div class="cap"></div></div><div class="fnum">0.32</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">2 / 1</div></div>
+<div class="frow support"><div class="fname">Mana Spring Support<em>support &mdash; damage incidental</em></div><div class="meter" data-tip="Mana Spring Support &middot; 0.30 of its Hedgehog damage survives on Hedgehog &middot; 2 Hedgehog / 2 Hedgehog players &middot; weak"><div class="fill" style="width:30.0%"></div><div class="cap"></div></div><div class="fnum">0.30</div><div><span class="dots"><span class="on">●</span>○○ <span class="word">weak</span></span></div><div class="fsample">2 / 2</div></div>
+</div>
+</section>
+<section id="scores">
+<h2>Player scores</h2>
+<p class="lede"><span class="n">Norm</span> is raw damage divided by the build’s factor — rebased to the Hedgehog scale and comparable <em>across</em> builds. <span class="n">Score</span> is 100 &times; Norm over the best Norm in that build, so it compares <em>within</em> a build only.</p>
+<nav class="jump">
+<a href="#nature-dps">Nature DPS</a>
+<a href="#crossbow">Crossbow</a>
+<a href="#smash">Smash</a>
+<a href="#bow">Bow</a>
+<a href="#fire">Fire</a>
+<a href="#flex-dps">Flex DPS</a>
+<a href="#mana-spring-support">Mana Spring Support</a>
+<a href="#nature-support">Nature Support</a>
+<a href="#slash">Slash</a>
+<a href="#stab">Stab</a>
+<a href="#wark">Wark</a>
+<a href="#water">Water</a>
+</nav>
+<h3 id="nature-dps">Nature DPS<span class="count">8 players</span></h3>
+<p class="note"><strong>One boss only.</strong> The factor is a common constant across every player here, so it cancels out of these scores entirely — the ranking holds regardless of what the factor turns out to be.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th><th>Heal</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">WillT</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">198K</td><td class="n">336K</td><td class="n">136</td><td class="n dim">128</td><td class="l dim">Speed 32</td><td class="n dim">69K</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">IronQino</td><td><span class="sc"><span class="bar"><i style="width:77%"></i></span><span class="v">77.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">153K</td><td class="n">259K</td><td class="n">134</td><td class="n dim">122</td><td class="l dim">Guardian 34</td><td class="n dim">49K</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Ironnqsr</td><td><span class="sc"><span class="bar"><i style="width:75%"></i></span><span class="v">74.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">148K</td><td class="n">251K</td><td class="n">130</td><td class="n dim">120</td><td class="l dim">Mystic 31</td><td class="n dim">53K</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">MitzieWitzie</td><td><span class="sc"><span class="bar"><i style="width:73%"></i></span><span class="v">72.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">144K</td><td class="n">244K</td><td class="n">132</td><td class="n dim">119</td><td class="l dim">Mystic 33</td><td class="n dim">51K</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">Dedende</td><td><span class="sc"><span class="bar"><i style="width:72%"></i></span><span class="v">72.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">143K</td><td class="n">242K</td><td class="n">130</td><td class="n dim">134</td><td class="l dim">Guardian 25</td><td class="n dim">53K</td></tr>
+<tr><td class="l rk">6</td><td class="l pl">Skellt</td><td><span class="sc"><span class="bar"><i style="width:70%"></i></span><span class="v">70.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">139K</td><td class="n">236K</td><td class="n">130</td><td class="n dim">125</td><td class="l dim">Mystic 36</td><td class="n dim">49K</td></tr>
+<tr><td class="l rk">7</td><td class="l pl">Fisu</td><td><span class="sc"><span class="bar"><i style="width:62%"></i></span><span class="v">61.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">122K</td><td class="n">207K</td><td class="n">130</td><td class="n dim">121</td><td class="l dim">—</td><td class="n dim">—</td></tr>
+<tr><td class="l rk">8</td><td class="l pl">SomeUdderOrph</td><td><span class="sc"><span class="bar"><i style="width:55%"></i></span><span class="v">54.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">108K</td><td class="n">183K</td><td class="n">132</td><td class="n dim">114</td><td class="l dim">Guardian 30</td><td class="n dim">43K</td></tr>
+</tbody></table></div>
+<h3 id="crossbow">Crossbow<span class="count">23 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">RedGreenBlue</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">204K</td><td class="n">240K</td><td class="n">133</td><td class="n dim">126</td><td class="l dim">Crit 34</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">Kahvikippo</td><td><span class="sc"><span class="bar"><i style="width:90%"></i></span><span class="v">89.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">183K</td><td class="n">215K</td><td class="n">133</td><td class="n dim">123</td><td class="l dim">Crit 36</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">AzureCamilla</td><td><span class="sc"><span class="bar"><i style="width:87%"></i></span><span class="v">87.1</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">209K</td><td class="n">209K</td><td class="n">133</td><td class="n dim">118</td><td class="l dim">Speed 36</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">ccp002</td><td><span class="sc"><span class="bar"><i style="width:85%"></i></span><span class="v">85.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">174K</td><td class="n">205K</td><td class="n">129</td><td class="n dim">123</td><td class="l dim">Crit 30</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">raanger</td><td><span class="sc"><span class="bar"><i style="width:84%"></i></span><span class="v">83.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">171K</td><td class="n">201K</td><td class="n">129</td><td class="n dim">125</td><td class="l dim">Crit 29</td></tr>
+<tr><td class="l rk">6</td><td class="l pl">stockysalmon897</td><td><span class="sc"><span class="bar"><i style="width:84%"></i></span><span class="v">83.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">201K</td><td class="n">201K</td><td class="n">125</td><td class="n dim">121</td><td class="l dim">Crit 25</td></tr>
+<tr><td class="l rk">7</td><td class="l pl">INVINCIBLE</td><td><span class="sc"><span class="bar"><i style="width:80%"></i></span><span class="v">79.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">163K</td><td class="n">192K</td><td class="n">135</td><td class="n dim">114</td><td class="l dim">Crit 31</td></tr>
+<tr><td class="l rk">8</td><td class="l pl">NagiRabbit</td><td><span class="sc"><span class="bar"><i style="width:80%"></i></span><span class="v">79.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">191K</td><td class="n">191K</td><td class="n">130</td><td class="n dim">120</td><td class="l dim">Crit 25</td></tr>
+<tr><td class="l rk">9</td><td class="l pl">Arroneath</td><td><span class="sc"><span class="bar"><i style="width:79%"></i></span><span class="v">78.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">161K</td><td class="n">189K</td><td class="n">126</td><td class="n dim">120</td><td class="l dim">Speed 25</td></tr>
+<tr><td class="l rk">10</td><td class="l pl">Stelllaaa</td><td><span class="sc"><span class="bar"><i style="width:74%"></i></span><span class="v">74.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">178K</td><td class="n">178K</td><td class="n">126</td><td class="n dim">120</td><td class="l dim">—</td></tr>
+<tr><td class="l rk">11</td><td class="l pl">MorOrph</td><td><span class="sc"><span class="bar"><i style="width:74%"></i></span><span class="v">73.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">150K</td><td class="n">176K</td><td class="n">129</td><td class="n dim">118</td><td class="l dim">Crit 28</td></tr>
+<tr><td class="l rk">12</td><td class="l pl">dimibay</td><td><span class="sc"><span class="bar"><i style="width:66%"></i></span><span class="v">65.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">158K</td><td class="n">158K</td><td class="n">127</td><td class="n dim">116</td><td class="l dim">Crit 20</td></tr>
+<tr><td class="l rk">13</td><td class="l pl">ZeemanSplitting</td><td><span class="sc"><span class="bar"><i style="width:64%"></i></span><span class="v">64.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">154K</td><td class="n">154K</td><td class="n">128</td><td class="n dim">120</td><td class="l dim">Crit 28</td></tr>
+<tr><td class="l rk">14</td><td class="l pl">KakaKim</td><td><span class="sc"><span class="bar"><i style="width:62%"></i></span><span class="v">62.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">127K</td><td class="n">149K</td><td class="n">124</td><td class="n dim">113</td><td class="l dim">Crit 17</td></tr>
+<tr><td class="l rk">15</td><td class="l pl">SundotKulangot</td><td><span class="sc"><span class="bar"><i style="width:62%"></i></span><span class="v">61.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">148K</td><td class="n">148K</td><td class="n">128</td><td class="n dim">119</td><td class="l dim">Speed 30</td></tr>
+<tr><td class="l rk">16</td><td class="l pl">AdmiralKizaru</td><td><span class="sc"><span class="bar"><i style="width:57%"></i></span><span class="v">57.4</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">117K</td><td class="n">138K</td><td class="n">125</td><td class="n dim">121</td><td class="l dim">Crit 24</td></tr>
+<tr><td class="l rk">17</td><td class="l pl">Tinbad</td><td><span class="sc"><span class="bar"><i style="width:56%"></i></span><span class="v">56.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">135K</td><td class="n">135K</td><td class="n">126</td><td class="n dim">112</td><td class="l dim">Guardian 27</td></tr>
+<tr><td class="l rk">18</td><td class="l pl">Binbad</td><td><span class="sc"><span class="bar"><i style="width:56%"></i></span><span class="v">55.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">114K</td><td class="n">134K</td><td class="n">127</td><td class="n dim">116</td><td class="l dim">Speed 27</td></tr>
+<tr><td class="l rk">19</td><td class="l pl">BlessedKlay</td><td><span class="sc"><span class="bar"><i style="width:51%"></i></span><span class="v">51.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">105K</td><td class="n">124K</td><td class="n">128</td><td class="n dim">125</td><td class="l dim">Fierce 33</td></tr>
+<tr><td class="l rk">20</td><td class="l pl">Ragnavar</td><td><span class="sc"><span class="bar"><i style="width:50%"></i></span><span class="v">50.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">103K</td><td class="n">121K</td><td class="n">123</td><td class="n dim">109</td><td class="l dim">Speed 14</td></tr>
+<tr><td class="l rk">21</td><td class="l pl">CastorTroyRanged</td><td><span class="sc"><span class="bar"><i style="width:50%"></i></span><span class="v">49.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">101K</td><td class="n">119K</td><td class="n">132</td><td class="n dim">117</td><td class="l dim">Mystic 28</td></tr>
+<tr><td class="l rk">22</td><td class="l pl">Jinbad</td><td><span class="sc"><span class="bar"><i style="width:49%"></i></span><span class="v">48.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">99K</td><td class="n">116K</td><td class="n">126</td><td class="n dim">102</td><td class="l dim">Fierce 29</td></tr>
+<tr><td class="l rk">23</td><td class="l pl">PastaPasta</td><td><span class="sc"><span class="bar"><i style="width:34%"></i></span><span class="v">33.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">81K</td><td class="n">81K</td><td class="n">115</td><td class="n dim">109</td><td class="l dim">Speed 21</td></tr>
+</tbody></table></div>
+<h3 id="smash">Smash<span class="count">31 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">ironmitzie</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">476K</td><td class="n">476K</td><td class="n">146</td><td class="n dim">122</td><td class="l dim">Fierce 39</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">IronKefka</td><td><span class="sc"><span class="bar"><i style="width:90%"></i></span><span class="v">89.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">427K</td><td class="n">427K</td><td class="n">135</td><td class="n dim">125</td><td class="l dim">Fierce 30</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Kahvimuki</td><td><span class="sc"><span class="bar"><i style="width:87%"></i></span><span class="v">87.4</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">416K</td><td class="n">416K</td><td class="n">134</td><td class="n dim">127</td><td class="l dim">Fierce 34</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">Coolcabbage16</td><td><span class="sc"><span class="bar"><i style="width:80%"></i></span><span class="v">80.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">381K</td><td class="n">381K</td><td class="n">131</td><td class="n dim">125</td><td class="l dim">Fierce 32</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">WaytonoIC</td><td><span class="sc"><span class="bar"><i style="width:80%"></i></span><span class="v">79.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">380K</td><td class="n">380K</td><td class="n">137</td><td class="n dim">120</td><td class="l dim">Fierce 31</td></tr>
+<tr><td class="l rk">6</td><td class="l pl">epichelldeath</td><td><span class="sc"><span class="bar"><i style="width:78%"></i></span><span class="v">78.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">183K</td><td class="n">373K</td><td class="n">135</td><td class="n dim">123</td><td class="l dim">Fierce 17</td></tr>
+<tr><td class="l rk">7</td><td class="l pl">mitziethesecond</td><td><span class="sc"><span class="bar"><i style="width:73%"></i></span><span class="v">72.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">346K</td><td class="n">346K</td><td class="n">135</td><td class="n dim">114</td><td class="l dim">Crit 37</td></tr>
+<tr><td class="l rk">8</td><td class="l pl">ryaan</td><td><span class="sc"><span class="bar"><i style="width:72%"></i></span><span class="v">72.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">344K</td><td class="n">344K</td><td class="n">133</td><td class="n dim">125</td><td class="l dim">Fierce 36</td></tr>
+<tr><td class="l rk">9</td><td class="l pl">Ireneman</td><td><span class="sc"><span class="bar"><i style="width:72%"></i></span><span class="v">71.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">167K</td><td class="n">341K</td><td class="n">128</td><td class="n dim">122</td><td class="l dim">Fierce 29</td></tr>
+<tr><td class="l rk">10</td><td class="l pl">moodoom</td><td><span class="sc"><span class="bar"><i style="width:68%"></i></span><span class="v">68.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">326K</td><td class="n">326K</td><td class="n">125</td><td class="n dim">125</td><td class="l dim">Fierce 33</td></tr>
+<tr><td class="l rk">11</td><td class="l pl">SteelMoo</td><td><span class="sc"><span class="bar"><i style="width:68%"></i></span><span class="v">67.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">322K</td><td class="n">322K</td><td class="n">131</td><td class="n dim">123</td><td class="l dim">Fierce 28</td></tr>
+<tr><td class="l rk">12</td><td class="l pl">HaveMoreFaith</td><td><span class="sc"><span class="bar"><i style="width:67%"></i></span><span class="v">66.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">318K</td><td class="n">318K</td><td class="n">129</td><td class="n dim">125</td><td class="l dim">Fierce 31</td></tr>
+<tr><td class="l rk">13</td><td class="l pl">Mission41</td><td><span class="sc"><span class="bar"><i style="width:67%"></i></span><span class="v">66.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">317K</td><td class="n">317K</td><td class="n">129</td><td class="n dim">121</td><td class="l dim">Fierce 25</td></tr>
+<tr><td class="l rk">14</td><td class="l pl">CCTV1</td><td><span class="sc"><span class="bar"><i style="width:65%"></i></span><span class="v">64.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">309K</td><td class="n">309K</td><td class="n">128</td><td class="n dim">123</td><td class="l dim">Crit 28</td></tr>
+<tr><td class="l rk">15</td><td class="l pl">hcmomo</td><td><span class="sc"><span class="bar"><i style="width:65%"></i></span><span class="v">64.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">309K</td><td class="n">309K</td><td class="n">130</td><td class="n dim">119</td><td class="l dim">Crit 27</td></tr>
+<tr><td class="l rk">16</td><td class="l pl">Lirc</td><td><span class="sc"><span class="bar"><i style="width:65%"></i></span><span class="v">64.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">151K</td><td class="n">308K</td><td class="n">133</td><td class="n dim">124</td><td class="l dim">Speed 34</td></tr>
+<tr><td class="l rk">17</td><td class="l pl">HeroShadow71</td><td><span class="sc"><span class="bar"><i style="width:64%"></i></span><span class="v">64.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">306K</td><td class="n">306K</td><td class="n">127</td><td class="n dim">123</td><td class="l dim">Fierce 24</td></tr>
+<tr><td class="l rk">18</td><td class="l pl">woshiYITUOSHI</td><td><span class="sc"><span class="bar"><i style="width:64%"></i></span><span class="v">64.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">306K</td><td class="n">306K</td><td class="n">129</td><td class="n dim">126</td><td class="l dim">Fierce 28</td></tr>
+<tr><td class="l rk">19</td><td class="l pl">ccccacassie</td><td><span class="sc"><span class="bar"><i style="width:60%"></i></span><span class="v">60.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">141K</td><td class="n">288K</td><td class="n">121</td><td class="n dim">122</td><td class="l dim">Guardian 18</td></tr>
+<tr><td class="l rk">20</td><td class="l pl">Nagishiro</td><td><span class="sc"><span class="bar"><i style="width:59%"></i></span><span class="v">59.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">282K</td><td class="n">282K</td><td class="n">128</td><td class="n dim">119</td><td class="l dim">Fierce 34</td></tr>
+<tr><td class="l rk">21</td><td class="l pl">roso</td><td><span class="sc"><span class="bar"><i style="width:58%"></i></span><span class="v">58.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">276K</td><td class="n">276K</td><td class="n">128</td><td class="n dim">125</td><td class="l dim">Fierce 32</td></tr>
+<tr><td class="l rk">22</td><td class="l pl">PriddyTanky</td><td><span class="sc"><span class="bar"><i style="width:55%"></i></span><span class="v">55.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">264K</td><td class="n">264K</td><td class="n">127</td><td class="n dim">120</td><td class="l dim">Fierce 31</td></tr>
+<tr><td class="l rk">23</td><td class="l pl">OneEyedWIlly</td><td><span class="sc"><span class="bar"><i style="width:55%"></i></span><span class="v">55.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">263K</td><td class="n">263K</td><td class="n">133</td><td class="n dim">110</td><td class="l dim">Fierce 28</td></tr>
+<tr><td class="l rk">24</td><td class="l pl">yumibay</td><td><span class="sc"><span class="bar"><i style="width:50%"></i></span><span class="v">50.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">239K</td><td class="n">239K</td><td class="n">117</td><td class="n dim">119</td><td class="l dim">Speed 31</td></tr>
+<tr><td class="l rk">25</td><td class="l pl">GoodliveIron</td><td><span class="sc"><span class="bar"><i style="width:47%"></i></span><span class="v">46.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">223K</td><td class="n">223K</td><td class="n">126</td><td class="n dim">118</td><td class="l dim">Guardian 23</td></tr>
+<tr><td class="l rk">26</td><td class="l pl">tamibay</td><td><span class="sc"><span class="bar"><i style="width:43%"></i></span><span class="v">43.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">206K</td><td class="n">206K</td><td class="n">118</td><td class="n dim">117</td><td class="l dim">Fierce 24</td></tr>
+<tr><td class="l rk">27</td><td class="l pl">Caseum</td><td><span class="sc"><span class="bar"><i style="width:43%"></i></span><span class="v">42.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">99K</td><td class="n">202K</td><td class="n">118</td><td class="n dim">117</td><td class="l dim">Fierce 30</td></tr>
+<tr><td class="l rk">28</td><td class="l pl">DrayMoneyGreen</td><td><span class="sc"><span class="bar"><i style="width:42%"></i></span><span class="v">41.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">97K</td><td class="n">199K</td><td class="n">127</td><td class="n dim">123</td><td class="l dim">Speed 29</td></tr>
+<tr><td class="l rk">29</td><td class="l pl">IronPhipsi</td><td><span class="sc"><span class="bar"><i style="width:23%"></i></span><span class="v">23.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">54K</td><td class="n">111K</td><td class="n">125</td><td class="n dim">118</td><td class="l dim">Speed 17</td></tr>
+<tr><td class="l rk">30</td><td class="l pl">Lanceagne</td><td><span class="sc"><span class="bar"><i style="width:23%"></i></span><span class="v">22.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">109K</td><td class="n">109K</td><td class="n">124</td><td class="n dim">114</td><td class="l dim">Fierce 22</td></tr>
+<tr><td class="l rk">31</td><td class="l pl">PastaLance</td><td><span class="sc"><span class="bar"><i style="width:20%"></i></span><span class="v">19.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">95K</td><td class="n">95K</td><td class="n">120</td><td class="n dim">115</td><td class="l dim">Fierce 18</td></tr>
+</tbody></table></div>
+<h3 id="bow">Bow<span class="count">3 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">WillZ</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">307K</td><td class="n">307K</td><td class="n">136</td><td class="n dim">128</td><td class="l dim">Crit 37</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">DarkShadow17</td><td><span class="sc"><span class="bar"><i style="width:78%"></i></span><span class="v">77.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">160K</td><td class="n">239K</td><td class="n">130</td><td class="n dim">125</td><td class="l dim">Crit 27</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Agla</td><td><span class="sc"><span class="bar"><i style="width:44%"></i></span><span class="v">43.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">90K</td><td class="n">135K</td><td class="n">123</td><td class="n dim">108</td><td class="l dim">Guardian 21</td></tr>
+</tbody></table></div>
+<h3 id="fire">Fire<span class="count">3 players</span></h3>
+<p class="note"><strong>One boss only.</strong> The factor is a common constant across every player here, so it cancels out of these scores entirely — the ranking holds regardless of what the factor turns out to be.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">ShadowAndroid</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">140K</td><td class="n">237K</td><td class="n">128</td><td class="n dim">122</td><td class="l dim">Mystic 26</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">AllFish</td><td><span class="sc"><span class="bar"><i style="width:84%"></i></span><span class="v">84.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">118K</td><td class="n">200K</td><td class="n">127</td><td class="n dim">123</td><td class="l dim">Crit 32</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Hardalia</td><td><span class="sc"><span class="bar"><i style="width:83%"></i></span><span class="v">82.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">116K</td><td class="n">197K</td><td class="n">126</td><td class="n dim">110</td><td class="l dim">Mystic 32</td></tr>
+</tbody></table></div>
+<h3 id="flex-dps">Flex DPS<span class="count">3 players</span></h3>
+<p class="note"><strong>One boss only.</strong> The factor is a common constant across every player here, so it cancels out of these scores entirely — the ranking holds regardless of what the factor turns out to be.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th><th>Heal</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">Rrrrakot</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">140K</td><td class="n">237K</td><td class="n">125</td><td class="n dim">125</td><td class="l dim">Guardian 24</td><td class="n dim">—</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">Rrrakot</td><td><span class="sc"><span class="bar"><i style="width:98%"></i></span><span class="v">97.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">137K</td><td class="n">232K</td><td class="n">122</td><td class="n dim">125</td><td class="l dim">Fierce 30</td><td class="n dim">59K</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Rrakot</td><td><span class="sc"><span class="bar"><i style="width:90%"></i></span><span class="v">90.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">126K</td><td class="n">214K</td><td class="n">122</td><td class="n dim">124</td><td class="l dim">Speed 26</td><td class="n dim">43K</td></tr>
+</tbody></table></div>
+<h3 id="mana-spring-support">Mana Spring Support<span class="count">4 players</span></h3>
+<p class="note"><strong>Support build.</strong> Damage is a byproduct of healing; the heal column is the real output.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th><th>Heal</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">s0datab</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">53K</td><td class="n">176K</td><td class="n">126</td><td class="n dim">122</td><td class="l dim">Speed 26</td><td class="n dim">680K</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">Vesi</td><td><span class="sc"><span class="bar"><i style="width:78%"></i></span><span class="v">77.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">137K</td><td class="n">137K</td><td class="n">130</td><td class="n dim">115</td><td class="l dim">Speed 26</td><td class="n dim">712K</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">mightysailfish22</td><td><span class="sc"><span class="bar"><i style="width:77%"></i></span><span class="v">76.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">135K</td><td class="n">135K</td><td class="n">125</td><td class="n dim">118</td><td class="l dim">Speed 22</td><td class="n dim">530K</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">Amakore</td><td><span class="sc"><span class="bar"><i style="width:61%"></i></span><span class="v">61.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">32K</td><td class="n">108K</td><td class="n">126</td><td class="n dim">115</td><td class="l dim">—</td><td class="n dim">594K</td></tr>
+</tbody></table></div>
+<h3 id="nature-support">Nature Support<span class="count">11 players</span></h3>
+<p class="note"><strong>Support build.</strong> Damage is a byproduct of healing; the heal column is the real output.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th><th>Heal</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">Nyctophileoo</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">201K</td><td class="n">201K</td><td class="n">137</td><td class="n dim">126</td><td class="l dim">Mystic 32</td><td class="n dim">867K</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">ccp003</td><td><span class="sc"><span class="bar"><i style="width:86%"></i></span><span class="v">86.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">90K</td><td class="n">173K</td><td class="n">129</td><td class="n dim">120</td><td class="l dim">Guardian 33</td><td class="n dim">1,014K</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">WaytonoIC2</td><td><span class="sc"><span class="bar"><i style="width:69%"></i></span><span class="v">68.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">138K</td><td class="n">138K</td><td class="n">132</td><td class="n dim">117</td><td class="l dim">Speed 30</td><td class="n dim">608K</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">NagiStella</td><td><span class="sc"><span class="bar"><i style="width:57%"></i></span><span class="v">56.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">59K</td><td class="n">114K</td><td class="n">130</td><td class="n dim">116</td><td class="l dim">Speed 31</td><td class="n dim">779K</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">maage</td><td><span class="sc"><span class="bar"><i style="width:52%"></i></span><span class="v">52.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">55K</td><td class="n">105K</td><td class="n">128</td><td class="n dim">125</td><td class="l dim">Mystic 25</td><td class="n dim">766K</td></tr>
+<tr><td class="l rk">6</td><td class="l pl">CP3</td><td><span class="sc"><span class="bar"><i style="width:49%"></i></span><span class="v">49.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">51K</td><td class="n">99K</td><td class="n">127</td><td class="n dim">116</td><td class="l dim">Guardian 27</td><td class="n dim">898K</td></tr>
+<tr><td class="l rk">7</td><td class="l pl">VamosRaiders</td><td><span class="sc"><span class="bar"><i style="width:44%"></i></span><span class="v">43.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">46K</td><td class="n">88K</td><td class="n">127</td><td class="n dim">121</td><td class="l dim">Guardian 27</td><td class="n dim">547K</td></tr>
+<tr><td class="l rk">8</td><td class="l pl">AzureMagica</td><td><span class="sc"><span class="bar"><i style="width:43%"></i></span><span class="v">43.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">87K</td><td class="n">87K</td><td class="n">133</td><td class="n dim">116</td><td class="l dim">Crit 16</td><td class="n dim">578K</td></tr>
+<tr><td class="l rk">9</td><td class="l pl">tongbin3</td><td><span class="sc"><span class="bar"><i style="width:41%"></i></span><span class="v">41.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">43K</td><td class="n">83K</td><td class="n">127</td><td class="n dim">104</td><td class="l dim">—</td><td class="n dim">505K</td></tr>
+<tr><td class="l rk">10</td><td class="l pl">gyt</td><td><span class="sc"><span class="bar"><i style="width:33%"></i></span><span class="v">32.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">66K</td><td class="n">66K</td><td class="n">109</td><td class="n dim">113</td><td class="l dim">Mystic 18</td><td class="n dim">441K</td></tr>
+<tr><td class="l rk">11</td><td class="l pl">Emaroka</td><td><span class="sc"><span class="bar"><i style="width:31%"></i></span><span class="v">31.4</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">63K</td><td class="n">63K</td><td class="n">126</td><td class="n dim">115</td><td class="l dim">—</td><td class="n dim">502K</td></tr>
+</tbody></table></div>
+<h3 id="slash">Slash<span class="count">4 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">FeFiFo</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">191K</td><td class="n">324K</td><td class="n">135</td><td class="n dim">125</td><td class="l dim">Fierce 38</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">brawlC0w</td><td><span class="sc"><span class="bar"><i style="width:96%"></i></span><span class="v">95.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">183K</td><td class="n">310K</td><td class="n">135</td><td class="n dim">130</td><td class="l dim">Guardian 23</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">wtvard</td><td><span class="sc"><span class="bar"><i style="width:84%"></i></span><span class="v">84.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">273K</td><td class="n">273K</td><td class="n">131</td><td class="n dim">123</td><td class="l dim">Fierce 33</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">LiaFish</td><td><span class="sc"><span class="bar"><i style="width:82%"></i></span><span class="v">81.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">264K</td><td class="n">264K</td><td class="n">131</td><td class="n dim">125</td><td class="l dim">Fierce 32</td></tr>
+</tbody></table></div>
+<h3 id="stab">Stab<span class="count">5 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">midget</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">341K</td><td class="n">341K</td><td class="n">142</td><td class="n dim">126</td><td class="l dim">Fierce 31</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">Qino1611</td><td><span class="sc"><span class="bar"><i style="width:65%"></i></span><span class="v">65.4</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">223K</td><td class="n">223K</td><td class="n">133</td><td class="n dim">126</td><td class="l dim">Fierce 34</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">Mooicide</td><td><span class="sc"><span class="bar"><i style="width:45%"></i></span><span class="v">45.2</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">154K</td><td class="n">154K</td><td class="n">121</td><td class="n dim">127</td><td class="l dim">Fierce 31</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">MooMooMouse</td><td><span class="sc"><span class="bar"><i style="width:39%"></i></span><span class="v">38.8</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">111K</td><td class="n">132K</td><td class="n">123</td><td class="n dim">114</td><td class="l dim">Speed 22</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">Rotta</td><td><span class="sc"><span class="bar"><i style="width:32%"></i></span><span class="v">31.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">108K</td><td class="n">108K</td><td class="n">114</td><td class="n dim">120</td><td class="l dim">Speed 25</td></tr>
+</tbody></table></div>
+<h3 id="wark">Wark<span class="count">3 players</span></h3>
+<p class="note"><strong>Support build.</strong> Damage is a byproduct of healing; the heal column is the real output.</p>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">Orph</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">271K</td><td class="n">271K</td><td class="n">134</td><td class="n dim">118</td><td class="l dim">Fierce 26</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">WaytonoIC3</td><td><span class="sc"><span class="bar"><i style="width:82%"></i></span><span class="v">81.5</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">71K</td><td class="n">221K</td><td class="n">134</td><td class="n dim">118</td><td class="l dim">Guardian 26</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">AzureMist</td><td><span class="sc"><span class="bar"><i style="width:65%"></i></span><span class="v">64.9</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">176K</td><td class="n">176K</td><td class="n">133</td><td class="n dim">118</td><td class="l dim">Guardian 32</td></tr>
+</tbody></table></div>
+<h3 id="water">Water<span class="count">5 players</span></h3>
+<div class="scroll"><table><thead><tr><th class="l">#</th><th class="l">Player</th><th>Score</th><th class="l">Boss</th><th>Raw</th><th>Norm</th><th>Main</th><th>Atk</th><th class="l">Aura</th></tr></thead><tbody>
+<tr><td class="l rk">1</td><td class="l pl">AsikkamykX</td><td><span class="sc"><span class="bar"><i style="width:100%"></i></span><span class="v">100.0</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">438K</td><td class="n">438K</td><td class="n">136</td><td class="n dim">128</td><td class="l dim">Mystic 37</td></tr>
+<tr><td class="l rk">2</td><td class="l pl">xaivaicc</td><td><span class="sc"><span class="bar"><i style="width:88%"></i></span><span class="v">88.4</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">387K</td><td class="n">387K</td><td class="n">129</td><td class="n dim">120</td><td class="l dim">Mystic 36</td></tr>
+<tr><td class="l rk">3</td><td class="l pl">DexterMorgan</td><td><span class="sc"><span class="bar"><i style="width:71%"></i></span><span class="v">71.3</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">100K</td><td class="n">312K</td><td class="n">135</td><td class="n dim">113</td><td class="l dim">Mystic 29</td></tr>
+<tr><td class="l rk">4</td><td class="l pl">EvilBunny</td><td><span class="sc"><span class="bar"><i style="width:71%"></i></span><span class="v">70.7</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">99K</td><td class="n">310K</td><td class="n">127</td><td class="n dim">115</td><td class="l dim">Mystic 28</td></tr>
+<tr><td class="l rk">5</td><td class="l pl">Ekorama</td><td><span class="sc"><span class="bar"><i style="width:34%"></i></span><span class="v">33.6</span></span></td><td class="l bosstag">Hedgehog</td><td class="n">147K</td><td class="n">147K</td><td class="n">126</td><td class="n dim">115</td><td class="l dim">—</td></tr>
+</tbody></table></div>
+</section>
+<section id="caveats">
+<h2>What limits these numbers</h2>
+<div class="caveats">
+<div><h4>Score is within-build; Norm is cross-build</h4><p>A 100 in Fire (3 players) and a 100 in Smash (31 players) are not the same achievement. For cross-class balancing use <code>Norm</code> — on that scale the top Smash is 476K against the top Crossbow’s 240K.</p></div>
+<div><h4>Nature DPS’s cross-class position rests on an assumption</h4><p>It appears only on Hedgehog, so its within-class ranking is solid but its level relative to other builds is not. At the assumed 0.59 factor WillT normalises to 336K, above every crossbow; at a crossbow-like 0.85 he would be 233K, roughly tied with RedGreenBlue. Pinning this down needs nature players on Hedgehog. Fire and Flex DPS have the same problem.</p></div>
+<div><h4>Water’s 0.32 is the shakiest number here</h4><p>It rests on 3 Hedgehog players, two of whom — AsikkamykX at 438K and xaivaicc at 387K — are the guild’s top two damage dealers overall. That inflates the two Hedgehog water players to about 310K normalised. Treat those scores as provisional.</p></div>
+<div><h4>Support scores are close to meaningless</h4><p>Nature Support, Mana Spring Support and Wark are scored on damage as requested, but healing is their real output — ccp003 scores 86 on damage while posting the guild’s highest heal at 1,014K.</p></div>
+<div><h4>The sheets record total damage, not damage per second</h4><p>Damage taken clusters tightly within each sheet — 187–221K on Hedgehog, 260–335K on Hedgehog — so encounter length looks common and totals are proportional to DPS. But they are totals.</p></div>
+<div><h4>Two data corrections</h4><p><code>ronmitzie</code> in the Hedgehog sheet is <code>ironmitzie</code>, with the leading &ldquo;i&rdquo; lost; no other row failed to join to the roster. And the arsenal backup’s <code>config.weeklyBosses</code> still records this week as Badger and Swarm — the party actually fought Hedgehog, so anything else keyed off that field may be stale too.</p></div>
+</div>
+</section>
+<footer>Generated from combat/trial_data.xlsx and arsenal-backup-2026-08-21.json by combat/analysis/make_html.py &middot; underlying data in analysis/player_scores.csv and analysis/boss_factors.csv</footer>
+</div>
+<div id="tip"></div>
+<script>
+(function(){
+  var tip=document.getElementById('tip');
+  document.querySelectorAll('[data-tip]').forEach(function(el){
+    el.addEventListener('mouseenter',function(){
+      tip.innerHTML=el.getAttribute('data-tip'); tip.classList.add('on');
+    });
+    el.addEventListener('mousemove',function(e){
+      var w=tip.offsetWidth, x=Math.min(e.clientX+14, window.innerWidth-w-10);
+      tip.style.left=x+'px'; tip.style.top=(e.clientY+16)+'px';
+    });
+    el.addEventListener('mouseleave',function(){ tip.classList.remove('on'); });
+  });
+})();
+</script>
+</body>
+</html>

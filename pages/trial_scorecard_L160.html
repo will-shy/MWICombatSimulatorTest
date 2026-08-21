@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>L160 Trial Scorecard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, h1, h2, h3, p, table, figure { margin: 0; padding: 0; }
+
+:root {
+    --bg: #e9ebe7;
+    --surface: #f8f9f6;
+    --surface-2: #f1f3ef;
+    --ink: #171b18;
+    --ink-2: #4b544e;
+    --ink-3: #737d76;
+    --rule: #d2d7cf;
+    --rule-strong: #b8c0b5;
+    --melee: #b4661f;
+    --ranged: #2f7d43;
+    --magic: #6a4fbf;
+    --melee-soft: #b4661f26;
+    --ranged-soft: #2f7d4326;
+    --magic-soft: #6a4fbf26;
+    --good: #2f7d43;
+    --warn: #a2611a;
+    --alert: #a33636;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+    --measure: 68ch;
+    --page: 1080px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #101311;
+        --surface: #171b18;
+        --surface-2: #1d2220;
+        --ink: #e9ece7;
+        --ink-2: #a5aea7;
+        --ink-3: #7b857e;
+        --rule: #2a302c;
+        --rule-strong: #3b433e;
+        --melee: #f0a45a;
+        --ranged: #74cf83;
+        --magic: #ad93ea;
+        --melee-soft: #f0a45a2b;
+        --ranged-soft: #74cf832b;
+        --magic-soft: #ad93ea2b;
+        --good: #74cf83;
+        --warn: #f0a45a;
+        --alert: #e57373;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #101311;
+    --surface: #171b18;
+    --surface-2: #1d2220;
+    --ink: #e9ece7;
+    --ink-2: #a5aea7;
+    --ink-3: #7b857e;
+    --rule: #2a302c;
+    --rule-strong: #3b433e;
+    --melee: #f0a45a;
+    --ranged: #74cf83;
+    --magic: #ad93ea;
+    --melee-soft: #f0a45a2b;
+    --ranged-soft: #74cf832b;
+    --magic-soft: #ad93ea2b;
+    --good: #74cf83;
+    --warn: #f0a45a;
+    --alert: #e57373;
+}
+
+body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+
+h1, h2, h3, .chip, table, .bar-label, .readout, .leader {
+    font-family: var(--display);
+}
+
+h1 {
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.04;
+    text-wrap: balance;
+}
+
+h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+}
+
+h3 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+p { max-width: var(--measure); }
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.standfirst { font-size: 1.12rem; color: var(--ink-2); }
+
+.note { font-size: 0.95rem; color: var(--ink-2); }
+
+.mono { font-family: var(--mono); font-size: 0.85em; }
+
+strong { font-weight: 600; }
+
+a { color: inherit; }
+
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+header { display: flex; flex-direction: column; gap: 18px; }
+
+.rule-top { height: 3px; background: var(--ink); max-width: 96px; }
+
+.specs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+.chip {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+    padding: 5px 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 2px;
+    color: var(--ink-2);
+    background: var(--surface);
+    white-space: nowrap;
+}
+
+.chip b { color: var(--ink); font-weight: 600; }
+
+section { display: flex; flex-direction: column; gap: 20px; }
+
+.section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 14px;
+}
+
+.scroll { overflow-x: auto; }
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 620px;
+    font-size: 0.88rem;
+    font-variant-numeric: tabular-nums;
+}
+
+thead th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: right;
+    padding: 0 12px 8px;
+    border-bottom: 1px solid var(--rule-strong);
+    white-space: nowrap;
+}
+
+thead th:first-child { text-align: left; padding-left: 0; }
+
+tbody td {
+    padding: 9px 12px;
+    text-align: right;
+    border-bottom: 1px solid var(--rule);
+    white-space: nowrap;
+}
+
+tbody td:first-child { text-align: left; padding-left: 0; font-weight: 600; }
+
+tbody tr:last-child td { border-bottom: none; }
+
+tbody tr.total td {
+    border-top: 1px solid var(--rule-strong);
+    color: var(--ink-2);
+    font-weight: 500;
+}
+
+tbody tr.total td:first-child { font-weight: 600; color: var(--ink); }
+
+td.m, th.m { color: var(--melee); }
+td.r, th.r { color: var(--ranged); }
+td.n, th.n { color: var(--magic); }
+
+td.best { font-weight: 600; }
+
+td.best::after { content: "◂"; font-size: 0.7em; padding-left: 5px; vertical-align: 1px; }
+
+.dim { color: var(--ink-3); font-weight: 400; }
+.up { color: var(--warn); }
+.flag { color: var(--alert); font-weight: 600; }
+.ok { color: var(--good); }
+
+.cards {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 18px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.card-head .meta {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    text-align: right;
+    line-height: 1.5;
+}
+
+.card-head .meta b { color: var(--ink-2); font-weight: 500; }
+
+.leader {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.leader.m { color: var(--melee); background: var(--melee-soft); }
+.leader.r { color: var(--ranged); background: var(--ranged-soft); }
+.leader.n { color: var(--magic); background: var(--magic-soft); }
+.leader.split {
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+}
+
+.bars { display: flex; flex-direction: column; gap: 9px; }
+
+.row {
+    display: grid;
+    grid-template-columns: 62px 1fr 100px;
+    align-items: center;
+    gap: 10px;
+}
+
+.bar-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.row.m .bar-label { color: var(--melee); }
+.row.r .bar-label { color: var(--ranged); }
+.row.n .bar-label { color: var(--magic); }
+
+.bar {
+    height: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 1px;
+    position: relative;
+    overflow: hidden;
+}
+
+.bar > span { position: absolute; inset: 0 auto 0 0; display: block; }
+
+.row.m .bar > span { background: var(--melee); }
+.row.r .bar > span { background: var(--ranged); }
+.row.n .bar > span { background: var(--magic); }
+
+.val {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    color: var(--ink-2);
+}
+
+.val b { color: var(--ink); font-weight: 600; }
+.val .idx { color: var(--ink-3); }
+
+.why { font-size: 0.94rem; color: var(--ink-2); margin: 0; max-width: none; }
+
+.readout {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.75;
+    color: var(--ink-3);
+    border-top: 1px dashed var(--rule-strong);
+    padding-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.readout span { color: var(--ink-2); }
+.readout .hi { color: var(--ink); font-weight: 500; }
+
+.callout {
+    border: 1px solid var(--rule-strong);
+    border-left: 3px solid var(--rule-strong);
+    background: var(--surface);
+    border-radius: 2px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.callout.warn { border-left-color: var(--warn); }
+.callout.alert { border-left-color: var(--alert); }
+
+.callout h3 { margin: 0; }
+.callout p { max-width: var(--measure); margin: 0; font-size: 0.96rem; }
+
+.kits {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    line-height: 1.7;
+    color: var(--ink-2);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.kits .k-label { display: inline-block; min-width: 148px; color: var(--ink-3); }
+
+footer {
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 16px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--ink-3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+footer span { color: var(--ink-2); }
+
+@media (max-width: 640px) {
+    .page { padding: 36px 16px 64px; gap: 44px; }
+    body { font-size: 16px; }
+    .row { grid-template-columns: 54px 1fr 92px; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<header>
+    <div class="rule-top"></div>
+    <div class="eyebrow">MWI Group Battle · trial level 160 · 52-player raid</div>
+    <h1>L160 Trial Scorecard</h1>
+    <p class="standfirst">How much of each trial group one damage class removes per minute, measured on the group-battle engine with 14 melee, 14 ranged and 14 magic damage dealers running per-trial ability kits.</p>
+    <div class="specs">
+        <span class="chip"><b>14</b> melee · smash_T95</span>
+        <span class="chip"><b>14</b> ranged · ranger_T95</span>
+        <span class="chip"><b>14</b> magic · nature_aoe_T95</span>
+        <span class="chip"><b>10</b> support placeholders, zero damage</span>
+        <span class="chip">infinite mana</span>
+        <span class="chip">players take no damage</span>
+        <span class="chip">Insanity <b>lv20</b> in every aura slot</span>
+        <span class="chip">5 auras <b>lv25</b> on placeholders</span>
+        <span class="chip"><b>5</b> seeded runs per group</span>
+    </div>
+</header>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">The score</div>
+        <h2>Percent of group HP removed per minute</h2>
+    </div>
+    <p class="note">One class squad of 14. The three class figures sum to the group's whole HP pool, so <span class="mono">Σ %/min × kill time = 100%</span> — these are shares of one real kill, not three separate estimates. <span class="dim">◂ marks the strongest class in that trial.</span></p>
+    <div class="scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Trial group</th>
+                    <th>Group HP</th>
+                    <th>Kill time</th>
+                    <th class="m">Melee</th>
+                    <th class="r">Ranged</th>
+                    <th class="n">Magic</th>
+                    <th>Raid total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Badger ×2</td>
+                    <td class="dim">1,782,960</td>
+                    <td class="dim">22.0 min</td>
+                    <td class="m">1.18</td>
+                    <td class="r">1.05</td>
+                    <td class="n best">2.31</td>
+                    <td class="dim">4.54</td>
+                </tr>
+                <tr>
+                    <td>Chameleon</td>
+                    <td class="dim">1,485,800</td>
+                    <td class="dim">18.9 min</td>
+                    <td class="m best">2.16</td>
+                    <td class="r">2.14</td>
+                    <td class="n">0.99</td>
+                    <td class="dim">5.29</td>
+                </tr>
+                <tr>
+                    <td>Jellyfish</td>
+                    <td class="dim">1,343,680</td>
+                    <td class="dim">16.3 min</td>
+                    <td class="m">1.37</td>
+                    <td class="r best">2.75</td>
+                    <td class="n">2.02</td>
+                    <td class="dim">6.14</td>
+                </tr>
+                <tr>
+                    <td>Hedgehog</td>
+                    <td class="dim">1,033,600</td>
+                    <td class="dim">19.6 min</td>
+                    <td class="m">1.52</td>
+                    <td class="r best">1.84</td>
+                    <td class="n">1.75</td>
+                    <td class="dim">5.11</td>
+                </tr>
+                <tr>
+                    <td>Swarm</td>
+                    <td class="dim">2,067,200</td>
+                    <td class="dim">20.0 min</td>
+                    <td class="m best">2.07</td>
+                    <td class="r">1.17</td>
+                    <td class="n">1.77</td>
+                    <td class="dim">5.01</td>
+                </tr>
+                <tr class="total">
+                    <td>Average</td>
+                    <td class="dim">—</td>
+                    <td class="dim">19.4 min</td>
+                    <td class="m">1.66</td>
+                    <td class="r">1.79</td>
+                    <td class="n">1.77</td>
+                    <td class="dim">5.22</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="note">Averaged over all five trials the three classes land within 8% of each other — <strong>there is no strongest class, only strongest matchups.</strong> Inside a single trial the spread reaches <strong>2.3×</strong>.</p>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Per trial</div>
+        <h2>Matchups, and what drives them</h2>
+    </div>
+    <p class="note">Bars share one scale across all five cards, so lengths compare everywhere. The bracketed number indexes the three classes <em>within</em> that trial, strongest = 100. Readouts are derived L160 values: resistances are <span class="mono">base × 1.6 + 32</span>, evasion ratings <span class="mono">170 × (1 + evasion%)</span>.</p>
+
+    <div class="cards">
+
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Trial Badger ×2</h3>
+                    <span class="leader n">Magic trial</span>
+                </div>
+                <div class="meta"><b>1,782,960</b> HP<br>kill in <b>22.0 min</b></div>
+            </div>
+            <div class="bars">
+                <div class="row m"><span class="bar-label">Melee</span><div class="bar"><span style="width:42.9%"></span></div><span class="val"><b>1.18</b> %/min <span class="idx">[51]</span></span></div>
+                <div class="row r"><span class="bar-label">Ranged</span><div class="bar"><span style="width:38.2%"></span></div><span class="val"><b>1.05</b> %/min <span class="idx">[45]</span></span></div>
+                <div class="row n"><span class="bar-label">Magic</span><div class="bar"><span style="width:84.0%"></span></div><span class="val"><b>2.31</b> %/min <span class="idx">[100]</span></span></div>
+            </div>
+            <p class="why">The anti-physical boss and the most lopsided fight of the five: 672 armor against only 272 elemental resistance, plus the lowest magic evasion in the set. Magic doubles either physical class and carries 51% of the kill alone.</p>
+            <div class="readout">
+                <div>armor <span class="hi">672</span> · water/nature/fire <span>272 / 272 / 272</span></div>
+                <div>evasion <span>melee 799 · ranged 1020 · magic <span class="hi">578</span></span></div>
+                <div>hit rate <span>melee .47 · ranged .58 · magic .49</span></div>
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Trial Chameleon</h3>
+                    <span class="leader split">Physical trial · dead heat</span>
+                </div>
+                <div class="meta"><b>1,485,800</b> HP<br>kill in <b>18.9 min</b></div>
+            </div>
+            <div class="bars">
+                <div class="row m"><span class="bar-label">Melee</span><div class="bar"><span style="width:78.5%"></span></div><span class="val"><b>2.16</b> %/min <span class="idx">[100]</span></span></div>
+                <div class="row r"><span class="bar-label">Ranged</span><div class="bar"><span style="width:77.8%"></span></div><span class="val"><b>2.14</b> %/min <span class="idx">[99]</span></span></div>
+                <div class="row n"><span class="bar-label">Magic</span><div class="bar"><span style="width:36.0%"></span></div><span class="val"><b>0.99</b> %/min <span class="idx">[46]</span></span></div>
+            </div>
+            <p class="why">The exact inverse of Badger: 672 elemental resistance against 392 armor, and the highest magic evasion anywhere. Melee and ranged finish in a statistical tie; magic drops to 46 and should be the last squad you bring.</p>
+            <div class="readout">
+                <div>armor <span>392</span> · water/nature/fire <span class="hi">672 / 672 / 672</span></div>
+                <div>evasion <span>melee 612 · ranged 799 · magic <span class="hi">952</span></span></div>
+                <div>hit rate <span>melee .49 · ranged .58 · magic .42</span></div>
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Trial Jellyfish</h3>
+                    <span class="leader r">Ranged trial</span>
+                </div>
+                <div class="meta"><b>1,343,680</b> HP<br>kill in <b>16.3 min</b></div>
+            </div>
+            <div class="bars">
+                <div class="row m"><span class="bar-label">Melee</span><div class="bar"><span style="width:49.8%"></span></div><span class="val"><b>1.37</b> %/min <span class="idx">[50]</span></span></div>
+                <div class="row r"><span class="bar-label">Ranged</span><div class="bar"><span style="width:100%"></span></div><span class="val"><b>2.75</b> %/min <span class="idx">[100]</span></span></div>
+                <div class="row n"><span class="bar-label">Magic</span><div class="bar"><span style="width:73.5%"></span></div><span class="val"><b>2.02</b> %/min <span class="idx">[73]</span></span></div>
+            </div>
+            <p class="why">1190 melee evasion means a smasher lands 28% of swings — the worst hit rate in the study. The fastest kill of the five, and the highest single score on the board. Magic stays relevant only because nature resistance is 312 while water and fire sit at 512, and Life Drain is nature damage.</p>
+            <div class="readout">
+                <div>armor <span>392</span> · water/nature/fire <span>512 / <span class="hi">312</span> / 512</span></div>
+                <div>evasion <span>melee <span class="hi">1190</span> · ranged 612 · magic 799</span></div>
+                <div>hit rate <span>melee <span class="hi">.28</span> · ranged .67 · magic .38</span></div>
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Trial Hedgehog</h3>
+                    <span class="leader split">Even trial</span>
+                </div>
+                <div class="meta"><b>1,033,600</b> HP<br>kill in <b>19.6 min</b></div>
+            </div>
+            <div class="bars">
+                <div class="row m"><span class="bar-label">Melee</span><div class="bar"><span style="width:55.3%"></span></div><span class="val"><b>1.52</b> %/min <span class="idx">[83]</span></span></div>
+                <div class="row r"><span class="bar-label">Ranged</span><div class="bar"><span style="width:66.9%"></span></div><span class="val"><b>1.84</b> %/min <span class="idx">[100]</span></span></div>
+                <div class="row n"><span class="bar-label">Magic</span><div class="bar"><span style="width:63.6%"></span></div><span class="val"><b>1.75</b> %/min <span class="idx">[95]</span></span></div>
+            </div>
+            <p class="why">Flat 765 evasion against every style, so nothing is punished and all three land within 17 points — the one trial where composition barely matters. The 256 fire resistance is the only hole in the wall, and Smoke Burst is fire, which is what keeps magic level with ranged.</p>
+            <div class="readout">
+                <div>armor <span>432</span> · water/nature/fire <span>432 / 432 / <span class="hi">256</span></span></div>
+                <div>evasion <span>melee 765 · ranged 765 · magic 765</span></div>
+                <div>hit rate <span>melee .39 · ranged <span class="hi">.65</span> · magic .36</span></div>
+            </div>
+        </article>
+
+        <article class="card">
+            <div class="card-head">
+                <div>
+                    <h3>Trial Swarm</h3>
+                    <span class="leader m">AoE trial</span>
+                </div>
+                <div class="meta"><b>2,067,200</b> HP · 4 mobs<br>kill in <b>20.0 min</b></div>
+            </div>
+            <div class="bars">
+                <div class="row m"><span class="bar-label">Melee</span><div class="bar"><span style="width:75.3%"></span></div><span class="val"><b>2.07</b> %/min <span class="idx">[100]</span></span></div>
+                <div class="row r"><span class="bar-label">Ranged</span><div class="bar"><span style="width:42.5%"></span></div><span class="val"><b>1.17</b> %/min <span class="idx">[57]</span></span></div>
+                <div class="row n"><span class="bar-label">Magic</span><div class="bar"><span style="width:64.4%"></span></div><span class="val"><b>1.77</b> %/min <span class="idx">[86]</span></span></div>
+            </div>
+            <p class="why">Four mobs, so every AoE counts four times: Fracturing Impact is 15% of melee's damage and Nature's Veil 34% of magic's. Ranged is the one squad running no AoE here, which is exactly why it sits last — see the finding below. The beetle is the gate at 672 armor plus Invincible for +1141 armor over 12 s every 44 s.</p>
+            <div class="readout">
+                <div>armor <span>beetle <span class="hi">672</span> · wasp 320 · dragonfly 224 · firefly 192</span></div>
+                <div>evasion <span>beetle smash 663 / ranged 850 · firefly melee 1020</span></div>
+                <div>hit rate <span>melee <span class="hi">.59</span> · ranged .52 · magic .49</span></div>
+            </div>
+        </article>
+
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Per player</div>
+        <h2>Same numbers, one head at a time</h2>
+    </div>
+    <p class="note">Squad figures divided by 14 — use these to price a single body of each class into a roster.</p>
+    <div class="scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th>Trial group</th>
+                    <th class="m">Melee %/min</th>
+                    <th class="m">index</th>
+                    <th class="r">Ranged %/min</th>
+                    <th class="r">index</th>
+                    <th class="n">Magic %/min</th>
+                    <th class="n">index</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Badger ×2</td><td class="m">0.084</td><td class="dim">51</td><td class="r">0.075</td><td class="dim">45</td><td class="n best">0.165</td><td class="dim">100</td></tr>
+                <tr><td>Chameleon</td><td class="m best">0.154</td><td class="dim">100</td><td class="r">0.153</td><td class="dim">99</td><td class="n">0.071</td><td class="dim">46</td></tr>
+                <tr><td>Jellyfish</td><td class="m">0.098</td><td class="dim">50</td><td class="r best">0.196</td><td class="dim">100</td><td class="n">0.145</td><td class="dim">73</td></tr>
+                <tr><td>Hedgehog</td><td class="m">0.108</td><td class="dim">83</td><td class="r best">0.131</td><td class="dim">100</td><td class="n">0.125</td><td class="dim">95</td></tr>
+                <tr><td>Swarm</td><td class="m best">0.148</td><td class="dim">100</td><td class="r">0.084</td><td class="dim">57</td><td class="n">0.126</td><td class="dim">86</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Cross-check</div>
+        <h2>Against your reference table</h2>
+    </div>
+    <p class="note">Your per-player figures beside this run's. <strong>Ranged reconciles</strong> — four of five groups agree within 8%, one of them to within 1%. Melee sits uniformly low here, magic more so, and one cell disagrees outright.</p>
+    <div class="scroll">
+        <table style="min-width:760px">
+            <thead>
+                <tr>
+                    <th>Trial group</th>
+                    <th class="m">Melee — yours / here</th>
+                    <th class="m">gap</th>
+                    <th class="r">Ranged — yours / here</th>
+                    <th class="r">gap</th>
+                    <th class="n">Magic — yours / here</th>
+                    <th class="n">gap</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Badger ×2</td><td class="m">0.098 / 0.084</td><td class="up">+16%</td><td class="r">0.081 / 0.075</td><td class="ok">+8%</td><td class="n">0.250 / 0.165</td><td class="up">+51%</td></tr>
+                <tr><td>Chameleon</td><td class="m">0.194 / 0.154</td><td class="up">+26%</td><td class="r">0.163 / 0.153</td><td class="ok">+7%</td><td class="n">0.097 / 0.071</td><td class="up">+37%</td></tr>
+                <tr><td>Jellyfish</td><td class="m">0.118 / 0.098</td><td class="up">+20%</td><td class="r">0.194 / 0.196</td><td class="ok">−1%</td><td class="n">0.188 / 0.145</td><td class="up">+30%</td></tr>
+                <tr><td>Hedgehog</td><td class="m">0.136 / 0.108</td><td class="up">+26%</td><td class="r">0.136 / 0.131</td><td class="ok">+4%</td><td class="n">0.136 / 0.125</td><td class="ok">+9%</td></tr>
+                <tr><td>Swarm</td><td class="m">0.180 / 0.148</td><td class="up">+22%</td><td class="r">0.183 / 0.084</td><td class="flag">+119%</td><td class="n">0.180 / 0.126</td><td class="up">+42%</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="callout">
+        <h3>What the pattern rules out</h3>
+        <p>Because ranged reconciles, no <em>global</em> factor can explain the rest. Party size, the HP denominator, aura level and time-window choice would all move the three classes together. The melee and magic gaps have to come from per-build inputs. Two probes on this side: giving the smasher full maelstrom legs instead of the preset's anchorbound legs is worth <strong>+4%</strong>, and switching magic to the AoE kit on Badger is <strong>−14%</strong>, not a gain — so the specified single-target kit is already the better one there.</p>
+    </div>
+
+    <div class="callout warn">
+        <h3>Four questions that would close the gap</h3>
+        <p><strong>1.</strong> Do your melee and magic builds carry house rooms or achievements? The presets here have neither, and maxed combat rooms plus the Elite tier are worth roughly the 16–26% seen on melee. <strong>2.</strong> What enhancement levels and jewellery are on the nature build? <strong>3.</strong> Was your Swarm ranged kit still running Rain of Arrows? <strong>4.</strong> Are the Hedgehog and Swarm rows measured or carried forward? Hedgehog reads 0.136 for all three classes and Swarm reads 0.180 / 0.183 / 0.180 — that uniformity is unlike anything the engine produces, and 0.136 appears four times in the table.</p>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Findings</div>
+        <h2>What the kit changes cost and bought</h2>
+    </div>
+
+    <div class="callout warn">
+        <h3>On Swarm, the ranged squad needs its AoE back</h3>
+        <p>Running Pestilent Shot + Penetrating Shot against four mobs puts ranged last at 1.17 %/min. Both single-target — the squad is the only one in that fight with no AoE, while melee gets 15% of its damage from Fracturing Impact and magic 34% from Nature's Veil.</p>
+        <div class="scroll">
+            <table style="min-width:560px">
+                <thead>
+                    <tr><th>Swarm · ranged 4th + 5th slot</th><th class="r">Ranged %/min</th><th>Raid kill time</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Pestilent + Penetrating <span class="dim">(current)</span></td><td class="r">1.17</td><td class="dim">20.0 min</td></tr>
+                    <tr><td>Pestilent + Rain of Arrows</td><td class="r">1.26 <span class="ok">+8%</span></td><td class="ok">19.6 min ◂ fastest</td></tr>
+                    <tr><td>Penetrating + Rain of Arrows</td><td class="r">1.30 <span class="ok">+11%</span></td><td class="dim">20.1 min</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>Penetrating + Rain of Arrows scores the ranged squad highest, but <strong>Pestilent + Rain of Arrows kills the group fastest</strong>, because Pestilent Shot's −13.9% armor and resistance debuff is worth more to the other 28 damage dealers than to its own caster. Optimise for the clear, not the scoreboard.</p>
+    </div>
+
+    <div class="callout">
+        <h3>The Chameleon and Jellyfish tweak is a clear win</h3>
+        <p>Swapping Precision for Pestilent Shot alongside Steady Shot lifts ranged <strong>+20%</strong> in both fights — 0.128 → 0.153 %/min per player on Chameleon and 0.163 → 0.196 on Jellyfish — and pulls raid kill times down by two minutes each. Steady Shot lands at 84–86% accuracy, the highest hit rate of any ability in the study, and the armor strip carries the rest of the raid with it.</p>
+    </div>
+
+    <div class="callout">
+        <h3>Auras are worth 14–18%, and they reorder nothing</h3>
+        <p>The five auras sit at level 25 on the support placeholders — the only slots available, since every damage dealer keeps Insanity. Removing them entirely drops raid totals by 14–18% and adds two to four minutes per trial, but every class ordering above survives, so the index numbers hold either way.</p>
+    </div>
+
+    <div class="callout">
+        <h3>Melee and ranged are auto-attackers; magic is not</h3>
+        <p>Across all five trials, 85–93% of melee damage and 69–89% of ranged damage comes from auto-attacks — their abilities are mostly buffs and debuffs. Magic is the opposite: effectively all of its damage is cast, with Entangle filler alone accounting for 27–51% at 405–489 casts per fight. Attack speed is the physical squads' throughput lever; cast speed and ability haste are magic's.</p>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Kits</div>
+        <h2>What each squad ran</h2>
+    </div>
+    <p class="note">Insanity lv20 occupies the aura slot on every damage dealer; the four active abilities follow in priority order.</p>
+    <div class="kits">
+        <div><span class="k-label">melee · all trials</span>frenzy 40 → berserk 40 → precision 40 → fracturing impact 40</div>
+        <div><span class="k-label">ranged · default</span>frenzy 40 → berserk 40 → precision 40 → pestilent shot 40</div>
+        <div><span class="k-label">ranged · cham / jelly</span>frenzy 40 → berserk 40 → pestilent shot 40 → steady shot 40</div>
+        <div><span class="k-label">ranged · swarm</span>frenzy 40 → berserk 40 → pestilent shot 40 → penetrating shot 40</div>
+        <div><span class="k-label">magic · default</span>elemental affinity 40 → smoke burst 40 → life drain 40 → entangle 60</div>
+        <div><span class="k-label">magic · chameleon</span>precision 40 → smoke burst 40 → life drain 40 → entangle 60</div>
+        <div><span class="k-label">magic · swarm</span>elemental affinity 40 → firestorm 40 → nature's veil 40 → entangle 60</div>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Marginal levels</div>
+        <h2>What one level is worth</h2>
+    </div>
+    <p class="note">Fitted over levels 115–135 in the L160 Swarm fight. Both stats enter combat ratings as <span class="mono">(10 + level) × (1 + gear%)</span>, so one level is always ≈0.74% of the underlying rating — that ceiling is what the main attribute delivers.</p>
+    <div class="scroll">
+        <table style="min-width:560px">
+            <thead>
+                <tr><th>Build</th><th>Main attribute</th><th>Attack</th><th>Verdict</th></tr>
+            </thead>
+            <tbody>
+                <tr><td class="m">Melee</td><td>+0.70% / level <span class="dim">(melee)</span></td><td>+0.39% / level</td><td class="dim" style="text-align:left">melee ≈ 1.8× attack</td></tr>
+                <tr><td class="r">Ranged</td><td>+0.74% / level <span class="dim">(ranged)</span></td><td>+0.78% / level</td><td class="dim" style="text-align:left">interchangeable, attack marginally ahead</td></tr>
+                <tr><td class="n">Magic</td><td>+0.70% / level <span class="dim">(magic)</span></td><td>+0.60% / level</td><td class="dim" style="text-align:left">magic ≈ 1.2× attack</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <p class="note">Attack buys accuracy, which converts at <span class="mono">1.4 × (1 − hit rate) × 0.74%</span> — so it is worth more the more you miss, and it keeps gaining value as tiers rise. Ranged is the exception that beats its own main attribute: ranged crit chance is <span class="mono">0.3 × hit chance</span>, so accuracy buys crit rate too.</p>
+</section>
+
+<footer>
+    <div>Method — headless run of the same code path as the Group Battle page (<span>worker.js · case "start_battle"</span>): real Player objects built from the T95 presets, zone buffs from /actions/combat/fly, group-battle regen buffs, monsters rebuilt from combatMonsterDetailMap at room level 160 and scaled for 52 players (+1% max HP, +2% attack speed, +2% cast speed, +2 ability haste per player). Damage read from simResult.attacks; five seeded runs per group; seed-to-seed spread on every figure above is under ±0.06 %/min.</div>
+    <div>Caveats — support placeholders deal exactly zero damage but still carry the auras. Monster crowd control still applies, since stuns and blinds are not damage. The presets carry no house rooms, achievements, shrines or labyrinth upgrades, so treat absolute %/min as a floor and the class ratios as the durable result.</div>
+</footer>
+
+</div>
+
+</body>
+</html>

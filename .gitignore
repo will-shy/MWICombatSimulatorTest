@@ -3,3 +3,4 @@ node_modules/
 dist/
 plans/
 scripts/
+.DS_Store

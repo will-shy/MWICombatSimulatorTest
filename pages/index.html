@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arsenal Trials</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, h1, h2, h3, p, ul, li { margin: 0; padding: 0; }
+
+/* Shared token set with trial_scorecard_L160.html — keep the two in step. */
+:root {
+    --bg: #e9ebe7;
+    --surface: #f8f9f6;
+    --surface-2: #f1f3ef;
+    --ink: #171b18;
+    --ink-2: #4b544e;
+    --ink-3: #737d76;
+    --rule: #d2d7cf;
+    --rule-strong: #b8c0b5;
+    --melee: #b4661f;
+    --ranged: #2f7d43;
+    --magic: #6a4fbf;
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+    --measure: 66ch;
+    --page: 900px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #101311;
+        --surface: #171b18;
+        --surface-2: #1d2220;
+        --ink: #e9ece7;
+        --ink-2: #a5aea7;
+        --ink-3: #7b857e;
+        --rule: #2a302c;
+        --rule-strong: #3b433e;
+        --melee: #f0a45a;
+        --ranged: #74cf83;
+        --magic: #ad93ea;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #101311;
+    --surface: #171b18;
+    --surface-2: #1d2220;
+    --ink: #e9ece7;
+    --ink-2: #a5aea7;
+    --ink-3: #7b857e;
+    --rule: #2a302c;
+    --rule-strong: #3b433e;
+    --melee: #f0a45a;
+    --ranged: #74cf83;
+    --magic: #ad93ea;
+}
+
+body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 52px;
+}
+
+h1, h2, h3, .kind, .stamp, .meta {
+    font-family: var(--display);
+}
+
+h1 {
+    font-size: clamp(2.2rem, 5.5vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.028em;
+    line-height: 1.03;
+    text-wrap: balance;
+}
+
+h2 {
+    font-size: 1.28rem;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+}
+
+h3 { font-size: 1.14rem; font-weight: 600; letter-spacing: -0.012em; }
+
+p { max-width: var(--measure); }
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.standfirst { font-size: 1.1rem; color: var(--ink-2); }
+
+.note { font-size: 0.94rem; color: var(--ink-2); }
+
+.rule-top { height: 3px; background: var(--ink); max-width: 96px; }
+
+header { display: flex; flex-direction: column; gap: 16px; }
+
+section { display: flex; flex-direction: column; gap: 18px; }
+
+.section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 14px;
+}
+
+/* ------------------------------------------------------------------ entries */
+
+.entries { display: flex; flex-direction: column; gap: 12px; }
+
+a.entry {
+    display: grid;
+    grid-template-columns: 104px 1fr auto;
+    gap: 18px;
+    align-items: start;
+    text-decoration: none;
+    color: inherit;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--rule-strong);
+    border-radius: 3px;
+    padding: 18px 20px;
+    transition: border-color 120ms ease, background 120ms ease;
+}
+
+a.entry:hover, a.entry:focus-visible {
+    background: var(--surface-2);
+    border-color: var(--rule-strong);
+}
+
+a.entry:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+a.entry.reference { border-left-color: var(--magic); }
+a.entry.log { border-left-color: var(--ranged); }
+a.entry.tool { border-left-color: var(--melee); }
+
+.stamp {
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--ink-3);
+    padding-top: 3px;
+}
+
+.stamp b { display: block; color: var(--ink-2); font-weight: 600; }
+
+.entry .text { display: flex; flex-direction: column; gap: 6px; }
+
+.entry h3 { margin: 0; }
+
+.entry p { margin: 0; font-size: 0.95rem; color: var(--ink-2); max-width: 52ch; }
+
+.meta {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+}
+
+.arrow {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    color: var(--ink-3);
+    padding-top: 2px;
+}
+
+a.entry:hover .arrow, a.entry:focus-visible .arrow { color: var(--ink); }
+
+.kind {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+/* --------------------------------------------------------------- add-more */
+
+.howto {
+    border: 1px dashed var(--rule-strong);
+    border-radius: 3px;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--ink-2);
+}
+
+.howto h3 { font-size: 1rem; }
+
+.howto code {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1px 5px;
+}
+
+footer {
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 16px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: var(--ink-3);
+}
+
+footer a { color: var(--ink-2); }
+
+@media (max-width: 620px) {
+    .page { padding: 40px 16px 64px; gap: 40px; }
+    body { font-size: 16px; }
+    a.entry { grid-template-columns: 1fr; gap: 10px; }
+    .arrow { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<header>
+    <div class="rule-top"></div>
+    <div class="eyebrow">Arsenal · MilkyWayIdle guild trials</div>
+    <h1>Arsenal Trials</h1>
+    <p class="standfirst">Two kinds of page live here. The scorecard is simulated and evergreen — what a build <em>should</em> do against each trial group. The trial log is observed and dated — what the roster actually did on the night.</p>
+</header>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Reference</div>
+        <h2>Overview summary</h2>
+    </div>
+    <p class="note">Kept current with the simulator. Replace it when the model or the reference builds change, rather than adding a second copy.</p>
+    <div class="entries">
+        <a class="entry reference" href="trial_scorecard_L160.html">
+            <div class="stamp"><b>L160</b>simulated</div>
+            <div class="text">
+                <h3>L160 Trial Scorecard</h3>
+                <p>Percent of group HP each damage class removes per minute, across all five trial groups, with the armor and evasion profile that drives every matchup.</p>
+                <div class="meta">
+                    <span>52-player raid</span>
+                    <span>14 melee · 14 ranged · 14 magic</span>
+                    <span>5 seeded runs per group</span>
+                </div>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+        </a>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Trial log</div>
+        <h2>Weekly analysis</h2>
+    </div>
+    <p class="note">One page per trial night, newest first. Each is a snapshot of that run's observed damage — left as published, never back-edited.</p>
+    <div class="entries">
+
+        <!-- Newest entry goes at the top of this list. -->
+        <a class="entry log" href="aug21_hedgehog_swarm_analysis.html">
+            <div class="stamp"><b>21 Aug</b>2026</div>
+            <div class="text">
+                <h3>Hedgehog &amp; Badger Trial Board</h3>
+                <p>Two parties, two bosses, no shared members — so each build's boss penalty is measured first, then observed damage is rebased onto one comparable scale and ranked per player.</p>
+                <div class="meta">
+                    <span>103 members</span>
+                    <span>12 builds normalised</span>
+                    <span>observed damage</span>
+                </div>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+        </a>
+
+        <!--
+        TEMPLATE — copy this block above the previous entry for the next trial night.
+        Drop the new page in this same folder and point href at its filename.
+
+        <a class="entry log" href="FILENAME.html">
+            <div class="stamp"><b>DD Mon</b>YYYY</div>
+            <div class="text">
+                <h3>PAGE TITLE</h3>
+                <p>One or two sentences on what this run measured and what it concluded.</p>
+                <div class="meta">
+                    <span>N members</span>
+                    <span>BOSS / BOSSES</span>
+                    <span>observed damage</span>
+                </div>
+            </div>
+            <div class="arrow" aria-hidden="true">&rarr;</div>
+        </a>
+        -->
+
+    </div>
+
+    <div class="howto">
+        <h3>Adding next week's page</h3>
+        <p class="note" style="margin:0">Save the new file into this folder, then copy the commented template inside the list above and fill in the date, filename, title and summary. Keep the newest entry first. Filenames follow <code>monDD_topic_analysis.html</code>.</p>
+    </div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Tool</div>
+        <h2>Run your own numbers</h2>
+    </div>
+    <p class="note">The scorecard above is one configuration. The Skill Lab runs any of them on demand.</p>
+    <div class="entries">
+        <a class="entry tool" href="../skill-lab.html">
+            <div class="stamp"><b>Live</b>simulator</div>
+            <div class="text">
+                <h3>Skill Lab</h3>
+                <p>Build squads, pick each squad's five ability slots, and run a trial group to the kill. Split five players onto a different kit and read the difference straight off the table.</p>
+                <div class="meta">
+                    <span>any trial group · L100–300</span>
+                    <span>per-squad DPS and %HP/min</span>
+                    <span>kit A vs kit B</span>
+                </div>
+            </div>
+            <div class="arrow" aria-hidden="true">→</div>
+        </a>
+    </div>
+
+</section>
+
+<footer>
+    Arsenal internal pages · numbers come from the <a href="../group-battle.html">Group Battle simulator</a>; the engine behind them is documented in <a href="https://github.com/will-shy/MWICombatSimulatorTest/blob/testing/docs/group_battle.md">docs/group_battle.md</a>. Every page here is self-contained — the only external request is the Google Fonts stylesheet, so they open straight from disk as well as from the site.
+</footer>
+
+</div>
+
+</body>
+</html>

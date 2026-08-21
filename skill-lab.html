@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MWI Skill Lab</title>
+    <link rel="icon" href="data:," />
+    <style>
+        /* Same palette as group-battle.html so the two pages read as one tool. */
+        :root {
+            --bg: #1e1f24;
+            --panel: #2a2c33;
+            --panel2: #33353d;
+            --text: #e8e8ea;
+            --dim: #9aa0aa;
+            --accent: #5b9bd5;
+            --border: #3d404a;
+            --win: #4caf50;
+            --lose: #e05252;
+            --draw: #d4a13a;
+            --aura: #f0c250;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+
+        header {
+            padding: 14px 20px;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        header h1 { font-size: 18px; margin: 0; }
+        header a { color: var(--accent); text-decoration: none; font-size: 13px; }
+        header a:hover { text-decoration: underline; }
+        header .disclaimer { color: var(--dim); font-size: 12px; }
+
+        .wrap { padding: 16px 20px 60px; max-width: 1400px; margin: 0 auto; }
+
+        .intro {
+            color: var(--dim);
+            font-size: 13px;
+            line-height: 1.6;
+            max-width: 90ch;
+            margin: 0 0 16px;
+        }
+
+        .intro b { color: var(--text); }
+
+        #errorBox {
+            display: none;
+            margin: 0 0 14px;
+            padding: 10px 12px;
+            background: #3a2326;
+            border: 1px solid var(--lose);
+            border-radius: 4px;
+            color: #ffb3b3;
+            white-space: pre-wrap;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+        }
+
+        .card > h2 {
+            font-size: 14px;
+            margin: 0 0 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--dim);
+        }
+
+        .card > .card-hint {
+            font-size: 12px;
+            color: var(--dim);
+            margin: 0 0 12px;
+            line-height: 1.5;
+        }
+
+        .grid2 { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(340px, 1.4fr); gap: 14px; align-items: start; }
+        @media (max-width: 1080px) { .grid2 { grid-template-columns: 1fr; } }
+
+        label.inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+
+        select, input[type="number"], input[type="text"] {
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 5px 7px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        select:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+        input[type="number"] { width: 68px; }
+
+        .btn {
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .btn:hover { border-color: var(--accent); }
+        .btn.small { padding: 4px 8px; font-size: 12px; }
+        .btn.danger:hover { border-color: var(--lose); color: #ffb3b3; }
+        .btn.primary { background: var(--accent); border-color: var(--accent); color: #10222f; font-weight: 600; }
+        .btn.primary:hover { filter: brightness(1.1); }
+        .btn:disabled { opacity: 0.5; cursor: default; }
+
+        .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .grow { flex: 1 1 auto; }
+
+        /* ------------------------------------------------------------ squads */
+
+        .squad {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--dim);
+            border-radius: 5px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+        }
+
+        .squad-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+
+        .squad-label {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 3px 6px;
+            width: 150px;
+        }
+
+        .squad-label:hover, .squad-label:focus { border-color: var(--border); background: var(--panel); }
+
+        .tag {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #3a3f4a;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .tag.variant { background: #3b3524; color: var(--aura); }
+
+        .slots { display: flex; flex-direction: column; gap: 5px; }
+
+        .slot { display: grid; grid-template-columns: 38px minmax(120px, 200px) 62px 1fr; gap: 8px; align-items: center; }
+
+        .slot-no {
+            font-size: 11px;
+            color: var(--dim);
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .slot-meta { font-size: 11px; color: var(--dim); }
+        .slot-warn { font-size: 11px; color: var(--draw); margin-left: 8px; cursor: help; }
+
+        .support { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .support select { flex: 1 1 auto; max-width: 260px; }
+
+        /* ----------------------------------------------------------- results */
+
+        .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+
+        .stat {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 10px;
+            min-width: 104px;
+        }
+
+        .stat span { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+        .stat b { font-size: 15px; font-variant-numeric: tabular-nums; }
+
+        table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+
+        th {
+            text-align: right;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--dim);
+            font-weight: 600;
+            padding: 0 8px 6px;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        th:first-child, td:first-child { text-align: left; }
+
+        td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+
+        tbody tr.squad-row { cursor: pointer; }
+        tbody tr.squad-row:hover { background: var(--panel2); }
+
+        table.mini { font-size: 12px; }
+        table.mini th { font-size: 10px; padding: 0 6px 4px; }
+        table.mini td { padding: 4px 6px; }
+
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+
+        .dim { color: var(--dim); }
+        .good { color: var(--win); }
+        .bad { color: var(--lose); }
+        .warn { color: var(--draw); }
+
+        .hint { font-size: 12px; color: var(--dim); line-height: 1.6; margin: 10px 0 0; }
+
+        .breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 6px 0 10px; }
+        .bd-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); margin-bottom: 5px; }
+
+        #progress {
+            display: none;
+            font-size: 13px;
+            color: var(--accent);
+            padding: 8px 0 0;
+        }
+
+        #resultPanel { display: none; }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>MWI Skill Lab</h1>
+        <span class="disclaimer">Ability-kit DPS bench · For IC guild Arsenal internal use only.</span>
+        <span class="grow"></span>
+        <a href="group-battle.html">← Group Battle</a>
+        <a href="pages/index.html">Trial pages</a>
+    </header>
+
+    <div class="wrap">
+        <p class="intro">
+            Build squads of identical players, pick each squad's five ability slots, and run one trial group to
+            completion. Squads sharing the same build are compared against the first of that build, so the
+            workflow for <b>“what if 5 of our 14 crossbows swapped skills?”</b> is: press <b>＋ variant</b> on that
+            squad, change the copy's kit, and read the <b>vs baseline</b> column.
+            This is a damage bench, not a survival test — by default nobody takes damage and nobody runs out of mana,
+            so the numbers isolate the kit. Slot 0 is the special/aura slot.
+        </p>
+
+        <div id="errorBox"></div>
+
+        <div class="grid2">
+            <div>
+                <div class="card">
+                    <h2>Enemy</h2>
+                    <p class="card-hint">Trial groups come from the same data the Group Battle page uses. Monster HP and
+                        action speed scale with the <em>whole</em> party, support placeholders included.</p>
+                    <div class="row" style="margin-bottom:12px">
+                        <label class="inline">group <select id="groupSelect"></select></label>
+                        <label class="inline">level <select id="levelSelect"></select></label>
+                    </div>
+                    <div id="enemyPreview"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Support placeholders</h2>
+                    <p class="card-hint">Tanks and healers that deal <b>exactly zero damage</b> but still count toward
+                        party-size scaling and carry the auras. Use these to model the real raid size without letting
+                        support damage pollute the comparison.</p>
+                    <div id="supportList"></div>
+                    <button type="button" class="btn small" id="addSupport">＋ add placeholder row</button>
+                </div>
+
+                <div class="card">
+                    <h2>Options</h2>
+                    <div class="row" style="margin-bottom:10px">
+                        <label class="inline"><input type="checkbox" id="optInfiniteMana"> infinite mana</label>
+                        <label class="inline"><input type="checkbox" id="optNoDamage"> players take no damage</label>
+                    </div>
+                    <div class="row" style="margin-bottom:10px">
+                        <label class="inline"><input type="checkbox" id="optAuras"> auras active</label>
+                        <label class="inline">aura level <input type="number" id="auraLevel" min="1" max="40"></label>
+                    </div>
+                    <div class="row">
+                        <label class="inline">runs (seeds) <input type="number" id="runCount" min="1" max="10"></label>
+                        <label class="inline">time cap (s) <input type="number" id="timeCap" min="60" max="14400" step="60" style="width:84px"></label>
+                    </div>
+                    <p class="card-hint" style="margin:12px 0 0">Auras go on the support placeholders when there are any,
+                        otherwise on the highest-skill damage dealers, which costs those players a slot. More runs
+                        average out roll luck; three is usually enough to separate kits more than 2% apart.</p>
+                </div>
+            </div>
+
+            <div>
+                <div class="card">
+                    <h2>Squads</h2>
+                    <p class="card-hint">Each squad is N identical players. <b>＋ variant</b> moves up to 5 players into a
+                        copy of the squad so party size stays fixed. A ⚠ on a slot means that ability resolves on a
+                        different combat style's accuracy and damage than the squad's weapon — usually a trap.</p>
+                    <div id="squadList"></div>
+                    <div class="row" style="margin-top:4px">
+                        <button type="button" class="btn small" id="addSquad">＋ add squad</button>
+                        <span class="grow"></span>
+                        <button type="button" class="btn" id="resetBtn">Reset to defaults</button>
+                        <button type="button" class="btn primary" id="runBtn">Run simulation</button>
+                    </div>
+                    <div id="progress"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="resultPanel">
+            <h2>Results</h2>
+            <div id="resultSummary"></div>
+            <div id="resultTable"></div>
+        </div>
+    </div>
+
+    <script src="skillLab.js"></script>
+</body>
+
+</html>
