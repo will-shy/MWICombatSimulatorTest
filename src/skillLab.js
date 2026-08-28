@@ -4,11 +4,17 @@
 //
 // English-only by project convention for new group-battle features.
 import {
-    PRESET_LIST, PRESETS, MONSTER_GROUPS, ABILITY_LIST,
-    enemyPreview, buildStyle, presetKit,
+    PRESET_LIST, PRESETS, MONSTER_GROUPS, ABILITY_LIST, CUSTOM_BUILD_PREFIX,
+    enemyPreview, buildStyle, presetKit, squadDTO,
+    getBuild, customBuildList, setCustomBuilds, equipmentSetToSoloExport,
 } from "./combatsimulator/skillLab.js";
+import { playerDetailHtml, renderDetailedStatus, dtoToSoloExport } from "./playerDetailView.js";
 
 const STORE_KEY = "mwiSkillLabConfigV2";
+// Where the standard simulator keeps its saved equipment sets, and the key it
+// reads on load to auto-import a build. Both must match src/main.js.
+const LS_EQUIPMENT_SETS_KEY = "equipmentSets";
+const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
 const ABILITY_BY_HRID = ABILITY_LIST.reduce((acc, a) => (acc[a.hrid] = a, acc), {});
 
 const STYLE_COLORS = {
@@ -22,6 +28,9 @@ const STYLE_COLORS = {
 let worker = new Worker(new URL("skillLabWorker.js", import.meta.url));
 let running = false;
 let lastResult = null;
+// Options the displayed result was produced with — the panel explains the result
+// it is showing, not whatever the checkboxes say now.
+let lastRunOptions = null;
 
 // --------------------------------------------------------------- default state
 
@@ -84,6 +93,41 @@ function pick(...ids) {
     return PRESET_LIST[0].id;
 }
 
+// --------------------------------------------------- builds from saved gear
+
+// Besides the bundled presets, any equipment set saved in the standard simulator
+// (same browser, localStorage "equipmentSets") can be used as a squad's build.
+// They are read at page load and again on Refresh, so a set saved in the other
+// tab shows up here without a reload. Returns the names that failed to convert.
+function loadSavedBuilds() {
+    let sets = {};
+    try {
+        sets = JSON.parse(localStorage.getItem(LS_EQUIPMENT_SETS_KEY)) || {};
+    } catch (e) {
+        sets = {};
+    }
+
+    const builds = [];
+    const failed = [];
+    for (const name of Object.keys(sets)) {
+        try {
+            builds.push({
+                id: CUSTOM_BUILD_PREFIX + name,
+                name,
+                export: equipmentSetToSoloExport(sets[name]),
+            });
+        } catch (e) {
+            failed.push(name + ": " + e.message);
+        }
+    }
+    setCustomBuilds(builds);
+    return failed;
+}
+
+// Must run before loadState(), which drops squads whose build no longer resolves
+// — a squad on a saved set has to be resolvable at that point or it is lost.
+loadSavedBuilds();
+
 let state = loadState();
 
 function loadState() {
@@ -91,8 +135,8 @@ function loadState() {
         const raw = localStorage.getItem(STORE_KEY);
         if (!raw) return defaultState();
         const parsed = JSON.parse(raw);
-        // Drop anything referencing a preset that no longer exists.
-        parsed.squads = (parsed.squads || []).filter((s) => PRESETS[s.presetId]);
+        // Drop anything referencing a build that no longer exists.
+        parsed.squads = (parsed.squads || []).filter((s) => getBuild(s.presetId));
         if (!parsed.squads.length) return defaultState();
         return { ...defaultState(), ...parsed };
     } catch (e) {
@@ -211,6 +255,39 @@ function slotMeta(hrid, squadStyle) {
     return `<span class="slot-meta">${esc(bits.join(" · "))}</span>${warn}`;
 }
 
+// Build picker: bundled presets first, then whatever equipment sets are loaded.
+// A squad whose saved set has since been deleted keeps its id in a "missing"
+// option, so the squad is visible and fixable instead of silently re-pointed.
+function buildOptions(selected) {
+    const opt = (id, name) => `<option value="${esc(id)}"${id === selected ? " selected" : ""}>${esc(name)}</option>`;
+    let html = `<optgroup label="Presets">${PRESET_LIST.map((p) => opt(p.id, p.name)).join("")}</optgroup>`;
+    const saved = customBuildList();
+    if (saved.length) {
+        html += `<optgroup label="Saved equipment sets">${saved.map((b) => opt(b.id, b.name)).join("")}</optgroup>`;
+    }
+    if (!getBuild(selected)) {
+        html += opt(selected, selected.replace(CUSTOM_BUILD_PREFIX, "") + " (missing)");
+    }
+    return html;
+}
+
+// The saved-gear panel: one chip per equipment set, each opening its preview.
+function renderSavedBuilds() {
+    const host = el("savedBuilds");
+    const saved = customBuildList();
+    if (!saved.length) {
+        host.innerHTML = `<div class="hint" style="margin:0">No equipment sets found in this browser. Save one in the
+            <a href="index.html" target="_blank" rel="noopener">standard simulator ↗</a>, then press Refresh.</div>`;
+        return;
+    }
+    host.innerHTML = saved.map((b) => {
+        const style = styleName(buildStyle(b.id));
+        return `<button type="button" class="chip-btn" data-build="${esc(b.id)}"
+                        title="Preview this build's gear, levels and abilities">${esc(b.name)}${
+            style ? ` <span class="dim">${esc(style)}</span>` : ""}</button>`;
+    }).join("");
+}
+
 function renderSquads() {
     const host = el("squadList");
     host.innerHTML = state.squads.map((squad, idx) => {
@@ -229,13 +306,12 @@ function renderSquads() {
                     <input type="checkbox" data-field="support"${squad.support ? " checked" : ""}> support
                 </label>
                 <label class="inline">build
-                    <select data-field="presetId">
-                        ${PRESET_LIST.map((p) => `<option value="${esc(p.id)}"${p.id === squad.presetId ? " selected" : ""}>${esc(p.name)}</option>`).join("")}
-                    </select>
+                    <select data-field="presetId">${buildOptions(squad.presetId)}</select>
                 </label>
                 <label class="inline">players
                     <input type="number" min="0" max="200" data-field="count" value="${Number(squad.count) || 0}">
                 </label>
+                <button type="button" class="btn small" data-act="preview" title="Preview this squad's gear, levels and abilities exactly as it will be simulated">👁 preview</button>
                 <button type="button" class="btn small" data-act="variant" title="Split players off into a copy of this squad, so you can change its kit and compare">＋ variant</button>
                 <button type="button" class="btn small danger" data-act="remove" title="Remove this squad">✕</button>
             </div>
@@ -267,8 +343,87 @@ function renderOptions() {
 
 function renderAll() {
     renderEnemy();
+    renderSavedBuilds();
     renderSquads();
     renderOptions();
+}
+
+// --------------------------------------------------------- build preview
+
+// Preview modal: the same build detail the group-battle page shows, rendered from
+// the DTO the simulation would actually build, plus the two handoffs — copy the
+// build as a solo export, or open it in the standard simulator.
+function openPreview(title, presetId, kit) {
+    const dto = squadDTO(presetId, kit);
+    if (!dto) {
+        showError(`Build "${presetId}" is not available — press Refresh under Saved builds, or pick another build.`);
+        return;
+    }
+
+    const build = getBuild(presetId);
+    el("previewTitle").textContent = build && build.name !== title ? `${title} — ${build.name}` : title;
+    const body = el("previewBody");
+    body.innerHTML = `<div class="row" style="margin-bottom:6px">
+            <button type="button" class="btn small export-json-btn">⧉ Export JSON</button>
+            <button type="button" class="btn small open-sim-btn">↗ Open in simulator</button>
+            <span class="export-status hint" style="margin:0"></span>
+        </div>
+        <p class="hint" style="margin:0 0 10px">Food and drinks are never part of a Skill Lab build, so they are empty
+            here and in anything handed to the simulator.</p>` + playerDetailHtml(dto);
+
+    const status = body.querySelector(".export-status");
+
+    const statusBtn = body.querySelector(".show-status-btn");
+    statusBtn.addEventListener("click", () => {
+        const panel = body.querySelector(".detailed-status");
+        const open = panel.style.display !== "none";
+        if (open) {
+            panel.style.display = "none";
+            statusBtn.textContent = "Show Detailed Combat Status";
+        } else {
+            renderDetailedStatus(panel, dto);
+            panel.style.display = "block";
+            statusBtn.textContent = "Hide Detailed Combat Status";
+        }
+    });
+
+    body.querySelector(".export-json-btn").addEventListener("click", async () => {
+        const json = JSON.stringify(dtoToSoloExport(dto));
+        try {
+            await navigator.clipboard.writeText(json);
+            status.textContent = "Copied to clipboard.";
+        } catch (e) {
+            status.textContent = "Copy failed — clipboard unavailable.";
+        }
+    });
+
+    // Hand the build to the standard simulator: it consumes this key on load.
+    body.querySelector(".open-sim-btn").addEventListener("click", () => {
+        try {
+            localStorage.setItem(SOLO_IMPORT_HANDOFF_KEY, JSON.stringify(dtoToSoloExport(dto)));
+        } catch (e) {
+            status.textContent = "Could not hand the build over — storage unavailable.";
+            return;
+        }
+        window.open("index.html", "_blank", "noopener");
+    });
+
+    el("previewOverlay").style.display = "flex";
+    el("previewClose").focus();
+}
+
+function closePreview() {
+    el("previewOverlay").style.display = "none";
+}
+
+// Reload the saved equipment sets from localStorage (Refresh, and on page load).
+function refreshSavedBuilds() {
+    const failed = loadSavedBuilds();
+    renderSavedBuilds();
+    renderSquads();
+    showError(failed.length
+        ? `Skipped ${failed.length} equipment set(s):\n` + failed.join("\n")
+        : "");
 }
 
 // ------------------------------------------------------------------- results
@@ -282,6 +437,9 @@ function renderResult(agg) {
     const supSquads = agg.squads.filter((q) => q.support);
     const totalDmg = dpsSquads.reduce((s, q) => s + q.dmg, 0) || 1;
     const timedOut = agg.outcomes.some((o) => o === "timeout");
+    const wiped = agg.outcomes.some((o) => o === "defeat");
+    const outcome = outcomeSummary(agg.outcomes);
+    const deaths = agg.partySize - (agg.survivors ?? agg.partySize);
 
     const baselineFor = (q) => {
         const idx = agg.squads.indexOf(q);
@@ -291,13 +449,16 @@ function renderResult(agg) {
 
     el("resultSummary").innerHTML = `
         <div class="stat-row">
-            <div class="stat"><span>Outcome</span><b class="${timedOut ? "warn" : "good"}">${timedOut ? "time cap hit" : "cleared"}</b></div>
+            <div class="stat"><span>Outcome</span><b class="${outcome.cls}">${esc(outcome.text)}</b></div>
             <div class="stat"><span>Kill time</span><b>${(agg.seconds / 60).toFixed(1)} min</b></div>
             <div class="stat"><span>Group HP</span><b>${fmt(agg.totalHp)}</b></div>
             <div class="stat"><span>Party</span><b>${agg.partySize} <span class="dim">(${agg.supportCount} support)</span></b></div>
+            <div class="stat"><span>Survivors</span><b class="${deaths ? "bad" : ""}">${agg.survivors ?? agg.partySize} <span class="dim">/ ${agg.partySize}</span></b></div>
             <div class="stat"><span>Runs</span><b>${agg.runs} seed${agg.runs > 1 ? "s" : ""}</b></div>
         </div>
-        ${timedOut ? `<p class="hint warn">At least one run hit the time cap, so the numbers below are a partial fight. Raise the cap or add damage.</p>` : ""}`;
+        ${wiped ? `<p class="hint bad">The party wiped in at least one run — the fight ended early, so every damage number below covers a shorter fight than a clear would.</p>` : ""}
+        ${timedOut ? `<p class="hint warn">At least one run hit the time cap, so the numbers below are a partial fight. Raise the cap or add damage.</p>` : ""}
+        ${(lastRunOptions || state).noPlayerDamage && !wiped ? `<p class="hint">Players take no damage with the current options, so a wipe cannot happen — untick <b>players take no damage</b> to test survival.</p>` : ""}`;
 
     el("resultTable").innerHTML = `
         <table>
@@ -348,6 +509,31 @@ function renderResult(agg) {
             d.style.display = d.style.display === "none" ? "table-row" : "none";
         });
     });
+}
+
+// Engine outcomes in the page's words, collapsed across seeds: one label when
+// every run agreed, otherwise a count per distinct outcome ("2× victory · 1× wiped").
+const OUTCOME_LABELS = {
+    victory: { text: "victory", cls: "good" },
+    defeat: { text: "wiped", cls: "bad" },
+    timeout: { text: "time cap hit", cls: "warn" },
+    ended: { text: "stalemate", cls: "warn" },
+};
+
+function outcomeSummary(outcomes) {
+    const counts = new Map();
+    for (const o of outcomes) counts.set(o, (counts.get(o) || 0) + 1);
+    // Worst outcome present drives the colour: wipe, then time cap, then clear.
+    const cls = counts.has("defeat") ? "bad"
+        : counts.has("timeout") || counts.has("ended") ? "warn" : "good";
+    if (counts.size === 1) {
+        const only = outcomes[0];
+        return { text: (OUTCOME_LABELS[only] || { text: only }).text, cls };
+    }
+    const text = [...counts.entries()]
+        .map(([o, n]) => `${n}× ${(OUTCOME_LABELS[o] || { text: o }).text}`)
+        .join(" · ");
+    return { text, cls };
 }
 
 function abilityBreakdown(q) {
@@ -403,27 +589,29 @@ function run() {
     el("progress").style.display = "block";
     el("progress").textContent = "Running run 1…";
 
-    worker.postMessage({
-        type: "run_skill_lab",
-        config: {
-            groupName: state.groupName,
-            level: Number(state.level),
-            runs: Number(state.runs),
-            squads: state.squads.map((s) => ({
-                id: s.id, label: s.label, presetId: s.presetId,
-                count: Number(s.count) || 0,
-                support: !!s.support,
-                kit: (s.kit || []).map((slot) => (slot && slot.hrid ? { hrid: slot.hrid, level: Number(slot.level) || 1 } : null)),
-            })),
-            options: {
-                infiniteMana: !!state.infiniteMana,
-                noPlayerDamage: !!state.noPlayerDamage,
-                auras: !!state.auras,
-                auraLevel: Number(state.auraLevel) || 25,
-                timeCapSeconds: Number(state.timeCapSeconds) || 3600,
-            },
+    const config = {
+        groupName: state.groupName,
+        level: Number(state.level),
+        runs: Number(state.runs),
+        // Saved-gear builds aren't bundled, so the worker gets them by value.
+        customBuilds: customBuildList().map((b) => ({ id: b.id, name: b.name, export: b.export })),
+        squads: state.squads.map((s) => ({
+            id: s.id, label: s.label, presetId: s.presetId,
+            count: Number(s.count) || 0,
+            support: !!s.support,
+            kit: (s.kit || []).map((slot) => (slot && slot.hrid ? { hrid: slot.hrid, level: Number(slot.level) || 1 } : null)),
+        })),
+        options: {
+            infiniteMana: !!state.infiniteMana,
+            noPlayerDamage: !!state.noPlayerDamage,
+            auras: !!state.auras,
+            auraLevel: Number(state.auraLevel) || 25,
+            timeCapSeconds: Number(state.timeCapSeconds) || 3600,
         },
-    });
+    };
+
+    lastRunOptions = config.options;
+    worker.postMessage({ type: "run_skill_lab", config });
 }
 
 worker.onmessage = (event) => {
@@ -498,6 +686,11 @@ function onSquadClick(e) {
     const squad = state.squads[idx];
     if (!squad) return;
 
+    if (btn.dataset.act === "preview") {
+        openPreview(squad.label, squad.presetId, squad.kit || []);
+        return;
+    }
+
     if (btn.dataset.act === "remove") {
         state.squads.splice(idx, 1);
         if (!state.squads.length) state.squads.push({ ...defaultState().squads[0], id: state.nextId++ });
@@ -545,6 +738,23 @@ document.addEventListener("DOMContentLoaded", () => {
     el("auraLevel").addEventListener("input", (e) => { state.auraLevel = Math.max(1, Number(e.target.value) || 1); saveState(); });
     el("runCount").addEventListener("input", (e) => { state.runs = Math.min(10, Math.max(1, Number(e.target.value) || 1)); saveState(); });
     el("timeCap").addEventListener("input", (e) => { state.timeCapSeconds = Math.max(60, Number(e.target.value) || 3600); saveState(); });
+
+    el("refreshBuilds").addEventListener("click", refreshSavedBuilds);
+    el("savedBuilds").addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-build]");
+        if (!btn) return;
+        const build = getBuild(btn.dataset.build);
+        // A saved set previews on its own gear and its own abilities.
+        openPreview(build ? build.name : btn.dataset.build, btn.dataset.build, null);
+    });
+
+    el("previewClose").addEventListener("click", closePreview);
+    el("previewOverlay").addEventListener("click", (e) => {
+        if (e.target === el("previewOverlay")) closePreview();
+    });
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closePreview();
+    });
 
     el("runBtn").addEventListener("click", run);
     el("resetBtn").addEventListener("click", () => {

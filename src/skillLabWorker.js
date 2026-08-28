@@ -2,7 +2,7 @@
 // combatsimulator/skillLab.js so it can also be driven from node or a test.
 // Runs the requested number of seeds one after another, reporting progress so a
 // long multi-seed sweep doesn't look frozen.
-import { runSkillLab, aggregateRuns } from "./combatsimulator/skillLab.js";
+import { runSkillLab, aggregateRuns, setCustomBuilds } from "./combatsimulator/skillLab.js";
 
 onmessage = async function (event) {
     if (event.data.type !== "run_skill_lab") {
@@ -10,6 +10,9 @@ onmessage = async function (event) {
     }
 
     const config = event.data.config;
+    // Builds the page read out of localStorage aren't bundled, so they arrive with
+    // the config; register them before anything resolves a squad's build id.
+    setCustomBuilds(config.customBuilds);
     const runCount = Math.max(1, Math.min(10, Math.floor(Number(config.runs) || 1)));
 
     try {

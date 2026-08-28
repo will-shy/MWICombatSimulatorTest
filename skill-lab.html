@@ -242,6 +242,127 @@
         .breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 6px 0 10px; }
         .bd-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); margin-bottom: 5px; }
 
+        /* --------------------------------------------- saved builds + preview */
+
+        /* The shared detail renderer emits <button class="secondary">. */
+        button.secondary {
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 12px;
+            font-family: inherit;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        button.secondary:hover { border-color: var(--accent); }
+
+        .chip-btn {
+            background: var(--panel2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 4px 11px;
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            margin: 0 5px 5px 0;
+        }
+
+        .chip-btn:hover { border-color: var(--accent); }
+
+        #savedBuilds { display: flex; flex-wrap: wrap; }
+        #savedBuilds a { color: var(--accent); }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: none;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 16px;
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-box {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            width: 100%;
+            max-width: 760px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--panel);
+            border-radius: 10px 10px 0 0;
+        }
+
+        .modal-header h3 { margin: 0; font-size: 16px; }
+        .modal-body { padding: 14px 16px 18px; }
+
+        /* Shared with the group-battle detail modal (playerDetailView.js). */
+        .detail-skills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+        .chip {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2px 10px;
+            font-size: 12px;
+        }
+
+        .detail-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 700px) { .detail-cols { grid-template-columns: 1fr; } }
+        .detail-cols h5 { margin: 0 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-abilities { margin: 0; padding-left: 18px; font-size: 12px; }
+        .detail-abilities li { padding: 1px 0; }
+
+        .tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .tbl th, .tbl td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); white-space: normal; }
+        .tbl th { color: var(--dim); font-weight: 600; }
+
+        .empty { color: var(--dim); font-style: italic; padding: 8px 0; }
+
+        .ability-detail {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            background: var(--panel2);
+        }
+
+        .ability-detail .tbl { margin-top: 4px; }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .stat-tile {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+
+        .stat-tile .stat-label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.04em; }
+        .stat-tile .stat-value { font-size: 16px; font-weight: 600; }
+        .stat-tile.highlight { border-color: var(--accent); }
+
         #progress {
             display: none;
             font-size: 13px;
@@ -259,6 +380,7 @@
         <span class="disclaimer">Ability-kit DPS bench · For IC guild Arsenal internal use only.</span>
         <span class="grow"></span>
         <a href="group-battle.html">← Group Battle</a>
+        <a href="index.html" target="_blank" rel="noopener">Standard simulator ↗</a>
         <a href="pages/index.html">Trial pages</a>
     </header>
 
@@ -312,12 +434,25 @@
 
             <div>
                 <div class="card">
+                    <h2>Builds from your saved gear</h2>
+                    <p class="card-hint">Equipment sets you saved in the standard simulator (same browser) are loaded as
+                        builds and appear under <b>Saved equipment sets</b> in every squad's build picker — for damage
+                        squads and support squads alike. Save a set over there, then press <b>Refresh</b> here. Click a
+                        set to preview its gear, levels and abilities, or to open it in the simulator.</p>
+                    <div id="savedBuilds"></div>
+                    <div class="row" style="margin-top:8px">
+                        <button type="button" class="btn small" id="refreshBuilds">↻ Refresh</button>
+                    </div>
+                </div>
+
+                <div class="card">
                     <h2>Squads</h2>
                     <p class="card-hint">Each squad is N identical players. <b>＋ variant</b> moves up to 5 players into a
                         copy of the squad so party size stays fixed. The <b>support</b> checkbox keeps a squad fighting
                         (debuffs and mana feeds still land) while excluding its damage from the analysis — its kit stays
                         editable, e.g. the Water squad's Mana Spring level. A ⚠ on a slot means that ability resolves on
-                        a different combat style's accuracy and damage than the squad's weapon — usually a trap.</p>
+                        a different combat style's accuracy and damage than the squad's weapon — usually a trap.
+                        <b>👁 preview</b> shows the gear, levels and abilities that squad will actually be simulated with.</p>
                     <div id="squadList"></div>
                     <div class="row" style="margin-top:4px">
                         <button type="button" class="btn small" id="addSquad">＋ add squad</button>
@@ -334,6 +469,17 @@
             <h2>Results</h2>
             <div id="resultSummary"></div>
             <div id="resultTable"></div>
+        </div>
+    </div>
+
+    <!-- Build preview modal: gear, levels, abilities and full combat status. -->
+    <div id="previewOverlay" class="modal-overlay">
+        <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+            <div class="modal-header">
+                <h3 id="previewTitle"></h3>
+                <button type="button" class="btn small" id="previewClose" aria-label="Close" title="Close (Esc)">✕</button>
+            </div>
+            <div class="modal-body" id="previewBody"></div>
         </div>
     </div>
 

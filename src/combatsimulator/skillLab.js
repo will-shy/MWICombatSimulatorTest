@@ -47,16 +47,119 @@ export const PRESETS = PRESET_CTX.keys().reduce((acc, file) => {
 
 export const PRESET_LIST = Object.values(PRESETS).sort((a, b) => a.name.localeCompare(b.name));
 
-// A preset's own ability list as a length-5 kit ({hrid, level}|null), so the UI
+// ------------------------------------------------------- saved (custom) builds
+
+// Besides the bundled presets, a build can come from an equipment set the user
+// saved in the standard simulator (localStorage "equipmentSets"). Those are read
+// at runtime, so they cannot be bundled: the page registers them here, and the
+// worker registers the same list from the run config before the fight is built.
+// Ids are prefixed so a saved set named "Wark" never shadows the wark preset.
+export const CUSTOM_BUILD_PREFIX = "set:";
+
+let CUSTOM_BUILDS = {};
+
+export function setCustomBuilds(builds) {
+    CUSTOM_BUILDS = {};
+    for (const b of builds || []) {
+        if (b && b.id && b.export && b.export.player) CUSTOM_BUILDS[b.id] = b;
+    }
+}
+
+// [{ id, name, export }] in display order.
+export function customBuildList() {
+    return Object.values(CUSTOM_BUILDS).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Resolve a build id: bundled preset first, then a saved equipment set.
+export function getBuild(id) {
+    return PRESETS[id] || CUSTOM_BUILDS[id] || null;
+}
+
+// Convert one equipment set (the shape main.js persists under "equipmentSets")
+// into the solo-export shape everything else here consumes. The two differ:
+// levels/equipment/abilities are keyed objects rather than arrays, the weapon
+// lives in a single "weapon" slot (main_hand vs two_hand comes from the item's
+// own type), and there is an extra "charm" slot.
+export function equipmentSetToSoloExport(set) {
+    const levels = set.levels || {};
+    const lvl = (skill) => Number(levels[skill]) || 1;
+
+    const equipment = [];
+    const simpleSlots = [
+        "head", "body", "legs", "feet", "hands",
+        "off_hand", "pouch", "neck", "earrings", "ring", "back", "charm",
+    ];
+    for (const slot of simpleSlots) {
+        const entry = (set.equipment || {})[slot];
+        const itemHrid = entry && entry.equipment;
+        if (!itemHrid || !itemDetailMap[itemHrid]) continue;
+        equipment.push({
+            itemLocationHrid: "/item_locations/" + slot,
+            itemHrid,
+            enhancementLevel: Number(entry.enhancementLevel) || 0,
+        });
+    }
+    const weaponEntry = (set.equipment || {}).weapon;
+    const weaponHrid = weaponEntry && weaponEntry.equipment;
+    if (weaponHrid && itemDetailMap[weaponHrid]) {
+        const type = itemDetailMap[weaponHrid].equipmentDetail
+            && itemDetailMap[weaponHrid].equipmentDetail.type;
+        const slot = type === "/equipment_types/two_hand" ? "two_hand" : "main_hand";
+        equipment.push({
+            itemLocationHrid: "/item_locations/" + slot,
+            itemHrid: weaponHrid,
+            enhancementLevel: Number(weaponEntry.enhancementLevel) || 0,
+        });
+    }
+
+    // Kept index-aligned (nulls for empty slots) so slot 2 stays slot 2.
+    const abilities = [0, 1, 2, 3, 4].map((i) => {
+        const entry = (set.abilities || {})[i];
+        const abilityHrid = entry && entry.ability;
+        return abilityHrid && abilityDetailMap[abilityHrid]
+            ? { abilityHrid, level: Number(entry.level) || 1 }
+            : null;
+    });
+
+    return {
+        player: {
+            staminaLevel: lvl("stamina"),
+            intelligenceLevel: lvl("intelligence"),
+            attackLevel: lvl("attack"),
+            meleeLevel: lvl("melee"),
+            defenseLevel: lvl("defense"),
+            rangedLevel: lvl("ranged"),
+            magicLevel: lvl("magic"),
+            equipment,
+        },
+        abilities,
+        triggerMap: set.triggerMap || {},
+        houseRooms: set.houseRooms || {},
+        achievements: set.achievements || {},
+    };
+}
+
+// A build's own ability list as a length-5 kit ({hrid, level}|null), so the UI
 // can prefill a squad's slots with what the build actually runs.
 export function presetKit(presetId) {
-    const preset = PRESETS[presetId];
+    const preset = getBuild(presetId);
     if (!preset) return [null, null, null, null, null];
     const kit = [0, 1, 2, 3, 4].map((i) => {
         const a = (preset.export.abilities || [])[i];
         return a && a.abilityHrid ? { hrid: a.abilityHrid, level: Number(a.level) || 1 } : null;
     });
     return kit;
+}
+
+// The DTO a squad's players are built from: the build's gear and levels with the
+// squad's kit applied. The preview modal renders this, so what it shows is what
+// the simulation runs.
+export function squadDTO(presetId, kit, hrid = "preview") {
+    const build = getBuild(presetId);
+    if (!build) return null;
+    // Mirrors runSkillLab: an array (even an all-empty one) is the squad's kit;
+    // null/undefined means "run the build's own abilities".
+    return soloExportToDTO(build.export, hrid, Array.isArray(kit) ? kit : undefined);
 }
 
 // ------------------------------------------------------------------ monsters --
@@ -91,7 +194,7 @@ export function enemyPreview(groupName, level, partySize) {
 // to warn when a kit slot's ability resolves on a different style's rating (a
 // slash ability on a flail uses slash accuracy/damage, which the gear never buffs).
 export function buildStyle(presetId) {
-    const preset = PRESETS[presetId];
+    const preset = getBuild(presetId);
     if (!preset) return "";
     const eq = preset.export.player.equipment || [];
     const weapon = eq.find((i) => i.itemLocationHrid === "/item_locations/main_hand")
@@ -319,9 +422,9 @@ export async function runSkillLab(config) {
     // Legacy shorthand: bare {presetId, count} supports become support squads
     // running the preset's own ability kit.
     for (const [i, sup] of (config.supports || []).entries()) {
-        if (!PRESETS[sup.presetId]) continue;
+        if (!getBuild(sup.presetId)) continue;
         squads.push({
-            id: "support-" + i, label: PRESETS[sup.presetId].name,
+            id: "support-" + i, label: getBuild(sup.presetId).name,
             presetId: sup.presetId, count: sup.count, kit: null, support: true,
         });
     }
@@ -329,7 +432,7 @@ export async function runSkillLab(config) {
     const roster = [];
     let n = 0;
     for (const squad of squads) {
-        const preset = PRESETS[squad.presetId];
+        const preset = getBuild(squad.presetId);
         if (!preset) throw new Error("Unknown build: " + squad.presetId);
         const count = Math.max(0, Math.floor(Number(squad.count) || 0));
         for (let i = 0; i < count; i++) {
@@ -412,6 +515,7 @@ export async function runSkillLab(config) {
             seconds,
             totalHp,
             partySize: players.length,
+            survivors: (res.playerSurvivors || []).length,
             supportCount: roster.filter((r) => r.support).length,
             maxEnrage: res.maxEnrageStack,
             enemies: (res.enemyFinalState || []).map((e) => ({
@@ -456,6 +560,8 @@ export function aggregateRuns(runs) {
         outcomes: runs.map((r) => r.outcome),
         totalHp: first.totalHp,
         partySize: first.partySize,
+        // Worst case across the seeds — one wipe out of three is the number worth seeing.
+        survivors: Math.min(...runs.map((r) => r.survivors ?? r.partySize)),
         supportCount: first.supportCount,
         enemies: first.enemies,
         squads,
