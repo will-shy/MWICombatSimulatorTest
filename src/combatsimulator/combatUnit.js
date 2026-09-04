@@ -9,6 +9,10 @@ class CombatUnit {
 
     isOutOfMana = false;
 
+    // Labyrinth monsters start every ability at a FIXED half cooldown instead of
+    // the usual random roll. Set by Labyrinth.getMonster(); see resetCooldowns().
+    fixedStartCooldown = false;
+
     // Base levels which don't change after initialization
     staminaLevel = 1;
     intelligenceLevel = 1;
@@ -560,7 +564,14 @@ class CombatUnit {
                     if (haste > 0) {
                         cooldownDuration = cooldownDuration * 100 / (100 + haste);
                     }
-                    ability.lastUsed = currentTime - Math.floor(cooldownDuration * 0.5) + Math.floor(Math.random() * cooldownDuration * 0.5);
+                    // Monsters spawn partway into their cooldown: normally a random
+                    // roll leaving 50%-100% of the cooldown, but labyrinth monsters
+                    // are pinned to exactly 50%.
+                    if (this.fixedStartCooldown) {
+                        ability.lastUsed = currentTime - Math.floor(cooldownDuration * 0.5);
+                    } else {
+                        ability.lastUsed = currentTime - Math.floor(cooldownDuration * 0.5) + Math.floor(Math.random() * cooldownDuration * 0.5);
+                    }
                 }
             });
     }

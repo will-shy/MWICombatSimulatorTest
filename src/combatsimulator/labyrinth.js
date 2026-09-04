@@ -18,7 +18,11 @@ class Labyrinth{
 
     getMonster () {
         this.attemptCount ++;
-        return [new Monster(this.monsterHrid, 0, this.roomLevel)];
+        let monster = new Monster(this.monsterHrid, 0, this.roomLevel);
+        // Labyrinth monsters don't roll a random spawn cooldown: every ability
+        // starts at exactly half its cooldown. See combatUnit.resetCooldowns().
+        monster.fixedStartCooldown = true;
+        return [monster];
     }
 
     updateEnconterStartTime (enconterStartTime) {
