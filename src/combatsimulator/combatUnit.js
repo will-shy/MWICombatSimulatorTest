@@ -188,11 +188,14 @@ class CombatUnit {
         let maxHitpointsRatioBoost = this.getBuffBoost("/buff_types/max_hitpoints").ratioBoost;
         let maxManapointsRatioBoost = this.getBuffBoost("/buff_types/max_manapoints").ratioBoost;
 
-        this.combatDetails.maxHitpoints = Math.ceil(
+        // Rounded to nearest, matching the game. Checked against a character whose fractional pools
+        // fall on both sides of .5 at once: with Shrine of Spirit 2, HP 2519.159 reads as 2519
+        // in game (so not rounded up) while MP 1611.600 reads as 1612 (so not rounded down).
+        this.combatDetails.maxHitpoints = Math.round(
             (10 * (10 + this.combatDetails.staminaLevel) + this.combatDetails.combatStats.maxHitpoints)
             * (1 + this.combatDetails.combatStats.maxHitpointsRatio + maxHitpointsRatioBoost)
         );
-        this.combatDetails.maxManapoints = Math.ceil(
+        this.combatDetails.maxManapoints = Math.round(
             (10 * (10 + this.combatDetails.intelligenceLevel) + this.combatDetails.combatStats.maxManapoints)
             * (1 + this.combatDetails.combatStats.maxManapointsRatio + maxManapointsRatioBoost)
         );
