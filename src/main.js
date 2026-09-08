@@ -23,6 +23,8 @@ import achievementDetailMap from "./combatsimulator/data/achievementDetailMap.js
 import labyrinthUpgradeDetailMap from "./combatsimulator/data/labyrinthUpgradeDetailMap.json"
 import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json"
 
+import { computeRecoverStats, REGEN_TICK_SECONDS } from "./recoverStats.js";
+
 import patchNote from "../patchNote.json";
 
 const ONE_SECOND = 1e9;
@@ -606,22 +608,48 @@ function changeEquipmentSetListener() {
 //
 // Labyrinth upgrades are included only while a labyrinth sim is selected, matching the gating in
 // worker.js.
-function applyDisplayBuffs() {
-    let buffs = Shrine.buffsFromLevels(player.shrines);
+// Kept grouped by where each buff came from so the Recovery Stats panel can name the source of
+// every contribution; applyDisplayBuffs() just flattens them again. The player merges buffs of the
+// same type anyway, so grouping changes nothing about the resulting stats.
+function displayBuffSources() {
+    let sources = [];
+
+    for (const [hrid, level] of Object.entries(player.shrines ?? {})) {
+        if (shrineDetailMap[hrid] && level > 0) {
+            sources.push({ id: { kind: "shrine", hrid, level }, buffs: new Shrine(hrid, Number(level)).buffs });
+        }
+    }
 
     let simLabyrinthToggle = document.getElementById("simLabyrinthToggle");
     let simAllLabyrinthsToggle = document.getElementById("simAllLabyrinthsToggle");
     if (simLabyrinthToggle?.checked || simAllLabyrinthsToggle?.checked) {
-        buffs = buffs.concat(LabyrinthUpgrade.buffsFromLevels(player.labyrinthUpgrades));
+        for (const [hrid, level] of Object.entries(player.labyrinthUpgrades ?? {})) {
+            if (labyrinthUpgradeDetailMap[hrid] && level > 0) {
+                sources.push({
+                    id: { kind: "labyrinthUpgrade", hrid, level },
+                    buffs: new LabyrinthUpgrade(hrid, Number(level)).buffs,
+                });
+            }
+        }
     }
 
     for (const [hrid, level] of Object.entries(player.houseRooms ?? {})) {
         if (houseRoomDetailMap[hrid] && level > 0) {
-            buffs = buffs.concat(new HouseRoom(hrid, level).buffs);
+            sources.push({ id: { kind: "houseRoom", hrid, level }, buffs: new HouseRoom(hrid, level).buffs });
         }
     }
 
-    buffs = buffs.concat(new Achievement(player.achievements ?? {}).buffs);
+    sources.push({ id: { kind: "achievements" }, buffs: new Achievement(player.achievements ?? {}).buffs });
+
+    return sources;
+}
+
+function displayBuffs() {
+    return displayBuffSources().flatMap((source) => source.buffs);
+}
+
+function applyDisplayBuffs() {
+    let buffs = displayBuffs();
 
     player.permanentBuffs = {};
     for (const buff of buffs) {
@@ -749,6 +777,285 @@ function updateCombatStatsUI() {
         });
         element.innerHTML = value + "%";
     });
+}
+
+// #endregion
+
+// #region Recovery Stats
+
+// "Show Recovery Stats" panel. The simulation restores floor(maxPool * regenRate) on every regen
+// tick, so the amount healed only ever moves in whole points - Stamina raises max HP smoothly, but
+// the heal stays put until max HP crosses the next boundary. This panel shows where the imported
+// build sits and which Stamina / Intelligence level crosses the next one.
+//
+// It reads the same player state the Combat Stats panel does, so it follows whatever is currently
+// loaded (imported set, equipment set, or hand-edited fields).
+
+// Plain data snapshot of the current player for Player.createFromDTO. Food, drinks and abilities
+// are left empty: the drinks that matter here are folded in as buffs instead (see drinkBuffs), and
+// nothing else in this panel depends on them.
+function recoverStatsDTO() {
+    let equipment = {};
+    for (const [type, item] of Object.entries(player.equipment)) {
+        equipment[type] = item ? { hrid: item.hrid, enhancementLevel: item.enhancementLevel } : null;
+    }
+
+    return {
+        staminaLevel: player.staminaLevel,
+        intelligenceLevel: player.intelligenceLevel,
+        attackLevel: player.attackLevel,
+        meleeLevel: player.meleeLevel,
+        defenseLevel: player.defenseLevel,
+        rangedLevel: player.rangedLevel,
+        magicLevel: player.magicLevel,
+        hrid: "player",
+        equipment,
+        food: [null, null, null],
+        drinks: [null, null, null],
+        abilities: [null, null, null, null, null],
+        // House room and achievement buffs come through displayBuffs() instead; passing the plain
+        // maps on to createFromDTO would double count them.
+        houseRooms: {},
+        achievements: {},
+        labyrinthUpgrades: {},
+        shrines: {},
+    };
+}
+
+// Buffs granted by the drinks in usable slots. Coffees raise Stamina / Intelligence and the regen
+// rate itself, so they move both the pool and the thresholds.
+function drinkBuffSources() {
+    let sources = [];
+    for (let i = 0; i < drinks.length && i < player.combatDetails.combatStats.drinkSlots; i++) {
+        if (!drinks[i]) {
+            continue;
+        }
+        sources.push({ id: { kind: "drink", hrid: drinks[i] }, buffs: new Consumable(drinks[i]).buffs });
+    }
+    return sources;
+}
+
+function itemLabel(hrid) {
+    return i18next.t("itemNames." + hrid, { defaultValue: itemDetailMap[hrid]?.name ?? hrid });
+}
+
+// Names the origin of one breakdown row. `id` is whatever displayBuffSources() / drinkBuffSources()
+// attached to the buff group, so every source can say which room, shrine or drink it was.
+function buffSourceLabel(id) {
+    if (!id) {
+        return i18next.t("common:recoverStats.otherSource");
+    }
+    switch (id.kind) {
+        case "houseRoom":
+            return `${i18next.t("houseRoomNames." + id.hrid, { defaultValue: houseRoomDetailMap[id.hrid]?.name ?? id.hrid })} L${id.level}`;
+        case "shrine":
+            return `${i18next.t("common:shrineNames." + id.hrid, { defaultValue: shrineDetailMap[id.hrid]?.name ?? id.hrid })} L${id.level}`;
+        case "labyrinthUpgrade":
+            return `${i18next.t("common:labyrinthUpgradeNames." + id.hrid, { defaultValue: labyrinthUpgradeDetailMap[id.hrid]?.name ?? id.hrid })} L${id.level}`;
+        case "drink":
+            return itemLabel(id.hrid);
+        case "achievements":
+            return i18next.t("common:recoverStats.achievements");
+        default:
+            return i18next.t("common:recoverStats.otherSource");
+    }
+}
+
+function formatPercent(value) {
+    return (100 * value).toLocaleString([], { minimumFractionDigits: 0, maximumFractionDigits: 4 }) + "%";
+}
+
+function recoverStatsRow(label, value) {
+    return `<tr><td>${label}</td><td class="text-end">${value}</td></tr>`;
+}
+
+function formatSigned(value, digits) {
+    let text = Math.abs(value).toLocaleString([], { maximumFractionDigits: digits });
+    return (value < 0 ? "-" : "+") + text;
+}
+
+// Turns one breakdown row into a "where it came from" label plus the qualifier that explains the
+// amount (the level a room grants, the percentage a coffee or shrine applies).
+function breakdownLabel(row, poolKey) {
+    let t = (key, options) => i18next.t("common:recoverStats." + key, options);
+    let detail = (text) => ` <span class="text-secondary">(${text})</span>`;
+
+    switch (row.source) {
+        case "base":
+            return t("sourceBase");
+        case "level":
+            return t(poolKey === "hitpoints" ? "staminaLevel" : "intelligenceLevel") +
+                detail(t("sourceLevelDetail", { level: row.level }));
+        case "levelFlat":
+            return buffSourceLabel(row.id) +
+                detail(t("sourceLevels", { levels: formatSigned(row.levels, 2) }));
+        case "levelRatio":
+            return buffSourceLabel(row.id) +
+                detail(t("sourceLevels", { levels: formatSigned(row.levels, 2) }) + ", " + formatPercent(row.ratio));
+        case "equipment":
+            return itemLabel(row.hrid) + (row.enhancementLevel ? ` +${row.enhancementLevel}` : "");
+        case "poolRatio":
+        case "regenRatio":
+            return buffSourceLabel(row.id) + detail(formatPercent(row.ratio));
+        case "regenFlat":
+            return buffSourceLabel(row.id);
+        case "rounding":
+            return t("sourceRounding");
+        default:
+            return t("otherSource");
+    }
+}
+
+// The "where does this number come from" table under each pool. Every contribution is listed, and
+// the rows add up to the total so the panel can be checked against the Combat Stats panel by eye.
+//
+// The pool table shows whole points, which on its own would not always add up: the max pool ratio
+// contributes a fraction and the pool is then rounded up. Both land in one reconciling "Rounding"
+// row, so the column always sums to the number the simulation uses.
+function poolBreakdownHtml(breakdown, poolKey, titleKey, totalLabel) {
+    let t = (key, options) => i18next.t("common:recoverStats." + key, options);
+
+    let shown = breakdown.rows
+        .filter((row) => row.source !== "rounding")
+        .map((row) => ({ row, value: Math.round(row.value) }))
+        .filter((entry) => entry.value !== 0);
+    let rounding = breakdown.total - shown.reduce((sum, entry) => sum + entry.value, 0);
+
+    let rows = shown
+        .map((entry) => `<tr><td>${breakdownLabel(entry.row, poolKey)}</td><td class="text-end">${entry.value.toLocaleString()}</td></tr>`)
+        .join("");
+    if (rounding !== 0) {
+        rows += `<tr><td>${t("sourceRounding")}</td><td class="text-end">${formatSigned(rounding, 0)}</td></tr>`;
+    }
+
+    return breakdownTableHtml(t(titleKey), rows, totalLabel, breakdown.total.toLocaleString());
+}
+
+function regenBreakdownHtml(breakdown, poolKey, totalLabel) {
+    let t = (key, options) => i18next.t("common:recoverStats." + key, options);
+    let rows = breakdown.rows
+        .filter((row) => Math.abs(row.value) > 1e-9)
+        .map((row) => `<tr><td>${breakdownLabel(row, poolKey)}</td><td class="text-end">${formatPercent(row.value)}</td></tr>`)
+        .join("");
+
+    return breakdownTableHtml(t("regenSources"), rows, totalLabel, formatPercent(breakdown.total));
+}
+
+function breakdownTableHtml(title, rows, totalLabel, totalValue) {
+    return `<div class="fw-bold mt-2">${title}</div>
+        <table class="table table-sm">
+            <tbody>${rows}</tbody>
+            <tfoot><tr class="fw-bold"><td>${totalLabel}</td><td class="text-end">${totalValue}</td></tr></tfoot>
+        </table>`;
+}
+
+// One pool's card: what it restores now, the pool size that would restore one more point, and the
+// levels that reach the next few boundaries.
+function recoverPoolHtml(stats, poolKey) {
+    let t = (key, options) => i18next.t("common:recoverStats." + key, options);
+    let levelLabel = t(poolKey === "hitpoints" ? "staminaLevel" : "intelligenceLevel");
+    let poolLabel = t(poolKey === "hitpoints" ? "maxHitpoints" : "maxManapoints");
+
+    let levelValue = stats.level.toLocaleString();
+    if (stats.effectiveLevel !== stats.level) {
+        let effective = stats.effectiveLevel.toLocaleString([], { maximumFractionDigits: 2 });
+        levelValue += ` <span class="text-secondary">(${t("effective", { level: effective })})</span>`;
+    }
+
+    let nextPointValue = "-";
+    if (stats.poolNeededForNextPoint !== null) {
+        let missing = stats.poolNeededForNextPoint - stats.maxPool;
+        nextPointValue = `${stats.poolNeededForNextPoint.toLocaleString()} <span class="text-secondary">(+${missing.toLocaleString()})</span>`;
+    }
+
+    let next = stats.thresholds[0];
+    let nextValue = next
+        ? `${levelLabel} ${next.level} <span class="text-secondary">(+${next.levelsNeeded})</span> &rarr; ${next.perTick.toLocaleString()}`
+        : t("noThreshold");
+
+    let rows = [
+        recoverStatsRow(levelLabel, levelValue),
+        recoverStatsRow(poolLabel, stats.maxPool.toLocaleString()),
+        recoverStatsRow(t("regenRate"), formatPercent(stats.regen)),
+        recoverStatsRow(t("perTick"), stats.perTick.toLocaleString()),
+        recoverStatsRow(t("perMinute"), stats.perMinute.toLocaleString()),
+        recoverStatsRow(t("poolForNextPoint"), nextPointValue),
+        recoverStatsRow(t("nextThreshold"), nextValue),
+    ].join("");
+
+    let thresholdRows = stats.thresholds
+        .map(
+            (threshold) =>
+                `<tr><td>${threshold.level} <span class="text-secondary">(+${threshold.levelsNeeded})</span></td>` +
+                `<td class="text-end">${threshold.maxPool.toLocaleString()}</td>` +
+                `<td class="text-end">${threshold.perTick.toLocaleString()}</td></tr>`
+        )
+        .join("");
+    let thresholdTable = thresholdRows
+        ? `<div class="fw-bold mt-2">${t("upcomingThresholds")}</div>
+           <table class="table table-sm">
+               <thead><tr><th>${levelLabel}</th><th class="text-end">${poolLabel}</th><th class="text-end">${t("perTick")}</th></tr></thead>
+               <tbody>${thresholdRows}</tbody>
+           </table>`
+        : "";
+
+    let poolTable = poolBreakdownHtml(
+        stats.poolSources,
+        poolKey,
+        poolKey === "hitpoints" ? "hitpointsSources" : "manapointsSources",
+        poolLabel
+    );
+    let regenTable = regenBreakdownHtml(stats.regenSources, poolKey, t("regenRate"));
+
+    return `<h6>${t(poolKey === "hitpoints" ? "hitpointsSection" : "manapointsSection")}</h6>
+        <table class="table table-sm"><tbody>${rows}</tbody></table>
+        ${thresholdTable}
+        ${poolTable}
+        ${regenTable}`;
+}
+
+function renderRecoverStats() {
+    let body = document.getElementById("recoverStatsBody");
+    if (!body) {
+        return;
+    }
+
+    let t = (key, options) => i18next.t("common:recoverStats." + key, options);
+    let includeDrinks = document.getElementById("recoverStatsIncludeDrinks").checked;
+
+    // The Combat Stats panel keeps player.combatDetails current, which drinkBuffSources() needs for
+    // the drink slot count.
+    let sources = displayBuffSources();
+    let drinkSources = drinkBuffSources();
+    if (includeDrinks) {
+        sources = sources.concat(drinkSources);
+    }
+
+    let stats = computeRecoverStats(recoverStatsDTO(), sources);
+
+    let names = drinkSources.map((source) => itemLabel(source.id.hrid));
+    let drinkNote = includeDrinks
+        ? names.length
+            ? t("drinksCounted", { drinks: names.join(", ") })
+            : t("noDrinks")
+        : t("drinksExcluded");
+
+    body.innerHTML = `<div class="row">
+            <div class="col-md-6">${recoverPoolHtml(stats.hitpoints, "hitpoints")}</div>
+            <div class="col-md-6">${recoverPoolHtml(stats.manapoints, "manapoints")}</div>
+        </div>
+        <div class="text-secondary small">${t("tickNote", { seconds: REGEN_TICK_SECONDS })}</div>
+        <div class="text-secondary small">${drinkNote}</div>`;
+}
+
+function initRecoverStatsModal() {
+    let modal = document.getElementById("recoverStatsModal");
+    if (!modal) {
+        return;
+    }
+
+    modal.addEventListener("show.bs.modal", renderRecoverStats);
+    document.getElementById("recoverStatsIncludeDrinks").addEventListener("change", renderRecoverStats);
 }
 
 // #endregion
@@ -5074,6 +5381,7 @@ initSimulationControls();
 initEquipmentSetsModal();
 initErrorHandling();
 initImportExportModal();
+initRecoverStatsModal();
 initDamageDoneTaken();
 initPatchNotes();
 initExtraBuffSection();
