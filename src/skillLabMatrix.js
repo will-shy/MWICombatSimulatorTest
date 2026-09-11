@@ -42,6 +42,27 @@ const STAT_LEVEL = 125;
 const HOUSE_LEVEL = process.env.HOUSE_LEVEL !== undefined
     ? Number(process.env.HOUSE_LEVEL) : 4;
 
+// Mana what-ifs. REGEN_ACC=1 swaps the three DPS mages' crit ring/earrings for
+// Ring/Earrings of Regeneration at the same +4 (costs 4% crit rate, buys
+// +0.4pp base MP regen before enhancement). MS_TRIGGER=1 gives the Mana Spring
+// supports the in-game trigger "self / mana_spring / is_inactive" so a spring
+// is only cast when no one else's is running — overlapping casts share
+// /buff_uniques/mana_spring and just overwrite each other.
+const REGEN_ACC = process.env.REGEN_ACC === "1";
+const MS_TRIGGER = process.env.MS_TRIGGER === "1";
+
+const MAGE_GEAR_IDS = new Set(["fire_T95", "water_T95", "nature_aoe_T95"]);
+
+function swapRegenAccessories(exp) {
+    for (const item of exp.player.equipment || []) {
+        if (item.itemLocationHrid === "/item_locations/ring") {
+            item.itemHrid = "/items/ring_of_regeneration";
+        } else if (item.itemLocationHrid === "/item_locations/earrings") {
+            item.itemHrid = "/items/earrings_of_regeneration";
+        }
+    }
+}
+
 // Ability levels: aura lvl25 (per the later brief; the original said 20), the
 // three 0-cd mage spells lvl60, everything else lvl40. Keyed by ability, so a
 // kit can name abilities and the level rule fills itself in.
@@ -90,8 +111,11 @@ const GEAR = {
     // No Mana Spring preset exists; the guide's Mana Spring Support is a Blooming
     // nature caster, so it runs on the healer's gear with the Mana Spring kit.
     healer: "nature_healer_revive",
-    manaspring: "nature_healer_revive",
+    // Distinct id (same gear file) so the MS_TRIGGER dedup trigger can be
+    // attached to the Mana Spring squad without touching the healers.
+    manaspring: "manaspring",
 };
+const VIRTUAL_GEAR = { manaspring: "nature_healer_revive" };
 
 const BOSSES = [
     { key: "badger", group: "Trial Badger" },
@@ -218,9 +242,19 @@ function dpsCounts() {
 function registerBuilds() {
     const ids = [...new Set(Object.values(GEAR))];
     const builds = ids.map((id) => {
-        const preset = PRESETS[id];
+        const preset = PRESETS[VIRTUAL_GEAR[id] || id];
         if (!preset) throw new Error("Missing gear preset: " + id + ".json");
         const exp = structuredClone(preset.export);
+        if (REGEN_ACC && MAGE_GEAR_IDS.has(id)) swapRegenAccessories(exp);
+        if (MS_TRIGGER && id === "manaspring") {
+            exp.triggerMap = { ...(exp.triggerMap || {}) };
+            exp.triggerMap["/abilities/mana_spring"] = [{
+                dependencyHrid: "/combat_trigger_dependencies/self",
+                conditionHrid: "/combat_trigger_conditions/mana_spring",
+                comparatorHrid: "/combat_trigger_comparators/is_inactive",
+                value: 0,
+            }];
+        }
         for (const skill of [
             "staminaLevel", "intelligenceLevel", "attackLevel",
             "meleeLevel", "defenseLevel", "rangedLevel", "magicLevel",
@@ -344,6 +378,8 @@ async function main() {
         partySize: PARTY_SIZE,
         statLevel: STAT_LEVEL,
         houseLevel: HOUSE_LEVEL,
+        regenAccessories: REGEN_ACC,
+        manaSpringTrigger: MS_TRIGGER,
         infiniteMana: process.env.INFINITE_MANA === "1",
         abilityLevels: { aura: AURA_LEVEL, zeroCdSpell: ZERO_CD_SPELL_LEVEL, other: DEFAULT_ABILITY_LEVEL },
         roster: {

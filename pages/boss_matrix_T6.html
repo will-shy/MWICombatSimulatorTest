@@ -542,6 +542,22 @@ footer { border-top: 1px solid var(--rule-strong); padding-top: 16px; }
   <p class="why">With mana solved, Fire takes first on Hedgehog (0.327) and Water takes first on Swarm
   (0.287) — both exactly the guide's call. The guide's matrix behaves like an unconstrained-mana
   model, which is why those two cells are where the sim disagrees most.</p>
+
+  <h3>The practical fix is regen gear, not more springs</h3>
+  <p>Rerunning the matrix with the three mage builds' critical ring and earrings swapped for
+  <strong>+4 Ring and Earrings of Regeneration</strong> (+0.58pp MP regen per 10s, about +15% mana
+  income, paid for with 4% critical rate) buys back a third to half of the mana loss on most bosses
+  &mdash; and cuts blocked casts by half or more:</p>
+  <div class="scroll"><table class="mana">
+<thead><tr><th class="rowh">Build</th><th class="num">Blocked<br>casts</th><th class="num">Badger</th><th class="num">Chameleon</th><th class="num">Jellyfish</th><th class="num">Hedgehog</th><th class="num">Swarm</th></tr></thead>
+<tbody><tr class="n"><th class="rowh">Fire</th><td class="num oomc">63&rarr;26</td><td class="num"><span class="d warm">+6%</span><span class="dsub mono">0.275→0.292</span></td><td class="num"><span class="d warm">+8%</span><span class="dsub mono">0.112→0.120</span></td><td class="num"><span class="d warm">+5%</span><span class="dsub mono">0.198→0.207</span></td><td class="num"><span class="d warm">+7%</span><span class="dsub mono">0.262→0.280</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.205→0.209</span></td></tr><tr class="n"><th class="rowh">Water</th><td class="num oomc">62&rarr;29</td><td class="num"><span class="d hot">+12%</span><span class="dsub mono">0.268→0.301</span></td><td class="num"><span class="d warm">+7%</span><span class="dsub mono">0.107→0.115</span></td><td class="num"><span class="d warm">+6%</span><span class="dsub mono">0.172→0.182</span></td><td class="num"><span class="d hot">+13%</span><span class="dsub mono">0.175→0.197</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.228→0.232</span></td></tr><tr class="n"><th class="rowh">Nature DPS</th><td class="num oomc">59&rarr;19</td><td class="num"><span class="d hot">+11%</span><span class="dsub mono">0.234→0.259</span></td><td class="num"><span class="d hot">+10%</span><span class="dsub mono">0.098→0.107</span></td><td class="num"><span class="d warm">+8%</span><span class="dsub mono">0.216→0.232</span></td><td class="num"><span class="d hot">+10%</span><span class="dsub mono">0.187→0.206</span></td><td class="num"><span class="d warm">+6%</span><span class="dsub mono">0.215→0.227</span></td></tr></tbody>
+</table></div>
+  <p class="note">Two negative results worth recording. A stagger trigger on the two Mana Springs
+  (<span class="mono">self &middot; mana spring &middot; is inactive</span>, settable in-game) changes
+  nothing: two casters already hold the buff up essentially full-time, and a blocked cast only slides
+  the next one behind a single filler spell. And adding <em>more</em> Mana Spring players doesn't
+  stack &mdash; every caster writes the same <span class="mono">/buff_uniques/mana_spring</span> buff,
+  so a third spring buys uptime the raid already has.</p>
 </section>
 
 <section>
@@ -604,7 +620,8 @@ footer { border-top: 1px solid var(--rule-strong); padding-top: 16px; }
       <span class="mono">skill-lab.html</span> at level 150 and the page reproduces the cell.</dd>
       <dt>Raw output</dt>
       <dd><span class="mono">pages/data/boss_matrix_T6.json</span> and
-      <span class="mono">…_infinite_mana.json</span> carry per-ability damage, hit rates, cast counts
+      <span class="mono">…_infinite_mana.json</span> and
+      <span class="mono">…_regen_acc.json</span> carry per-ability damage, hit rates, cast counts
       and blocked casts for every squad.</dd>
     </dl>
   </div>
