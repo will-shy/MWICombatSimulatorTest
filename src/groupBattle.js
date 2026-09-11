@@ -282,7 +282,7 @@ const LS_EQUIPMENT_SETS_KEY = "equipmentSets";
 // Default counts for the standard team, matched by a substring of the preset id
 // (filename). First matching rule wins; presets not matched default to 0.
 const PREDEFINED_DEFAULT_COUNTS = [
-    ["crossbow", 10], ["bow", 2], ["nature", 5], ["slash", 2],
+    ["crossbow", 10], ["xbow", 10], ["bow", 2], ["nature", 5], ["slash", 2],
     ["wark", 3], ["water", 2], ["stab", 2], ["smash", 10],
 ];
 function defaultCountForPreset(id) {

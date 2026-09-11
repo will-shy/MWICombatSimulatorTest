@@ -49,21 +49,21 @@ function defaultState() {
         nextId: 9,
         squads: [
             {
-                id: 1, label: "Melee", presetId: pick("smash_T95", "smash_insanity"), count: 14,
+                id: 1, label: "Melee", presetId: pick("smash_T95"), count: 14,
                 kit: [
                     A("/abilities/insanity", 20), A("/abilities/frenzy", 40), A("/abilities/berserk", 40),
                     A("/abilities/precision", 40), A("/abilities/fracturing_impact", 40),
                 ],
             },
             {
-                id: 2, label: "Ranged", presetId: pick("ranger_T95", "crossbow_insanity"), count: 14,
+                id: 2, label: "Ranged", presetId: pick("xbow_T95", "bow_T95"), count: 14,
                 kit: [
                     A("/abilities/insanity", 20), A("/abilities/frenzy", 40), A("/abilities/berserk", 40),
                     A("/abilities/pestilent_shot", 40), A("/abilities/penetrating_shot", 40),
                 ],
             },
             {
-                id: 3, label: "Magic", presetId: pick("nature_aoe_T95", "water_insanity"), count: 14,
+                id: 3, label: "Magic", presetId: pick("nature_aoe_T95"), count: 14,
                 kit: [
                     A("/abilities/insanity", 20), A("/abilities/elemental_affinity", 40),
                     A("/abilities/firestorm", 40), A("/abilities/natures_veil", 40),
@@ -76,9 +76,9 @@ function defaultState() {
             // Mana Spring level lives right in its slot list.
             supportSquad(4, "Tank", "wark", 2),
             supportSquad(5, "Nature Support", "nature_healer_revive", 6),
-            supportSquad(6, "Water Support", "water_insanity", 2),
-            supportSquad(7, "Stab Support", "stab_insanity", 2),
-            supportSquad(8, "Bow Support", "bow_insanity", 2),
+            supportSquad(6, "Water Support", "water_T95", 2),
+            supportSquad(7, "Stab Support", "stab_T95", 2),
+            supportSquad(8, "Bow Support", "bow_T95", 2),
         ],
     };
 }
