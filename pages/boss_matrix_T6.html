@@ -1,0 +1,611 @@
+<title>T6 Boss Matrix Rerun</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body, h1, h2, h3, p, table, figure { margin: 0; padding: 0; }
+
+:root {
+    --bg: #e9ebe7;
+    --surface: #f8f9f6;
+    --surface-2: #f1f3ef;
+    --ink: #171b18;
+    --ink-2: #4b544e;
+    --ink-3: #737d76;
+    --rule: #d2d7cf;
+    --rule-strong: #b8c0b5;
+    --m: #b4661f;
+    --r: #2f7d43;
+    --n: #6a4fbf;
+    --m-soft: #b4661f26;
+    --r-soft: #2f7d4326;
+    --n-soft: #6a4fbf26;
+    --good: #2f7d43;
+    --warn: #a2611a;
+    --alert: #a33636;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --measure: 68ch;
+    --page: 1120px;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #101311;
+        --surface: #171b18;
+        --surface-2: #1d2220;
+        --ink: #e9ece7;
+        --ink-2: #a5aea7;
+        --ink-3: #7b857e;
+        --rule: #2a302c;
+        --rule-strong: #3b433e;
+        --m: #f0a45a;
+        --r: #74cf83;
+        --n: #ad93ea;
+        --m-soft: #f0a45a2b;
+        --r-soft: #74cf832b;
+        --n-soft: #ad93ea2b;
+        --good: #74cf83;
+        --warn: #f0a45a;
+        --alert: #e57373;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #101311;
+    --surface: #171b18;
+    --surface-2: #1d2220;
+    --ink: #e9ece7;
+    --ink-2: #a5aea7;
+    --ink-3: #7b857e;
+    --rule: #2a302c;
+    --rule-strong: #3b433e;
+    --m: #f0a45a;
+    --r: #74cf83;
+    --n: #ad93ea;
+    --m-soft: #f0a45a2b;
+    --r-soft: #74cf832b;
+    --n-soft: #ad93ea2b;
+    --good: #74cf83;
+    --warn: #f0a45a;
+    --alert: #e57373;
+}
+
+body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+.page {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 56px 24px 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 56px;
+}
+
+h1, h2, h3, .chip, table, .bar-label, .readout, .eyebrow, .rk, .shift, .sv, .sp, .sb {
+    font-family: var(--display);
+}
+
+h1 {
+    font-size: clamp(2.1rem, 5vw, 3.1rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.04;
+    text-wrap: balance;
+}
+h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+h3 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+
+p { max-width: var(--measure); }
+
+.eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+
+.standfirst { font-size: 1.12rem; color: var(--ink-2); }
+.note { font-size: 0.95rem; color: var(--ink-2); }
+.note.small { font-size: 0.82rem; color: var(--ink-3); max-width: none; }
+.mono { font-family: var(--mono); font-size: 0.85em; }
+strong { font-weight: 600; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+header { display: flex; flex-direction: column; gap: 18px; }
+.rule-top { height: 3px; background: var(--ink); max-width: 96px; }
+.specs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+
+.chip {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.02em;
+    padding: 5px 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: 2px;
+    color: var(--ink-2);
+    background: var(--surface);
+    white-space: nowrap;
+}
+.chip b { color: var(--ink); font-weight: 600; }
+
+section { display: flex; flex-direction: column; gap: 20px; }
+.section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid var(--rule-strong);
+    padding-top: 14px;
+}
+
+.scroll { overflow-x: auto; }
+
+/* ------------------------------------------------------------ the matrix -- */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-variant-numeric: tabular-nums;
+}
+thead th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    text-align: right;
+    padding: 0 10px 10px;
+    border-bottom: 1px solid var(--rule-strong);
+    line-height: 1.3;
+}
+thead th.rowh, tbody th.rowh { text-align: left; }
+tbody th.rowh {
+    font-family: var(--display);
+    font-size: 0.92rem;
+    font-weight: 600;
+    padding: 12px 16px 12px 0;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--rule);
+}
+.matrix { min-width: 760px; }
+.matrix td.cell {
+    padding: 10px 10px 12px;
+    border-bottom: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+    vertical-align: top;
+    min-width: 124px;
+}
+.cval {
+    display: block;
+    font-family: var(--display);
+    font-size: 1.18rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+}
+.mark { font-size: 0.7em; margin-left: 4px; }
+.cbar {
+    display: block;
+    height: 5px;
+    margin: 7px 0 5px;
+    background: var(--rule);
+    border-radius: 1px;
+    overflow: hidden;
+}
+.cbar i { display: block; height: 100%; }
+.cgd {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--ink-3);
+    letter-spacing: 0.01em;
+}
+tr.m .cbar i, tr.m .bar i, tr.m .rk { background: var(--m); }
+tr.r .cbar i, tr.r .bar i, tr.r .rk { background: var(--r); }
+tr.n .cbar i, tr.n .bar i, tr.n .rk { background: var(--n); }
+tr.m th.rowh { color: var(--m); }
+tr.r th.rowh { color: var(--r); }
+tr.n th.rowh { color: var(--n); }
+tr.m td.best { background: var(--m-soft); }
+tr.r td.best { background: var(--r-soft); }
+tr.n td.best { background: var(--n-soft); }
+td.best .cval { font-weight: 700; }
+
+/* ------------------------------------------------------- agreement banner -- */
+
+.verdict {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1px;
+    background: var(--rule-strong);
+    border: 1px solid var(--rule-strong);
+}
+.verdict > div {
+    background: var(--surface);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.verdict .big {
+    font-family: var(--display);
+    font-size: 2.1rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+}
+.verdict .lbl { font-size: 0.9rem; color: var(--ink-2); }
+
+/* ------------------------------------------------------------ boss cards -- */
+
+.bosses { display: flex; flex-direction: column; gap: 34px; }
+.boss { display: flex; flex-direction: column; gap: 12px; }
+.boss-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.boss-head h3 { font-size: 1.3rem; }
+.readout { font-size: 0.78rem; color: var(--ink-3); letter-spacing: 0.01em; max-width: none; }
+
+.rows { display: flex; flex-direction: column; gap: 5px; }
+.row {
+    display: grid;
+    grid-template-columns: 22px 96px minmax(80px, 1fr) 62px 72px;
+    align-items: center;
+    gap: 10px;
+}
+.rk {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--surface);
+    text-align: center;
+    line-height: 19px;
+    height: 19px;
+    border-radius: 2px;
+}
+.bar-label { font-size: 0.86rem; font-weight: 500; }
+.row.m .bar-label { color: var(--m); }
+.row.r .bar-label { color: var(--r); }
+.row.n .bar-label { color: var(--n); }
+.bar { height: 9px; background: var(--surface-2); border: 1px solid var(--rule); overflow: hidden; }
+.bar i { display: block; height: 100%; }
+.row.m .bar i { background: var(--m); }
+.row.r .bar i { background: var(--r); }
+.row.n .bar i { background: var(--n); }
+.val { font-family: var(--mono); font-size: 0.82rem; text-align: right; font-variant-numeric: tabular-nums; }
+.shift {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--ink-3);
+    text-align: right;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.shift.pick { color: var(--ink); font-weight: 600; }
+.tie { color: var(--ink-3); font-size: 0.9em; margin-left: 2px; }
+.why { font-size: 0.95rem; color: var(--ink-2); border-left: 2px solid var(--rule-strong); padding-left: 14px; }
+
+/* ------------------------------------------------------------ rank shifts -- */
+
+.shifts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 22px; }
+.sc { display: flex; flex-direction: column; gap: 8px; }
+.sc-head { display: flex; flex-direction: column; gap: 3px; }
+.sc p { font-size: 0.92rem; color: var(--ink-2); max-width: none; }
+
+/* -------------------------------------------------------------- mana table -- */
+
+.mana { min-width: 800px; }
+.mana td.num {
+    padding: 10px;
+    border-bottom: 1px solid var(--rule);
+    border-left: 1px solid var(--rule);
+    text-align: right;
+}
+.mana td.oomc {
+    font-family: var(--mono);
+    font-size: 0.86rem;
+    font-weight: 600;
+    border-left: none;
+}
+.d { display: block; font-family: var(--display); font-size: 0.98rem; font-weight: 600; }
+.d.hot { color: var(--alert); }
+.d.warm { color: var(--warn); }
+.d.flat { color: var(--ink-3); }
+.dsub { display: block; font-size: 0.66rem; color: var(--ink-3); letter-spacing: -0.01em; }
+
+/* ------------------------------------------------------------ family split -- */
+
+.splits { display: flex; flex-direction: column; gap: 28px; }
+.split { display: flex; flex-direction: column; gap: 10px; }
+.split-rows { display: flex; flex-direction: column; gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+.split-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 18px;
+    background: var(--surface);
+    padding: 10px 14px;
+}
+.sb { font-size: 0.86rem; font-weight: 600; min-width: 92px; }
+.sv { display: inline-flex; align-items: baseline; gap: 6px; font-size: 0.8rem; opacity: 0.62; }
+.sv em { font-style: normal; color: var(--ink-3); }
+.sv b { font-family: var(--mono); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
+.sv.win { opacity: 1; }
+.sv.win.m b { color: var(--m); }
+.sv.win.r b { color: var(--r); }
+.sv.win.n b { color: var(--n); }
+.sp { margin-left: auto; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-3); }
+
+/* ------------------------------------------------------------------ method -- */
+
+.method { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 26px; }
+.method dl { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.method dt {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+}
+.method dd { margin: 0; font-size: 0.92rem; color: var(--ink-2); }
+.method dd b { color: var(--ink); }
+
+footer { border-top: 1px solid var(--rule-strong); padding-top: 16px; }
+
+@media (max-width: 640px) {
+    body { font-size: 16px; }
+    .page { padding: 36px 16px 72px; gap: 44px; }
+    .row { grid-template-columns: 20px 82px minmax(50px, 1fr) 54px 62px; gap: 7px; }
+}
+@media print {
+    .page { gap: 34px; }
+    .boss { break-inside: avoid; }
+}
+</style>
+
+<div class="page">
+
+<header>
+  <div class="rule-top"></div>
+  <span class="eyebrow">Guild trials · Arsenal · T6 (L150)</span>
+  <h1>T6 Boss Matrix Rerun</h1>
+  <p class="standfirst">The Arsenal build guide's Boss Matrix scores each build against each boss from
+  the combat formulas — hit chance times mitigation. This is the same eight builds run through the
+  group-battle simulator instead: a real 50-player raid, the guide's own recommended loadout for each
+  boss, fought to the kill at tier 6.</p>
+  <div class="specs">
+    <span class="chip">room level <b>150</b> · T6</span>
+    <span class="chip"><b>50</b>-player group</span>
+    <span class="chip">all stats <b>125</b></span>
+    <span class="chip">aura <b>20</b> · 0-cd spell <b>60</b> · rest <b>40</b></span>
+    <span class="chip"><b>3</b> seeds per boss</span>
+    <span class="chip">players take <b>no damage</b></span>
+  </div>
+</header>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">The score</span>
+    <h2>One point is one percent of the boss group's health per minute, per player</h2>
+  </div>
+  <p>Each build's score is the share of the enemy group's total HP that <em>one</em> player of that
+  build removes each minute. Because the whole raid fights one kill, the eight scores plus the three
+  support squads' add up to the real thing: score × players × kill time = 100% of the boss group.
+  Badger and Swarm are scored against the combined health of every body in the group, not one member.</p>
+  <p class="note">The guide's own numbers appear under every cell. They are a different quantity — a
+  formula index, not a rate — so read the comparison as ordering and spread, not as a difference of
+  two measurements of the same thing. <span class="mono">◂</span> marks each build's best boss in the sim.</p>
+  <div class="scroll"><table class="matrix">
+<thead><tr><th class="rowh">Build</th><th class="num">Badger</th><th class="num">Chameleon</th><th class="num">Jellyfish</th><th class="num">Hedgehog</th><th class="num">Swarm</th></tr></thead>
+<tbody><tr class="m"><th class="rowh">Smash</th><td class="cell"><span class="cval">0.144</span><span class="cbar"><i style="width:41.3%"></i></span><span class="cgd">guide 0.098</span></td><td class="cell best"><span class="cval">0.274<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:78.8%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.198</span><span class="cbar"><i style="width:57.0%"></i></span><span class="cgd">guide 0.118</span></td><td class="cell"><span class="cval">0.206</span><span class="cbar"><i style="width:59.1%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.216</span><span class="cbar"><i style="width:62.0%"></i></span><span class="cgd">guide 0.180</span></td></tr><tr class="m"><th class="rowh">Slash</th><td class="cell"><span class="cval">0.148</span><span class="cbar"><i style="width:42.5%"></i></span><span class="cgd">guide 0.098</span></td><td class="cell best"><span class="cval">0.310<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:89.1%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.230</span><span class="cbar"><i style="width:66.0%"></i></span><span class="cgd">guide 0.118</span></td><td class="cell"><span class="cval">0.240</span><span class="cbar"><i style="width:68.9%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.149</span><span class="cbar"><i style="width:42.8%"></i></span><span class="cgd">guide 0.176</span></td></tr><tr class="m"><th class="rowh">Stab</th><td class="cell"><span class="cval">0.173</span><span class="cbar"><i style="width:49.8%"></i></span><span class="cgd">guide 0.098</span></td><td class="cell best"><span class="cval">0.341<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:97.9%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.268</span><span class="cbar"><i style="width:77.0%"></i></span><span class="cgd">guide 0.118</span></td><td class="cell"><span class="cval">0.289</span><span class="cbar"><i style="width:83.0%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.151</span><span class="cbar"><i style="width:43.4%"></i></span><span class="cgd">guide 0.176</span></td></tr><tr class="r"><th class="rowh">Bow</th><td class="cell"><span class="cval">0.123</span><span class="cbar"><i style="width:35.4%"></i></span><span class="cgd">guide 0.081</span></td><td class="cell"><span class="cval">0.257</span><span class="cbar"><i style="width:74.0%"></i></span><span class="cgd">guide 0.163</span></td><td class="cell best"><span class="cval">0.348<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:100.0%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.243</span><span class="cbar"><i style="width:69.7%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.157</span><span class="cbar"><i style="width:45.0%"></i></span><span class="cgd">guide 0.183</span></td></tr><tr class="r"><th class="rowh">Crossbow</th><td class="cell"><span class="cval">0.134</span><span class="cbar"><i style="width:38.5%"></i></span><span class="cgd">guide 0.081</span></td><td class="cell"><span class="cval">0.267</span><span class="cbar"><i style="width:76.7%"></i></span><span class="cgd">guide 0.163</span></td><td class="cell best"><span class="cval">0.342<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:98.2%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.241</span><span class="cbar"><i style="width:69.2%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.176</span><span class="cbar"><i style="width:50.6%"></i></span><span class="cgd">guide 0.183</span></td></tr><tr class="n"><th class="rowh">Fire</th><td class="cell best"><span class="cval">0.240<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:68.9%"></i></span><span class="cgd">guide 0.250</span></td><td class="cell"><span class="cval">0.099</span><span class="cbar"><i style="width:28.3%"></i></span><span class="cgd">guide 0.097</span></td><td class="cell"><span class="cval">0.179</span><span class="cbar"><i style="width:51.3%"></i></span><span class="cgd">guide 0.128</span></td><td class="cell"><span class="cval">0.239</span><span class="cbar"><i style="width:68.6%"></i></span><span class="cgd">guide 0.194</span></td><td class="cell"><span class="cval">0.168</span><span class="cbar"><i style="width:48.2%"></i></span><span class="cgd">guide 0.180</span></td></tr><tr class="n"><th class="rowh">Water</th><td class="cell best"><span class="cval">0.236<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:67.7%"></i></span><span class="cgd">guide 0.250</span></td><td class="cell"><span class="cval">0.094</span><span class="cbar"><i style="width:27.1%"></i></span><span class="cgd">guide 0.097</span></td><td class="cell"><span class="cval">0.150</span><span class="cbar"><i style="width:43.1%"></i></span><span class="cgd">guide 0.128</span></td><td class="cell"><span class="cval">0.152</span><span class="cbar"><i style="width:43.7%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.187</span><span class="cbar"><i style="width:53.8%"></i></span><span class="cgd">guide 0.201</span></td></tr><tr class="n"><th class="rowh">Nature DPS</th><td class="cell best"><span class="cval">0.206<span class="mark" title="this build's best boss in the sim">◂</span></span><span class="cbar"><i style="width:59.3%"></i></span><span class="cgd">guide 0.250</span></td><td class="cell"><span class="cval">0.090</span><span class="cbar"><i style="width:26.0%"></i></span><span class="cgd">guide 0.097</span></td><td class="cell"><span class="cval">0.187</span><span class="cbar"><i style="width:53.6%"></i></span><span class="cgd">guide 0.188</span></td><td class="cell"><span class="cval">0.175</span><span class="cbar"><i style="width:50.4%"></i></span><span class="cgd">guide 0.136</span></td><td class="cell"><span class="cval">0.171</span><span class="cbar"><i style="width:49.0%"></i></span><span class="cgd">guide 0.180</span></td></tr></tbody>
+</table></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">Verdict</span>
+    <h2>Every build's best boss survives the rerun</h2>
+  </div>
+  <div class="verdict">
+    <div><span class="big">8/8</span><span class="lbl">builds whose best boss the sim and the
+      guide agree on — all of them. The assignment engine is sending people to the right place.</span></div>
+    <div><span class="big">2&ndash;4</span><span class="lbl">distinct values the guide's matrix uses
+      per boss, across eight builds &mdash; only two on Hedgehog. The sim separates all eight, and the
+      ordering inside those ties is where almost every disagreement sits.</span></div>
+    <div><span class="big">45%</span><span class="lbl">by how much Smash beats Slash on Swarm, and 43%
+      over Stab &mdash; three builds the guide rates within 0.004 of each other.</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">Boss by boss</span>
+    <h2>Rankings at tier 6</h2>
+  </div>
+  <p class="note">Ranked by simulated score; the numbered badge is the sim's ordering. The figure on
+  the right is the guide's own value for that build on that boss, with
+  <span class="mono">&times;n</span> where the guide gives n builds the identical number and
+  <span style="font-weight:600">&#9670;</span> on the guide's highest value &mdash; its pick. Because the
+  guide repeats values so heavily, comparing rank <em>positions</em> would invent an ordering it never
+  stated, so the values are shown as they are.</p>
+  <div class="bosses">
+    <article class="boss">
+  <div class="boss-head">
+    <h3>Badger</h3>
+    <span class="chip"><b>2 targets</b></span>
+    <span class="chip">1,656,000 HP</span>
+    <span class="chip">killed in <b>11.7 min</b></span>
+    <span class="chip">guide uses <b>3</b> distinct values here</span>
+  </div>
+  <p class="readout mono">armor 630 · resist 255 all · evasion 752 melee / 960 ranged / 544 magic</p>
+  <div class="rows"><div class="row n"><span class="rk">1</span><span class="bar-label">Fire</span><span class="bar"><i style="width:100.0%"></i></span><span class="val"><b>0.240</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.250<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">2</span><span class="bar-label">Water</span><span class="bar"><i style="width:98.2%"></i></span><span class="val"><b>0.236</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.250<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">3</span><span class="bar-label">Nature DPS</span><span class="bar"><i style="width:86.0%"></i></span><span class="val"><b>0.206</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.250<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">4</span><span class="bar-label">Stab</span><span class="bar"><i style="width:72.3%"></i></span><span class="val"><b>0.173</b></span><span class="shift" title="the guide gives 3 builds this same value">0.098<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">5</span><span class="bar-label">Slash</span><span class="bar"><i style="width:61.7%"></i></span><span class="val"><b>0.148</b></span><span class="shift" title="the guide gives 3 builds this same value">0.098<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">6</span><span class="bar-label">Smash</span><span class="bar"><i style="width:59.9%"></i></span><span class="val"><b>0.144</b></span><span class="shift" title="the guide gives 3 builds this same value">0.098<span class="tie">&times;3</span></span></div><div class="row r"><span class="rk">7</span><span class="bar-label">Crossbow</span><span class="bar"><i style="width:55.9%"></i></span><span class="val"><b>0.134</b></span><span class="shift" title="the guide gives 2 builds this same value">0.081<span class="tie">&times;2</span></span></div><div class="row r"><span class="rk">8</span><span class="bar-label">Bow</span><span class="bar"><i style="width:51.3%"></i></span><span class="val"><b>0.123</b></span><span class="shift" title="the guide gives 2 builds this same value">0.081<span class="tie">&times;2</span></span></div></div>
+  <p class="why">The one boss whose elemental resistances (255) sit far below its armor (630), and its magic evasion (544) is the lowest number on the board. Magic takes the top three places in both the guide and the sim. Ranged is worst hit: 960 ranged evasion is the highest evasion any build faces here.</p>
+  <p class="note small">Enemy HP at L150, 50-player scaling: Badger 828,000 · Badger 828,000.</p>
+</article><article class="boss">
+  <div class="boss-head">
+    <h3>Chameleon</h3>
+    <span class="chip"><b>1 target</b></span>
+    <span class="chip">1,380,000 HP</span>
+    <span class="chip">killed in <b>10.2 min</b></span>
+    <span class="chip">guide uses <b>3</b> distinct values here</span>
+  </div>
+  <p class="readout mono">armor 368 · resist 630 all · evasion 576 melee / 752 ranged / 896 magic</p>
+  <div class="rows"><div class="row m"><span class="rk">1</span><span class="bar-label">Stab</span><span class="bar"><i style="width:100.0%"></i></span><span class="val"><b>0.341</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">2</span><span class="bar-label">Slash</span><span class="bar"><i style="width:91.0%"></i></span><span class="val"><b>0.310</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">3</span><span class="bar-label">Smash</span><span class="bar"><i style="width:80.5%"></i></span><span class="val"><b>0.274</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194<span class="tie">&times;3</span></span></div><div class="row r"><span class="rk">4</span><span class="bar-label">Crossbow</span><span class="bar"><i style="width:78.3%"></i></span><span class="val"><b>0.267</b></span><span class="shift" title="the guide gives 2 builds this same value">0.163<span class="tie">&times;2</span></span></div><div class="row r"><span class="rk">5</span><span class="bar-label">Bow</span><span class="bar"><i style="width:75.5%"></i></span><span class="val"><b>0.257</b></span><span class="shift" title="the guide gives 2 builds this same value">0.163<span class="tie">&times;2</span></span></div><div class="row n"><span class="rk">6</span><span class="bar-label">Fire</span><span class="bar"><i style="width:28.9%"></i></span><span class="val"><b>0.099</b></span><span class="shift" title="the guide gives 3 builds this same value">0.097<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">7</span><span class="bar-label">Water</span><span class="bar"><i style="width:27.7%"></i></span><span class="val"><b>0.094</b></span><span class="shift" title="the guide gives 3 builds this same value">0.097<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">8</span><span class="bar-label">Nature DPS</span><span class="bar"><i style="width:26.5%"></i></span><span class="val"><b>0.090</b></span><span class="shift" title="the guide gives 3 builds this same value">0.097<span class="tie">&times;3</span></span></div></div>
+  <p class="why">Resistances of 630 against armor of 368 inverts Badger, and 896 magic evasion is the highest in the trial set — the guide's Precision-instead-of-Elemental-Affinity tweak is fighting that number. Magic lands under half its Badger output. Melee sweeps the top three.</p>
+  <p class="note small">Enemy HP at L150, 50-player scaling: Chameleon 1,380,000.</p>
+</article><article class="boss">
+  <div class="boss-head">
+    <h3>Jellyfish</h3>
+    <span class="chip"><b>1 target</b></span>
+    <span class="chip">1,248,000 HP</span>
+    <span class="chip">killed in <b>9.1 min</b></span>
+    <span class="chip">guide uses <b>4</b> distinct values here</span>
+  </div>
+  <p class="readout mono">armor 368 · resist 480 water / 292 nature / 480 fire · evasion 1120 melee / 576 ranged / 752 magic</p>
+  <div class="rows"><div class="row r"><span class="rk">1</span><span class="bar-label">Bow</span><span class="bar"><i style="width:100.0%"></i></span><span class="val"><b>0.348</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194<span class="tie">&times;2</span></span></div><div class="row r"><span class="rk">2</span><span class="bar-label">Crossbow</span><span class="bar"><i style="width:98.2%"></i></span><span class="val"><b>0.342</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194<span class="tie">&times;2</span></span></div><div class="row m"><span class="rk">3</span><span class="bar-label">Stab</span><span class="bar"><i style="width:77.0%"></i></span><span class="val"><b>0.268</b></span><span class="shift" title="the guide gives 3 builds this same value">0.118<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">4</span><span class="bar-label">Slash</span><span class="bar"><i style="width:66.0%"></i></span><span class="val"><b>0.230</b></span><span class="shift" title="the guide gives 3 builds this same value">0.118<span class="tie">&times;3</span></span></div><div class="row m"><span class="rk">5</span><span class="bar-label">Smash</span><span class="bar"><i style="width:57.0%"></i></span><span class="val"><b>0.198</b></span><span class="shift" title="the guide gives 3 builds this same value">0.118<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">6</span><span class="bar-label">Nature DPS</span><span class="bar"><i style="width:53.6%"></i></span><span class="val"><b>0.187</b></span><span class="shift">0.188</span></div><div class="row n"><span class="rk">7</span><span class="bar-label">Fire</span><span class="bar"><i style="width:51.3%"></i></span><span class="val"><b>0.179</b></span><span class="shift" title="the guide gives 2 builds this same value">0.128<span class="tie">&times;2</span></span></div><div class="row n"><span class="rk">8</span><span class="bar-label">Water</span><span class="bar"><i style="width:43.1%"></i></span><span class="val"><b>0.150</b></span><span class="shift" title="the guide gives 2 builds this same value">0.128<span class="tie">&times;2</span></span></div></div>
+  <p class="why">1120 melee evasion is the worst hit rate in the study — Smash lands 34.8% of swings. Ranged takes it on 576 evasion. Nature resistance (292) is far softer than water and fire (480), which is why the guide rates Nature DPS third; in the sim its Life Drain line is real but mana keeps it sixth.</p>
+  <p class="note small">Enemy HP at L150, 50-player scaling: Jellyfish 1,248,000.</p>
+</article><article class="boss">
+  <div class="boss-head">
+    <h3>Hedgehog</h3>
+    <span class="chip"><b>1 target</b></span>
+    <span class="chip">960,000 HP</span>
+    <span class="chip">killed in <b>9.6 min</b></span>
+    <span class="chip">guide uses <b>2</b> distinct values here</span>
+  </div>
+  <p class="readout mono">armor 405 · resist 405 water / 405 nature / 240 fire · evasion 720 all · tenacity 5000</p>
+  <div class="rows"><div class="row m"><span class="rk">1</span><span class="bar-label">Stab</span><span class="bar"><i style="width:100.0%"></i></span><span class="val"><b>0.289</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row r"><span class="rk">2</span><span class="bar-label">Bow</span><span class="bar"><i style="width:84.0%"></i></span><span class="val"><b>0.243</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row r"><span class="rk">3</span><span class="bar-label">Crossbow</span><span class="bar"><i style="width:83.3%"></i></span><span class="val"><b>0.241</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row m"><span class="rk">4</span><span class="bar-label">Slash</span><span class="bar"><i style="width:83.0%"></i></span><span class="val"><b>0.240</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row n"><span class="rk">5</span><span class="bar-label">Fire</span><span class="bar"><i style="width:82.7%"></i></span><span class="val"><b>0.239</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.194</span></div><div class="row m"><span class="rk">6</span><span class="bar-label">Smash</span><span class="bar"><i style="width:71.2%"></i></span><span class="val"><b>0.206</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row n"><span class="rk">7</span><span class="bar-label">Nature DPS</span><span class="bar"><i style="width:60.7%"></i></span><span class="val"><b>0.175</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div><div class="row n"><span class="rk">8</span><span class="bar-label">Water</span><span class="bar"><i style="width:52.6%"></i></span><span class="val"><b>0.152</b></span><span class="shift" title="the guide gives 7 builds this same value">0.136<span class="tie">&times;7</span></span></div></div>
+  <p class="why">Evasion is a flat 720 against every style, so the ordering is decided purely by mitigation — and fire resistance (240) is the softest spot on any T6 boss. The guide puts Fire first on exactly that reading. The sim agrees only once mana is solved: mana-limited, Fire is fifth; with mana it is first.</p>
+  <p class="note small">Enemy HP at L150, 50-player scaling: Hedgehog 960,000.</p>
+</article><article class="boss">
+  <div class="boss-head">
+    <h3>Swarm</h3>
+    <span class="chip"><b>4 targets, 480,000 HP each</b></span>
+    <span class="chip">1,920,000 HP</span>
+    <span class="chip">killed in <b>12.2 min</b></span>
+    <span class="chip">guide uses <b>4</b> distinct values here</span>
+  </div>
+  <p class="readout mono">armor 180–630 · resist 180–480 · evasion varies per member; Firefly 960 melee, Wasp 880 ranged</p>
+  <div class="rows"><div class="row m"><span class="rk">1</span><span class="bar-label">Smash</span><span class="bar"><i style="width:100.0%"></i></span><span class="val"><b>0.216</b></span><span class="shift" title="the guide gives 3 builds this same value">0.180<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">2</span><span class="bar-label">Water</span><span class="bar"><i style="width:86.8%"></i></span><span class="val"><b>0.187</b></span><span class="shift pick" title="the guide's highest value on this boss">&#9670; 0.201</span></div><div class="row r"><span class="rk">3</span><span class="bar-label">Crossbow</span><span class="bar"><i style="width:81.7%"></i></span><span class="val"><b>0.176</b></span><span class="shift" title="the guide gives 2 builds this same value">0.183<span class="tie">&times;2</span></span></div><div class="row n"><span class="rk">4</span><span class="bar-label">Nature DPS</span><span class="bar"><i style="width:79.1%"></i></span><span class="val"><b>0.171</b></span><span class="shift" title="the guide gives 3 builds this same value">0.180<span class="tie">&times;3</span></span></div><div class="row n"><span class="rk">5</span><span class="bar-label">Fire</span><span class="bar"><i style="width:77.7%"></i></span><span class="val"><b>0.168</b></span><span class="shift" title="the guide gives 3 builds this same value">0.180<span class="tie">&times;3</span></span></div><div class="row r"><span class="rk">6</span><span class="bar-label">Bow</span><span class="bar"><i style="width:72.5%"></i></span><span class="val"><b>0.157</b></span><span class="shift" title="the guide gives 2 builds this same value">0.183<span class="tie">&times;2</span></span></div><div class="row m"><span class="rk">7</span><span class="bar-label">Stab</span><span class="bar"><i style="width:70.0%"></i></span><span class="val"><b>0.151</b></span><span class="shift" title="the guide gives 2 builds this same value">0.176<span class="tie">&times;2</span></span></div><div class="row m"><span class="rk">8</span><span class="bar-label">Slash</span><span class="bar"><i style="width:69.1%"></i></span><span class="val"><b>0.149</b></span><span class="shift" title="the guide gives 2 builds this same value">0.176<span class="tie">&times;2</span></span></div></div>
+  <p class="why">Four separate 480,000 HP bodies make this the one fight where area damage compounds. Smash is the only melee build whose finisher (Fracturing Impact) hits all enemies, and it beats Slash and Stab by 43%. Water's Frost Surge is 41% of its damage. The guide ranks Water first; mana-limited the sim says Smash, with mana it says Water.</p>
+  <p class="note small">Enemy HP at L150, 50-player scaling: Beetle 480,000 · Dragonfly 480,000 · Wasp 480,000 · Firefly 480,000.</p>
+</article>
+  </div>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">Disagreements</span>
+    <h2>The four worth arguing about</h2>
+  </div>
+  <p class="note">These are the cells where the sim's ordering would change a real assignment
+  decision, not merely break one of the guide's ties.</p>
+  <div class="shifts"><article class="sc"><div class="sc-head"><span class="eyebrow">Hedgehog</span><h3>Fire: the guide's pick, fifth in the sim</h3></div><p>Fire is mana-starved, not outclassed. 70 casts per player are blocked for want of mana over a 9.6-minute fight. Give it mana and it scores 0.312 and takes first place, which is the guide's call.</p></article><article class="sc"><div class="sc-head"><span class="eyebrow">Swarm</span><h3>Smash: mid-pack in the guide, first in the sim</h3></div><p>The guide rates the three melee styles within 0.004 of each other on Swarm. Fracturing Impact hits all four bodies while Maim and Puncture hit one, so Smash outscores Slash by 45% and Stab by 43%.</p></article><article class="sc"><div class="sc-head"><span class="eyebrow">Jellyfish</span><h3>Stab: the guide's floor, the sim's third place</h3></div><p>The guide rates all three melee styles at 0.118, its lowest value on this boss. Puncture's −20% armor and the Furious Spear put Stab at 0.268 in the sim — third, behind only the two ranged builds, and ahead of all three casters.</p></article><article class="sc"><div class="sc-head"><span class="eyebrow">Swarm</span><h3>Bow: level with Crossbow in the guide, 12% behind it in the sim</h3></div><p>The guide's Swarm tweak drops Pestilent Shot for Penetrating Shot plus Rain of Arrows. Rain of Arrows is 20% of Bow's damage, but Crossbow keeps Pestilent Shot in its own Swarm tweak and scores 0.176 against Bow's 0.157 — the −10% armor and −10% all-resistance debuff is worth more than the second area ability.</p></article></div>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">The mana finding</span>
+    <h2>Two Mana Spring supports are not enough for the magic builds</h2>
+  </div>
+  <p>Fire, Water and Nature run 0-cooldown fillers, and with two Mana Spring supports in a
+  fifty-player group they spend a large part of the fight unable to pay for a cast. Re-running the
+  whole matrix with mana switched off isolates the cost: the physical builds gain a few percent, the
+  magic builds gain <strong>20&ndash;43%</strong>. That gap is the single largest correction in this
+  study, and it is a roster problem rather than a build problem.</p>
+  <p class="note">Blocked casts is per player per fight, averaged over the five bosses. The percentage
+  is what that build gains when mana stops being a constraint; below it, the mana-limited score and
+  the unconstrained one.</p>
+  <div class="scroll"><table class="mana">
+<thead><tr><th class="rowh">Build</th><th class="num">Blocked<br>casts</th><th class="num">Badger</th><th class="num">Chameleon</th><th class="num">Jellyfish</th><th class="num">Hedgehog</th><th class="num">Swarm</th></tr></thead>
+<tbody><tr class="m"><th class="rowh">Smash</th><td class="num oomc">21</td><td class="num"><span class="d warm">+10%</span><span class="dsub mono">0.144→0.158</span></td><td class="num"><span class="d flat">+4%</span><span class="dsub mono">0.274→0.284</span></td><td class="num"><span class="d flat">-1%</span><span class="dsub mono">0.198→0.197</span></td><td class="num"><span class="d flat">+7%</span><span class="dsub mono">0.206→0.220</span></td><td class="num"><span class="d warm">+9%</span><span class="dsub mono">0.216→0.235</span></td></tr><tr class="m"><th class="rowh">Slash</th><td class="num oomc">16</td><td class="num"><span class="d flat">+5%</span><span class="dsub mono">0.148→0.155</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.310→0.315</span></td><td class="num"><span class="d flat">+0%</span><span class="dsub mono">0.230→0.230</span></td><td class="num"><span class="d flat">+6%</span><span class="dsub mono">0.240→0.254</span></td><td class="num"><span class="d flat">+1%</span><span class="dsub mono">0.149→0.151</span></td></tr><tr class="m"><th class="rowh">Stab</th><td class="num oomc">19</td><td class="num"><span class="d flat">+5%</span><span class="dsub mono">0.173→0.182</span></td><td class="num"><span class="d flat">+5%</span><span class="dsub mono">0.341→0.356</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.268→0.273</span></td><td class="num"><span class="d flat">+0%</span><span class="dsub mono">0.289→0.290</span></td><td class="num"><span class="d flat">+6%</span><span class="dsub mono">0.151→0.160</span></td></tr><tr class="r"><th class="rowh">Bow</th><td class="num oomc">10</td><td class="num"><span class="d flat">+7%</span><span class="dsub mono">0.123→0.132</span></td><td class="num"><span class="d flat">+5%</span><span class="dsub mono">0.257→0.271</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.348→0.354</span></td><td class="num"><span class="d flat">+1%</span><span class="dsub mono">0.243→0.244</span></td><td class="num"><span class="d flat">+0%</span><span class="dsub mono">0.157→0.157</span></td></tr><tr class="r"><th class="rowh">Crossbow</th><td class="num oomc">7</td><td class="num"><span class="d warm">+8%</span><span class="dsub mono">0.134→0.145</span></td><td class="num"><span class="d flat">+3%</span><span class="dsub mono">0.267→0.275</span></td><td class="num"><span class="d flat">+2%</span><span class="dsub mono">0.342→0.350</span></td><td class="num"><span class="d flat">+3%</span><span class="dsub mono">0.241→0.248</span></td><td class="num"><span class="d flat">-1%</span><span class="dsub mono">0.176→0.174</span></td></tr><tr class="n"><th class="rowh">Fire</th><td class="num oomc">82</td><td class="num"><span class="d hot">+35%</span><span class="dsub mono">0.240→0.324</span></td><td class="num"><span class="d hot">+31%</span><span class="dsub mono">0.099→0.129</span></td><td class="num"><span class="d hot">+25%</span><span class="dsub mono">0.179→0.223</span></td><td class="num"><span class="d hot">+31%</span><span class="dsub mono">0.239→0.312</span></td><td class="num"><span class="d hot">+42%</span><span class="dsub mono">0.168→0.239</span></td></tr><tr class="n"><th class="rowh">Water</th><td class="num oomc">82</td><td class="num"><span class="d hot">+25%</span><span class="dsub mono">0.236→0.295</span></td><td class="num"><span class="d warm">+20%</span><span class="dsub mono">0.094→0.113</span></td><td class="num"><span class="d hot">+37%</span><span class="dsub mono">0.150→0.205</span></td><td class="num"><span class="d hot">+43%</span><span class="dsub mono">0.152→0.217</span></td><td class="num"><span class="d hot">+42%</span><span class="dsub mono">0.187→0.266</span></td></tr><tr class="n"><th class="rowh">Nature DPS</th><td class="num oomc">82</td><td class="num"><span class="d hot">+33%</span><span class="dsub mono">0.206→0.275</span></td><td class="num"><span class="d hot">+24%</span><span class="dsub mono">0.090→0.113</span></td><td class="num"><span class="d hot">+30%</span><span class="dsub mono">0.187→0.243</span></td><td class="num"><span class="d hot">+25%</span><span class="dsub mono">0.175→0.220</span></td><td class="num"><span class="d hot">+29%</span><span class="dsub mono">0.171→0.220</span></td></tr></tbody>
+</table></div>
+  <p class="why">With mana solved, Fire takes first on Hedgehog (0.312) and Water takes first on Swarm
+  (0.266) — both exactly the guide's call. The guide's matrix behaves like an unconstrained-mana
+  model, which is why those two cells are where the sim disagrees most.</p>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">What the matrix flattens</span>
+    <h2>Same-family builds are not interchangeable</h2>
+  </div>
+  <div class="splits"><div class="split"><h3>Melee</h3><p class="note">The guide rates Smash, Slash and Stab within 0.004 of each other on every boss.</p><div class="split-rows"><div class="split-row"><span class="sb">Badger</span><span class="sv m"><em>Smash</em><b>0.144</b></span><span class="sv m"><em>Slash</em><b>0.148</b></span><span class="sv m win"><em>Stab</em><b>0.173</b></span><span class="sp">21% spread</span></div><div class="split-row"><span class="sb">Chameleon</span><span class="sv m"><em>Smash</em><b>0.274</b></span><span class="sv m"><em>Slash</em><b>0.310</b></span><span class="sv m win"><em>Stab</em><b>0.341</b></span><span class="sp">24% spread</span></div><div class="split-row"><span class="sb">Jellyfish</span><span class="sv m"><em>Smash</em><b>0.198</b></span><span class="sv m"><em>Slash</em><b>0.230</b></span><span class="sv m win"><em>Stab</em><b>0.268</b></span><span class="sp">35% spread</span></div><div class="split-row"><span class="sb">Hedgehog</span><span class="sv m"><em>Smash</em><b>0.206</b></span><span class="sv m"><em>Slash</em><b>0.240</b></span><span class="sv m win"><em>Stab</em><b>0.289</b></span><span class="sp">40% spread</span></div><div class="split-row"><span class="sb">Swarm</span><span class="sv m win"><em>Smash</em><b>0.216</b></span><span class="sv m"><em>Slash</em><b>0.149</b></span><span class="sv m"><em>Stab</em><b>0.151</b></span><span class="sp">45% spread</span></div></div></div><div class="split"><h3>Ranged</h3><p class="note">The guide gives Bow and Crossbow identical numbers on all five bosses.</p><div class="split-rows"><div class="split-row"><span class="sb">Badger</span><span class="sv r"><em>Bow</em><b>0.123</b></span><span class="sv r win"><em>Crossbow</em><b>0.134</b></span><span class="sp">9% spread</span></div><div class="split-row"><span class="sb">Chameleon</span><span class="sv r"><em>Bow</em><b>0.257</b></span><span class="sv r win"><em>Crossbow</em><b>0.267</b></span><span class="sp">4% spread</span></div><div class="split-row"><span class="sb">Jellyfish</span><span class="sv r win"><em>Bow</em><b>0.348</b></span><span class="sv r"><em>Crossbow</em><b>0.342</b></span><span class="sp">2% spread</span></div><div class="split-row"><span class="sb">Hedgehog</span><span class="sv r win"><em>Bow</em><b>0.243</b></span><span class="sv r"><em>Crossbow</em><b>0.241</b></span><span class="sp">1% spread</span></div><div class="split-row"><span class="sb">Swarm</span><span class="sv r"><em>Bow</em><b>0.157</b></span><span class="sv r win"><em>Crossbow</em><b>0.176</b></span><span class="sp">13% spread</span></div></div></div></div>
+  <p class="why">Stab leads melee on four of the five bosses &mdash; Puncture's &minus;20% armor is the
+  strongest single-target debuff among the melee finishers, and it carries the Furious Spear. Smash
+  wins only on Swarm, where Fracturing Impact's all-enemies hit matters. Bow and Crossbow are much
+  closer: Crossbow is ahead by 4&ndash;13% on Badger, Chameleon and Swarm, and the two sit within 2%
+  of each other on Jellyfish and Hedgehog &mdash; so treating them as one build is nearly right
+  everywhere except Swarm.</p>
+</section>
+
+<section>
+  <div class="section-head">
+    <span class="eyebrow">Method</span>
+    <h2>How these numbers were produced</h2>
+  </div>
+  <div class="method">
+    <dl>
+      <dt>Roster</dt>
+      <dd>50 players. Support: <b>WarkTank 2 · Nature Support 5 · Mana Spring Support 2</b>. DPS: <b>Smash 6 · Slash 5 · Stab 5 · Bow 5 · Crossbow 5 · Fire 5 · Water 5 · Nature DPS 5</b>. 41 DPS over
+      8 builds leaves one spare; it went to Smash, whose Fracturing Impact is the raid's only
+      +damage-taken debuff and benefits everyone. Scores are per player, so the uneven squad does not
+      flatter its own number.</dd>
+      <dt>Loadouts</dt>
+      <dd>The guide's recommended kit for that boss, including every listed tweak — Steady Shot for
+      Bow and Crossbow on Chameleon and Jellyfish, Precision instead of Elemental Affinity for the
+      casters on Chameleon, and the Swarm variants.</dd>
+    </dl>
+    <dl>
+      <dt>Gear and levels</dt>
+      <dd>The <b>T95</b> sets under <span class="mono">data/testPlayers</span>. All seven skills forced
+      to <b>125</b>. Ability levels: auras 20, the three 0-cooldown spells (Water Strike, Entangle,
+      Fireball) 60, everything else 40.</dd>
+      <dt>Assumptions</dt>
+      <dd>Players take <b>no damage</b>, so nobody dies and the measurement is pure output. Every raid
+      debuff is present and held up: Fracturing Impact, Maim, Puncture, Pestilent Shot, Smoke Burst,
+      Frost Surge, Ice Spear and Toxic Pollen all have a live source. Debuffs are keyed by type in the
+      engine, so extra casters buy <em>uptime</em>, never a bigger number.</dd>
+    </dl>
+    <dl>
+      <dt>Monsters</dt>
+      <dd>Rebuilt from game data at room level 150 with 50-player scaling: <b>+50%</b> max HP,
+      <b>+100%</b> attack and cast speed, <b>+100</b> ability haste. Enrage runs as normal (+10%
+      monster damage and accuracy per 10 minutes), which affects incoming damage only.</dd>
+      <dt>Runs</dt>
+      <dd>Three seeded runs per boss, every one a victory in <b>9.1&ndash;12.2 minutes</b>. Damage is
+      summed over summed durations, so the score is a true rate. Seed spread on kill time was under
+      <b>4%</b>.</dd>
+    </dl>
+    <dl>
+      <dt>Reproducing a cell</dt>
+      <dd>Every number comes from <span class="mono">src/combatsimulator/skillLab.js</span> — the same
+      core the Skill Lab page runs — driven over the 40 cells by
+      <span class="mono">src/skillLabMatrix.js</span>. Enter the same squads and kits in
+      <span class="mono">skill-lab.html</span> at level 150 and the page reproduces the cell.</dd>
+      <dt>Raw output</dt>
+      <dd><span class="mono">pages/data/boss_matrix_T6.json</span> and
+      <span class="mono">…_infinite_mana.json</span> carry per-ability damage, hit rates, cast counts
+      and blocked casts for every squad.</dd>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  <p class="note small">Simulated 2026-09-11 · room level 150 (T6) · 50-player group ·
+  3 seeds per boss · build loadouts from the Arsenal guide, credit Feal (Survey Corps). The guide's
+  matrix values are reproduced for comparison only.</p>
+</footer>
+
+</div>

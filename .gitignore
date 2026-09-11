@@ -4,3 +4,4 @@ dist/
 plans/
 scripts/
 .DS_Store
+dist-node/

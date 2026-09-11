@@ -1,0 +1,3839 @@
+{
+  "generated": "2026-09-11T10:05:47.706Z",
+  "level": 150,
+  "tier": 6,
+  "seeds": 3,
+  "partySize": 50,
+  "statLevel": 125,
+  "infiniteMana": true,
+  "abilityLevels": {
+    "aura": 20,
+    "zeroCdSpell": 60,
+    "other": 40
+  },
+  "roster": {
+    "dps": [
+      {
+        "key": "smash",
+        "label": "Smash",
+        "count": 6
+      },
+      {
+        "key": "slash",
+        "label": "Slash",
+        "count": 5
+      },
+      {
+        "key": "stab",
+        "label": "Stab",
+        "count": 5
+      },
+      {
+        "key": "bow",
+        "label": "Bow",
+        "count": 5
+      },
+      {
+        "key": "crossbow",
+        "label": "Crossbow",
+        "count": 5
+      },
+      {
+        "key": "fire",
+        "label": "Fire",
+        "count": 5
+      },
+      {
+        "key": "water",
+        "label": "Water",
+        "count": 5
+      },
+      {
+        "key": "nature",
+        "label": "Nature DPS",
+        "count": 5
+      }
+    ],
+    "support": [
+      {
+        "key": "tank",
+        "label": "WarkTank",
+        "count": 2
+      },
+      {
+        "key": "healer",
+        "label": "Nature Support",
+        "count": 5
+      },
+      {
+        "key": "manaspring",
+        "label": "Mana Spring Support",
+        "count": 2
+      }
+    ]
+  },
+  "bosses": {
+    "badger": {
+      "boss": "Trial Badger",
+      "level": 150,
+      "preview": {
+        "enemies": [
+          {
+            "name": "trial_badger",
+            "maxHitpoints": 828000,
+            "armor": 630,
+            "evasion": {
+              "melee": 752,
+              "ranged": 960,
+              "magic": 544
+            }
+          },
+          {
+            "name": "trial_badger",
+            "maxHitpoints": 828000,
+            "armor": 630,
+            "evasion": {
+              "melee": 752,
+              "ranged": 960,
+              "magic": 544
+            }
+          }
+        ],
+        "totalHp": 1656000
+      },
+      "outcomes": [
+        "victory",
+        "victory",
+        "victory"
+      ],
+      "seconds": 599.1691387235386,
+      "secondsMin": 589.3016810265822,
+      "secondsMax": 617.7651289434968,
+      "totalHp": 1656000,
+      "partySize": 50,
+      "enemies": [
+        {
+          "hrid": "/monsters/trial_badger#1",
+          "maxHitpoints": 828000,
+          "currentHitpoints": 0
+        },
+        {
+          "hrid": "/monsters/trial_badger#2",
+          "maxHitpoints": 828000,
+          "currentHitpoints": 0
+        }
+      ],
+      "squads": [
+        {
+          "id": "smash",
+          "label": "Smash",
+          "support": false,
+          "n": 6,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "fracturing_impact",
+              "level": 40
+            }
+          ],
+          "dmg": 471195,
+          "hits": 3265,
+          "misses": 2381,
+          "hitRate": 0.5782855118668083,
+          "oom": 0,
+          "dps": 43.68966675381208,
+          "squadPctPerMin": 0.949775364213306,
+          "score": 0.158295894035551,
+          "perAbility": {
+            "/abilities/fracturing_impact": {
+              "dmg": 38369,
+              "hits": 378,
+              "misses": 390
+            },
+            "autoAttack": {
+              "dmg": 432826,
+              "hits": 2887,
+              "misses": 1991
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 221426,
+            "/monsters/trial_badger#2": 249769
+          },
+          "casts": {
+            "/abilities/insanity": 126,
+            "/abilities/frenzy": 348,
+            "/abilities/berserk": 348,
+            "/abilities/precision": 348,
+            "/abilities/fracturing_impact": 510
+          }
+        },
+        {
+          "id": "slash",
+          "label": "Slash",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "maim",
+              "level": 40
+            }
+          ],
+          "dmg": 383475,
+          "hits": 3571,
+          "misses": 2258,
+          "hitRate": 0.6126265225596157,
+          "oom": 0,
+          "dps": 42.66741784208598,
+          "squadPctPerMin": 0.7729604681537314,
+          "score": 0.15459209363074627,
+          "perAbility": {
+            "/abilities/maim": {
+              "dmg": 24046,
+              "hits": 241,
+              "misses": 184
+            },
+            "autoAttack": {
+              "dmg": 325001,
+              "hits": 2508,
+              "misses": 1977
+            },
+            "damageOverTime": {
+              "dmg": 24046,
+              "hits": 723,
+              "misses": 0
+            },
+            "parry": {
+              "dmg": 10382,
+              "hits": 99,
+              "misses": 97
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 200951,
+            "/monsters/trial_badger#2": 182524
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 305,
+            "/abilities/berserk": 305,
+            "/abilities/precision": 305,
+            "/abilities/maim": 425
+          }
+        },
+        {
+          "id": "stab",
+          "label": "Stab",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "puncture",
+              "level": 40
+            }
+          ],
+          "dmg": 451728,
+          "hits": 3496,
+          "misses": 1749,
+          "hitRate": 0.6665395614871306,
+          "oom": 0,
+          "dps": 50.26160069618572,
+          "squadPctPerMin": 0.9105362444961179,
+          "score": 0.18210724889922358,
+          "perAbility": {
+            "/abilities/puncture": {
+              "dmg": 45268,
+              "hits": 283,
+              "misses": 157
+            },
+            "autoAttack": {
+              "dmg": 406460,
+              "hits": 3213,
+              "misses": 1592
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 239726,
+            "/monsters/trial_badger#2": 212002
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 290,
+            "/abilities/berserk": 290,
+            "/abilities/precision": 290,
+            "/abilities/puncture": 440
+          }
+        },
+        {
+          "id": "bow",
+          "label": "Bow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 326355,
+          "hits": 2942,
+          "misses": 1893,
+          "hitRate": 0.6084798345398138,
+          "oom": 0,
+          "dps": 36.31195032232602,
+          "squadPctPerMin": 0.6578251869986597,
+          "score": 0.13156503739973194,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 41691,
+              "hits": 253,
+              "misses": 172
+            },
+            "autoAttack": {
+              "dmg": 284664,
+              "hits": 2689,
+              "misses": 1721
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 176055,
+            "/monsters/trial_badger#2": 150300
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 290,
+            "/abilities/berserk": 290,
+            "/abilities/precision": 290,
+            "/abilities/pestilent_shot": 425
+          }
+        },
+        {
+          "id": "crossbow",
+          "label": "Crossbow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 360141,
+          "hits": 3163,
+          "misses": 1532,
+          "hitRate": 0.6736954206602769,
+          "oom": 0,
+          "dps": 40.07115595297395,
+          "squadPctPerMin": 0.7259267382785137,
+          "score": 0.14518534765570273,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 46033,
+              "hits": 287,
+              "misses": 138
+            },
+            "autoAttack": {
+              "dmg": 314108,
+              "hits": 2876,
+              "misses": 1394
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 179364,
+            "/monsters/trial_badger#2": 180777
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 290,
+            "/abilities/berserk": 290,
+            "/abilities/precision": 290,
+            "/abilities/pestilent_shot": 425
+          }
+        },
+        {
+          "id": "fire",
+          "label": "Fire",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "fireball",
+              "level": 60
+            }
+          ],
+          "dmg": 803799,
+          "hits": 3569,
+          "misses": 2687,
+          "hitRate": 0.5704923273657289,
+          "oom": 0,
+          "dps": 89.43484658465576,
+          "squadPctPerMin": 1.6201964960988362,
+          "score": 0.32403929921976726,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 209271,
+              "hits": 341,
+              "misses": 224
+            },
+            "/abilities/life_drain": {
+              "dmg": 161852,
+              "hits": 344,
+              "misses": 216
+            },
+            "/abilities/fireball": {
+              "dmg": 360674,
+              "hits": 1920,
+              "misses": 1436
+            },
+            "blaze": {
+              "dmg": 72002,
+              "hits": 964,
+              "misses": 811
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 391893,
+            "/monsters/trial_badger#2": 411906
+          },
+          "casts": {
+            "/abilities/insanity": 120,
+            "/abilities/elemental_affinity": 335,
+            "/abilities/smoke_burst": 565,
+            "/abilities/life_drain": 560,
+            "/abilities/fireball": 3356
+          }
+        },
+        {
+          "id": "water",
+          "label": "Water",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "frost_surge",
+              "level": 40
+            },
+            {
+              "name": "ice_spear",
+              "level": 40
+            },
+            {
+              "name": "water_strike",
+              "level": 60
+            }
+          ],
+          "dmg": 732666,
+          "hits": 2865,
+          "misses": 2052,
+          "hitRate": 0.5826723611958511,
+          "oom": 0,
+          "dps": 81.52021999006395,
+          "squadPctPerMin": 1.4768155795301436,
+          "score": 0.2953631159060287,
+          "perAbility": {
+            "/abilities/frost_surge": {
+              "dmg": 184819,
+              "hits": 555,
+              "misses": 463
+            },
+            "/abilities/ice_spear": {
+              "dmg": 184544,
+              "hits": 382,
+              "misses": 276
+            },
+            "/abilities/water_strike": {
+              "dmg": 363303,
+              "hits": 1928,
+              "misses": 1313
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 354026,
+            "/monsters/trial_badger#2": 378640
+          },
+          "casts": {
+            "/abilities/insanity": 141,
+            "/abilities/elemental_affinity": 389,
+            "/abilities/frost_surge": 668,
+            "/abilities/ice_spear": 658,
+            "/abilities/water_strike": 3241
+          }
+        },
+        {
+          "id": "nature",
+          "label": "Nature DPS",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 682906,
+          "hits": 2580,
+          "misses": 1899,
+          "hitRate": 0.5760214333556597,
+          "oom": 0,
+          "dps": 75.98366425156156,
+          "squadPctPerMin": 1.3765156567311876,
+          "score": 0.2753031313462375,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 148009,
+              "hits": 337,
+              "misses": 227
+            },
+            "/abilities/life_drain": {
+              "dmg": 216092,
+              "hits": 339,
+              "misses": 221
+            },
+            "/abilities/entangle": {
+              "dmg": 318805,
+              "hits": 1904,
+              "misses": 1451
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 358477,
+            "/monsters/trial_badger#2": 324429
+          },
+          "casts": {
+            "/abilities/insanity": 120,
+            "/abilities/elemental_affinity": 335,
+            "/abilities/smoke_burst": 564,
+            "/abilities/life_drain": 560,
+            "/abilities/entangle": 3355
+          }
+        },
+        {
+          "id": "tank",
+          "label": "WarkTank",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "invincible",
+              "level": 20
+            },
+            {
+              "name": "provoke",
+              "level": 40
+            },
+            {
+              "name": "taunt",
+              "level": 40
+            },
+            {
+              "name": "spike_shell",
+              "level": 40
+            },
+            {
+              "name": "retribution",
+              "level": 40
+            }
+          ],
+          "dmg": 101372,
+          "hits": 2637,
+          "misses": 1439,
+          "hitRate": 0.6469578017664377,
+          "oom": 0,
+          "dps": 28.197936511427994,
+          "squadPctPerMin": 0.20433287327121732,
+          "score": 0.10216643663560866,
+          "perAbility": {
+            "physicalThorns": {
+              "dmg": 18031,
+              "hits": 1435,
+              "misses": 0
+            },
+            "retaliation": {
+              "dmg": 20663,
+              "hits": 626,
+              "misses": 821
+            },
+            "autoAttack": {
+              "dmg": 62678,
+              "hits": 576,
+              "misses": 618
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 47684,
+            "/monsters/trial_badger#2": 53688
+          },
+          "casts": {
+            "/abilities/fierce_aura": 16,
+            "/abilities/provoke": 60,
+            "/abilities/taunt": 60,
+            "/abilities/spike_shell": 116,
+            "/abilities/retribution": 116,
+            "/abilities/mystic_aura": 16
+          }
+        },
+        {
+          "id": "healer",
+          "label": "Nature Support",
+          "support": true,
+          "n": 5,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 454046,
+          "hits": 2756,
+          "misses": 1821,
+          "hitRate": 0.6021411404850339,
+          "oom": 0,
+          "dps": 50.51951340120679,
+          "squadPctPerMin": 0.9152085761088185,
+          "score": 0.18304171522176368,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 108055,
+              "hits": 353,
+              "misses": 239
+            },
+            "/abilities/toxic_pollen": {
+              "dmg": 94602,
+              "hits": 530,
+              "misses": 360
+            },
+            "/abilities/entangle": {
+              "dmg": 251389,
+              "hits": 1873,
+              "misses": 1222
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 215683,
+            "/monsters/trial_badger#2": 238363
+          },
+          "casts": {
+            "/abilities/critical_aura": 16,
+            "/abilities/rejuvenate": 395,
+            "/abilities/smoke_burst": 592,
+            "/abilities/toxic_pollen": 585,
+            "/abilities/entangle": 3095,
+            "/abilities/guardian_aura": 16,
+            "/abilities/speed_aura": 16
+          }
+        },
+        {
+          "id": "manaspring",
+          "label": "Mana Spring Support",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "mana_spring",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 200317,
+          "hits": 1093,
+          "misses": 740,
+          "hitRate": 0.5962902345881069,
+          "oom": 0,
+          "dps": 55.720771496663,
+          "squadPctPerMin": 0.403773706497558,
+          "score": 0.201886853248779,
+          "perAbility": {
+            "/abilities/mana_spring": {
+              "dmg": 25486,
+              "hits": 208,
+              "misses": 152
+            },
+            "/abilities/life_drain": {
+              "dmg": 74863,
+              "hits": 153,
+              "misses": 82
+            },
+            "/abilities/entangle": {
+              "dmg": 99968,
+              "hits": 732,
+              "misses": 506
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_badger#1": 98715,
+            "/monsters/trial_badger#2": 101602
+          },
+          "casts": {
+            "/abilities/mana_spring": 238,
+            "/abilities/rejuvenate": 158,
+            "/abilities/life_drain": 235,
+            "/abilities/entangle": 1238
+          }
+        }
+      ]
+    },
+    "chameleon": {
+      "boss": "Trial Chameleon",
+      "level": 150,
+      "preview": {
+        "enemies": [
+          {
+            "name": "trial_chameleon",
+            "maxHitpoints": 1380000,
+            "armor": 368,
+            "evasion": {
+              "melee": 576,
+              "ranged": 752,
+              "magic": 896
+            }
+          }
+        ],
+        "totalHp": 1380000
+      },
+      "outcomes": [
+        "victory",
+        "victory",
+        "victory"
+      ],
+      "seconds": 573.3827057064817,
+      "secondsMin": 569.3588936735368,
+      "secondsMax": 580.2233124148582,
+      "totalHp": 1380000,
+      "partySize": 50,
+      "enemies": [
+        {
+          "hrid": "/monsters/trial_chameleon#1",
+          "maxHitpoints": 1380000,
+          "currentHitpoints": 0
+        }
+      ],
+      "squads": [
+        {
+          "id": "smash",
+          "label": "Smash",
+          "support": false,
+          "n": 6,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "fracturing_impact",
+              "level": 40
+            }
+          ],
+          "dmg": 674524,
+          "hits": 2854,
+          "misses": 2306,
+          "hitRate": 0.5531007751937984,
+          "oom": 0,
+          "dps": 65.35522467386471,
+          "squadPctPerMin": 1.704918904535601,
+          "score": 0.2841531507559335,
+          "perAbility": {
+            "/abilities/fracturing_impact": {
+              "dmg": 46760,
+              "hits": 270,
+              "misses": 222
+            },
+            "autoAttack": {
+              "dmg": 627764,
+              "hits": 2584,
+              "misses": 2084
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 674524
+          },
+          "casts": {
+            "/abilities/insanity": 126,
+            "/abilities/frenzy": 330,
+            "/abilities/berserk": 330,
+            "/abilities/precision": 330,
+            "/abilities/fracturing_impact": 492
+          }
+        },
+        {
+          "id": "slash",
+          "label": "Slash",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "maim",
+              "level": 40
+            }
+          ],
+          "dmg": 623998,
+          "hits": 3763,
+          "misses": 1819,
+          "hitRate": 0.6741311357936224,
+          "oom": 0,
+          "dps": 72.55165921931714,
+          "squadPctPerMin": 1.5772099830286337,
+          "score": 0.31544199660572675,
+          "perAbility": {
+            "/abilities/maim": {
+              "dmg": 41173,
+              "hits": 253,
+              "misses": 157
+            },
+            "autoAttack": {
+              "dmg": 528439,
+              "hits": 2690,
+              "misses": 1615
+            },
+            "damageOverTime": {
+              "dmg": 40990,
+              "hits": 756,
+              "misses": 0
+            },
+            "parry": {
+              "dmg": 13396,
+              "hits": 64,
+              "misses": 47
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 623998
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 285,
+            "/abilities/berserk": 285,
+            "/abilities/precision": 285,
+            "/abilities/maim": 410
+          }
+        },
+        {
+          "id": "stab",
+          "label": "Stab",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "puncture",
+              "level": 40
+            }
+          ],
+          "dmg": 704870,
+          "hits": 3652,
+          "misses": 1373,
+          "hitRate": 0.7267661691542289,
+          "oom": 0,
+          "dps": 81.95457042157197,
+          "squadPctPerMin": 1.7816210961211296,
+          "score": 0.3563242192242259,
+          "perAbility": {
+            "/abilities/puncture": {
+              "dmg": 69775,
+              "hits": 290,
+              "misses": 130
+            },
+            "autoAttack": {
+              "dmg": 635095,
+              "hits": 3362,
+              "misses": 1243
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 704870
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 285,
+            "/abilities/berserk": 285,
+            "/abilities/precision": 285,
+            "/abilities/puncture": 420
+          }
+        },
+        {
+          "id": "bow",
+          "label": "Bow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            },
+            {
+              "name": "steady_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 536881,
+          "hits": 2904,
+          "misses": 2081,
+          "hitRate": 0.5825476429287864,
+          "oom": 0,
+          "dps": 62.42264775420146,
+          "squadPctPerMin": 1.3570140816130754,
+          "score": 0.2714028163226151,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 54979,
+              "hits": 224,
+              "misses": 186
+            },
+            "/abilities/steady_shot": {
+              "dmg": 99462,
+              "hits": 327,
+              "misses": 83
+            },
+            "autoAttack": {
+              "dmg": 382440,
+              "hits": 2353,
+              "misses": 1812
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 536881
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 275,
+            "/abilities/berserk": 275,
+            "/abilities/pestilent_shot": 410,
+            "/abilities/steady_shot": 410
+          }
+        },
+        {
+          "id": "crossbow",
+          "label": "Crossbow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            },
+            {
+              "name": "steady_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 544020,
+          "hits": 2893,
+          "misses": 1596,
+          "hitRate": 0.6444642459345066,
+          "oom": 0,
+          "dps": 63.2526925542917,
+          "squadPctPerMin": 1.3750585337889498,
+          "score": 0.27501170675778996,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 58625,
+              "hits": 244,
+              "misses": 161
+            },
+            "/abilities/steady_shot": {
+              "dmg": 96526,
+              "hits": 328,
+              "misses": 77
+            },
+            "autoAttack": {
+              "dmg": 388869,
+              "hits": 2321,
+              "misses": 1358
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 544020
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/frenzy": 285,
+            "/abilities/berserk": 285,
+            "/abilities/pestilent_shot": 405,
+            "/abilities/steady_shot": 405
+          }
+        },
+        {
+          "id": "fire",
+          "label": "Fire",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "fireball",
+              "level": 60
+            }
+          ],
+          "dmg": 256076,
+          "hits": 2680,
+          "misses": 2820,
+          "hitRate": 0.48727272727272725,
+          "oom": 0,
+          "dps": 29.77371511807066,
+          "squadPctPerMin": 0.647254676479797,
+          "score": 0.12945093529595939,
+          "perAbility": {
+            "blaze": {
+              "dmg": 19270,
+              "hits": 590,
+              "misses": 627
+            },
+            "/abilities/smoke_burst": {
+              "dmg": 75501,
+              "hits": 290,
+              "misses": 246
+            },
+            "/abilities/life_drain": {
+              "dmg": 44846,
+              "hits": 289,
+              "misses": 243
+            },
+            "/abilities/fireball": {
+              "dmg": 116459,
+              "hits": 1511,
+              "misses": 1704
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 256076
+          },
+          "casts": {
+            "/abilities/insanity": 120,
+            "/abilities/precision": 330,
+            "/abilities/smoke_burst": 536,
+            "/abilities/life_drain": 532,
+            "/abilities/fireball": 3215
+          }
+        },
+        {
+          "id": "water",
+          "label": "Water",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "frost_surge",
+              "level": 40
+            },
+            {
+              "name": "ice_spear",
+              "level": 40
+            },
+            {
+              "name": "water_strike",
+              "level": 60
+            }
+          ],
+          "dmg": 223642,
+          "hits": 2193,
+          "misses": 2178,
+          "hitRate": 0.5017158544955388,
+          "oom": 0,
+          "dps": 26.00264451348646,
+          "squadPctPerMin": 0.5652748807279665,
+          "score": 0.1130549761455933,
+          "perAbility": {
+            "/abilities/frost_surge": {
+              "dmg": 43461,
+              "hits": 308,
+              "misses": 329
+            },
+            "/abilities/ice_spear": {
+              "dmg": 54393,
+              "hits": 306,
+              "misses": 324
+            },
+            "/abilities/water_strike": {
+              "dmg": 125788,
+              "hits": 1579,
+              "misses": 1525
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 223642
+          },
+          "casts": {
+            "/abilities/insanity": 135,
+            "/abilities/precision": 374,
+            "/abilities/frost_surge": 637,
+            "/abilities/ice_spear": 630,
+            "/abilities/water_strike": 3104
+          }
+        },
+        {
+          "id": "nature",
+          "label": "Nature DPS",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 222720,
+          "hits": 2123,
+          "misses": 2161,
+          "hitRate": 0.49556489262371617,
+          "oom": 0,
+          "dps": 25.89544444265256,
+          "squadPctPerMin": 0.5629444444054904,
+          "score": 0.11258888888109808,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 47366,
+              "hits": 294,
+              "misses": 244
+            },
+            "/abilities/life_drain": {
+              "dmg": 67870,
+              "hits": 276,
+              "misses": 255
+            },
+            "/abilities/entangle": {
+              "dmg": 107484,
+              "hits": 1553,
+              "misses": 1662
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 222720
+          },
+          "casts": {
+            "/abilities/insanity": 120,
+            "/abilities/precision": 330,
+            "/abilities/smoke_burst": 538,
+            "/abilities/life_drain": 531,
+            "/abilities/entangle": 3215
+          }
+        },
+        {
+          "id": "tank",
+          "label": "WarkTank",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "invincible",
+              "level": 20
+            },
+            {
+              "name": "provoke",
+              "level": 40
+            },
+            {
+              "name": "taunt",
+              "level": 40
+            },
+            {
+              "name": "spike_shell",
+              "level": 40
+            },
+            {
+              "name": "retribution",
+              "level": 40
+            }
+          ],
+          "dmg": 149388,
+          "hits": 2006,
+          "misses": 957,
+          "hitRate": 0.6770165372932838,
+          "oom": 0,
+          "dps": 43.42300483116672,
+          "squadPctPerMin": 0.37759134635797154,
+          "score": 0.18879567317898577,
+          "perAbility": {
+            "autoAttack": {
+              "dmg": 95106,
+              "hits": 601,
+              "misses": 543
+            },
+            "physicalThorns": {
+              "dmg": 19605,
+              "hits": 907,
+              "misses": 0
+            },
+            "retaliation": {
+              "dmg": 34677,
+              "hits": 498,
+              "misses": 414
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 149388
+          },
+          "casts": {
+            "/abilities/fierce_aura": 15,
+            "/abilities/provoke": 60,
+            "/abilities/taunt": 60,
+            "/abilities/spike_shell": 108,
+            "/abilities/retribution": 108,
+            "/abilities/mystic_aura": 15
+          }
+        },
+        {
+          "id": "healer",
+          "label": "Nature Support",
+          "support": true,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 143282,
+          "hits": 1992,
+          "misses": 1938,
+          "hitRate": 0.5068702290076336,
+          "oom": 0,
+          "dps": 16.65926306857105,
+          "squadPctPerMin": 0.3621578927950228,
+          "score": 0.07243157855900456,
+          "perAbility": {
+            "/abilities/toxic_pollen": {
+              "dmg": 26721,
+              "hits": 279,
+              "misses": 281
+            },
+            "/abilities/entangle": {
+              "dmg": 116561,
+              "hits": 1713,
+              "misses": 1657
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 143282
+          },
+          "casts": {
+            "/abilities/critical_aura": 15,
+            "/abilities/rejuvenate": 375,
+            "/abilities/precision": 315,
+            "/abilities/toxic_pollen": 560,
+            "/abilities/entangle": 3370,
+            "/abilities/guardian_aura": 15,
+            "/abilities/speed_aura": 15,
+            "/abilities/insanity": 48
+          }
+        },
+        {
+          "id": "manaspring",
+          "label": "Mana Spring Support",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "mana_spring",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 60599,
+          "hits": 644,
+          "misses": 992,
+          "hitRate": 0.39364303178484106,
+          "oom": 0,
+          "dps": 17.614471508848585,
+          "squadPctPerMin": 0.15316931746824855,
+          "score": 0.07658465873412428,
+          "perAbility": {
+            "/abilities/mana_spring": {
+              "dmg": 6042,
+              "hits": 97,
+              "misses": 127
+            },
+            "/abilities/life_drain": {
+              "dmg": 23936,
+              "hits": 89,
+              "misses": 135
+            },
+            "/abilities/entangle": {
+              "dmg": 30621,
+              "hits": 458,
+              "misses": 730
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_chameleon#1": 60599
+          },
+          "casts": {
+            "/abilities/mana_spring": 224,
+            "/abilities/rejuvenate": 152,
+            "/abilities/life_drain": 224,
+            "/abilities/entangle": 1188
+          }
+        }
+      ]
+    },
+    "jellyfish": {
+      "boss": "Trial Jellyfish",
+      "level": 150,
+      "preview": {
+        "enemies": [
+          {
+            "name": "trial_jellyfish",
+            "maxHitpoints": 1248000,
+            "armor": 368,
+            "evasion": {
+              "melee": 1120,
+              "ranged": 576,
+              "magic": 752
+            }
+          }
+        ],
+        "totalHp": 1248000
+      },
+      "outcomes": [
+        "victory",
+        "victory",
+        "victory"
+      ],
+      "seconds": 501.6382741720434,
+      "secondsMin": 492.3238984182334,
+      "secondsMax": 507.2182915515643,
+      "totalHp": 1248000,
+      "partySize": 50,
+      "enemies": [
+        {
+          "hrid": "/monsters/trial_jellyfish#1",
+          "maxHitpoints": 1248000,
+          "currentHitpoints": 0
+        }
+      ],
+      "squads": [
+        {
+          "id": "smash",
+          "label": "Smash",
+          "support": false,
+          "n": 6,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "fracturing_impact",
+              "level": 40
+            }
+          ],
+          "dmg": 369899,
+          "hits": 1590,
+          "misses": 2928,
+          "hitRate": 0.351925630810093,
+          "oom": 0,
+          "dps": 40.96566291390392,
+          "squadPctPerMin": 1.1817018148241516,
+          "score": 0.19695030247069192,
+          "perAbility": {
+            "/abilities/fracturing_impact": {
+              "dmg": 30311,
+              "hits": 166,
+              "misses": 266
+            },
+            "autoAttack": {
+              "dmg": 339588,
+              "hits": 1424,
+              "misses": 2662
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 369899
+          },
+          "casts": {
+            "/abilities/insanity": 108,
+            "/abilities/frenzy": 288,
+            "/abilities/berserk": 288,
+            "/abilities/precision": 288,
+            "/abilities/fracturing_impact": 432
+          }
+        },
+        {
+          "id": "slash",
+          "label": "Slash",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "maim",
+              "level": 40
+            }
+          ],
+          "dmg": 360014,
+          "hits": 2180,
+          "misses": 2429,
+          "hitRate": 0.4729876328921675,
+          "oom": 0,
+          "dps": 47.84509988386951,
+          "squadPctPerMin": 1.1501225933622476,
+          "score": 0.23002451867244952,
+          "perAbility": {
+            "/abilities/maim": {
+              "dmg": 22011,
+              "hits": 133,
+              "misses": 222
+            },
+            "autoAttack": {
+              "dmg": 308004,
+              "hits": 1613,
+              "misses": 2150
+            },
+            "damageOverTime": {
+              "dmg": 22011,
+              "hits": 399,
+              "misses": 0
+            },
+            "parry": {
+              "dmg": 7988,
+              "hits": 35,
+              "misses": 57
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 360014
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 250,
+            "/abilities/berserk": 250,
+            "/abilities/precision": 250,
+            "/abilities/maim": 355
+          }
+        },
+        {
+          "id": "stab",
+          "label": "Stab",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "puncture",
+              "level": 40
+            }
+          ],
+          "dmg": 427125,
+          "hits": 2335,
+          "misses": 2060,
+          "hitRate": 0.5312855517633674,
+          "oom": 0,
+          "dps": 56.764009977105786,
+          "squadPctPerMin": 1.3645194706035046,
+          "score": 0.27290389412070093,
+          "perAbility": {
+            "/abilities/puncture": {
+              "dmg": 39616,
+              "hits": 188,
+              "misses": 182
+            },
+            "autoAttack": {
+              "dmg": 387509,
+              "hits": 2147,
+              "misses": 1878
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 427125
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 250,
+            "/abilities/berserk": 250,
+            "/abilities/precision": 250,
+            "/abilities/puncture": 370
+          }
+        },
+        {
+          "id": "bow",
+          "label": "Bow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            },
+            {
+              "name": "steady_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 554072,
+          "hits": 3015,
+          "misses": 1348,
+          "hitRate": 0.6910382764153106,
+          "oom": 0,
+          "dps": 73.63499803578567,
+          "squadPctPerMin": 1.7700720681679247,
+          "score": 0.35401441363358493,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 60266,
+              "hits": 235,
+              "misses": 125
+            },
+            "/abilities/steady_shot": {
+              "dmg": 92725,
+              "hits": 305,
+              "misses": 53
+            },
+            "autoAttack": {
+              "dmg": 401081,
+              "hits": 2475,
+              "misses": 1170
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 554072
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 240,
+            "/abilities/berserk": 240,
+            "/abilities/pestilent_shot": 360,
+            "/abilities/steady_shot": 358
+          }
+        },
+        {
+          "id": "crossbow",
+          "label": "Crossbow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            },
+            {
+              "name": "steady_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 547890,
+          "hits": 2906,
+          "misses": 1019,
+          "hitRate": 0.7403821656050955,
+          "oom": 0,
+          "dps": 72.81342329846413,
+          "squadPctPerMin": 1.750322675443849,
+          "score": 0.3500645350887698,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 69451,
+              "hits": 261,
+              "misses": 94
+            },
+            "/abilities/steady_shot": {
+              "dmg": 93000,
+              "hits": 314,
+              "misses": 41
+            },
+            "autoAttack": {
+              "dmg": 385439,
+              "hits": 2331,
+              "misses": 884
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 547890
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 250,
+            "/abilities/berserk": 250,
+            "/abilities/pestilent_shot": 355,
+            "/abilities/steady_shot": 355
+          }
+        },
+        {
+          "id": "fire",
+          "label": "Fire",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "fireball",
+              "level": 60
+            }
+          ],
+          "dmg": 349272,
+          "hits": 2194,
+          "misses": 2600,
+          "hitRate": 0.45765540258656656,
+          "oom": 0,
+          "dps": 46.41751078191089,
+          "squadPctPerMin": 1.1158055476420892,
+          "score": 0.22316110952841783,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 83728,
+              "hits": 210,
+              "misses": 265
+            },
+            "/abilities/life_drain": {
+              "dmg": 92149,
+              "hits": 225,
+              "misses": 245
+            },
+            "blaze": {
+              "dmg": 23002,
+              "hits": 459,
+              "misses": 580
+            },
+            "/abilities/fireball": {
+              "dmg": 150393,
+              "hits": 1300,
+              "misses": 1510
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 349272
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/elemental_affinity": 285,
+            "/abilities/smoke_burst": 475,
+            "/abilities/life_drain": 470,
+            "/abilities/fireball": 2810
+          }
+        },
+        {
+          "id": "water",
+          "label": "Water",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "frost_surge",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "water_strike",
+              "level": 60
+            }
+          ],
+          "dmg": 320764,
+          "hits": 1773,
+          "misses": 2049,
+          "hitRate": 0.4638932496075353,
+          "oom": 0,
+          "dps": 42.62885781983345,
+          "squadPctPerMin": 1.0247321591306118,
+          "score": 0.20494643182612235,
+          "perAbility": {
+            "/abilities/frost_surge": {
+              "dmg": 60478,
+              "hits": 254,
+              "misses": 302
+            },
+            "/abilities/life_drain": {
+              "dmg": 101493,
+              "hits": 248,
+              "misses": 295
+            },
+            "/abilities/water_strike": {
+              "dmg": 158793,
+              "hits": 1271,
+              "misses": 1452
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 320764
+          },
+          "casts": {
+            "/abilities/insanity": 120,
+            "/abilities/elemental_affinity": 325,
+            "/abilities/frost_surge": 556,
+            "/abilities/life_drain": 543,
+            "/abilities/water_strike": 2723
+          }
+        },
+        {
+          "id": "nature",
+          "label": "Nature DPS",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 379674,
+          "hits": 1661,
+          "misses": 2094,
+          "hitRate": 0.44234354194407455,
+          "oom": 0,
+          "dps": 50.4578723419319,
+          "squadPctPerMin": 1.212929623604132,
+          "score": 0.2425859247208264,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 55368,
+              "hits": 204,
+              "misses": 271
+            },
+            "/abilities/life_drain": {
+              "dmg": 136520,
+              "hits": 219,
+              "misses": 251
+            },
+            "/abilities/entangle": {
+              "dmg": 187786,
+              "hits": 1238,
+              "misses": 1572
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 379674
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/elemental_affinity": 285,
+            "/abilities/smoke_burst": 475,
+            "/abilities/life_drain": 470,
+            "/abilities/entangle": 2810
+          }
+        },
+        {
+          "id": "tank",
+          "label": "WarkTank",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "invincible",
+              "level": 20
+            },
+            {
+              "name": "provoke",
+              "level": 40
+            },
+            {
+              "name": "taunt",
+              "level": 40
+            },
+            {
+              "name": "spike_shell",
+              "level": 40
+            },
+            {
+              "name": "retribution",
+              "level": 40
+            }
+          ],
+          "dmg": 89032,
+          "hits": 1568,
+          "misses": 1279,
+          "hitRate": 0.5507551808921672,
+          "oom": 0,
+          "dps": 29.58041168441137,
+          "squadPctPerMin": 0.2844270354270324,
+          "score": 0.1422135177135162,
+          "perAbility": {
+            "autoAttack": {
+              "dmg": 55593,
+              "hits": 343,
+              "misses": 659
+            },
+            "elementalThorns": {
+              "dmg": 9823,
+              "hits": 926,
+              "misses": 0
+            },
+            "retaliation": {
+              "dmg": 23616,
+              "hits": 299,
+              "misses": 620
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 89032
+          },
+          "casts": {
+            "/abilities/fierce_aura": 15,
+            "/abilities/provoke": 52,
+            "/abilities/taunt": 52,
+            "/abilities/spike_shell": 96,
+            "/abilities/retribution": 96,
+            "/abilities/mystic_aura": 15
+          }
+        },
+        {
+          "id": "healer",
+          "label": "Nature Support",
+          "support": true,
+          "n": 5,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 237906,
+          "hits": 1766,
+          "misses": 1809,
+          "hitRate": 0.493986013986014,
+          "oom": 0,
+          "dps": 31.617204700294593,
+          "squadPctPerMin": 0.7600289591416971,
+          "score": 0.15200579182833943,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 44286,
+              "hits": 233,
+              "misses": 257
+            },
+            "/abilities/toxic_pollen": {
+              "dmg": 41918,
+              "hits": 238,
+              "misses": 252
+            },
+            "/abilities/entangle": {
+              "dmg": 151702,
+              "hits": 1295,
+              "misses": 1300
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 237906
+          },
+          "casts": {
+            "/abilities/critical_aura": 15,
+            "/abilities/rejuvenate": 330,
+            "/abilities/smoke_burst": 490,
+            "/abilities/toxic_pollen": 490,
+            "/abilities/entangle": 2595,
+            "/abilities/guardian_aura": 15,
+            "/abilities/speed_aura": 15
+          }
+        },
+        {
+          "id": "manaspring",
+          "label": "Mana Spring Support",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "mana_spring",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 108352,
+          "hits": 675,
+          "misses": 755,
+          "hitRate": 0.47202797202797203,
+          "oom": 0,
+          "dps": 35.99937962563281,
+          "squadPctPerMin": 0.3461478810157002,
+          "score": 0.1730739405078501,
+          "perAbility": {
+            "/abilities/mana_spring": {
+              "dmg": 8441,
+              "hits": 107,
+              "misses": 89
+            },
+            "/abilities/life_drain": {
+              "dmg": 40847,
+              "hits": 93,
+              "misses": 103
+            },
+            "/abilities/entangle": {
+              "dmg": 59064,
+              "hits": 475,
+              "misses": 563
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_jellyfish#1": 108352
+          },
+          "casts": {
+            "/abilities/mana_spring": 196,
+            "/abilities/rejuvenate": 132,
+            "/abilities/life_drain": 196,
+            "/abilities/entangle": 1038
+          }
+        }
+      ]
+    },
+    "hedgehog": {
+      "boss": "Trial Hedgehog",
+      "level": 150,
+      "preview": {
+        "enemies": [
+          {
+            "name": "trial_hedgehog",
+            "maxHitpoints": 960000,
+            "armor": 405,
+            "evasion": {
+              "melee": 720,
+              "ranged": 720,
+              "magic": 720
+            }
+          }
+        ],
+        "totalHp": 960000
+      },
+      "outcomes": [
+        "victory",
+        "victory",
+        "victory"
+      ],
+      "seconds": 514.9175152401684,
+      "secondsMin": 502.15659436951466,
+      "secondsMax": 522.4085913456805,
+      "totalHp": 960000,
+      "partySize": 50,
+      "enemies": [
+        {
+          "hrid": "/monsters/trial_hedgehog#1",
+          "maxHitpoints": 960000,
+          "currentHitpoints": 0
+        }
+      ],
+      "squads": [
+        {
+          "id": "smash",
+          "label": "Smash",
+          "support": false,
+          "n": 6,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "fracturing_impact",
+              "level": 40
+            }
+          ],
+          "dmg": 325974,
+          "hits": 2069,
+          "misses": 2133,
+          "hitRate": 0.4923845787720133,
+          "oom": 0,
+          "dps": 35.17003428834604,
+          "squadPctPerMin": 1.3188762858129766,
+          "score": 0.21981271430216276,
+          "perAbility": {
+            "/abilities/fracturing_impact": {
+              "dmg": 24442,
+              "hits": 221,
+              "misses": 223
+            },
+            "autoAttack": {
+              "dmg": 301532,
+              "hits": 1848,
+              "misses": 1910
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 325974
+          },
+          "casts": {
+            "/abilities/insanity": 108,
+            "/abilities/frenzy": 300,
+            "/abilities/berserk": 300,
+            "/abilities/precision": 300,
+            "/abilities/fracturing_impact": 444
+          }
+        },
+        {
+          "id": "slash",
+          "label": "Slash",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "maim",
+              "level": 40
+            }
+          ],
+          "dmg": 313378,
+          "hits": 2853,
+          "misses": 1710,
+          "hitRate": 0.6252465483234714,
+          "oom": 0,
+          "dps": 40.57322978598282,
+          "squadPctPerMin": 1.267913430811963,
+          "score": 0.2535826861623926,
+          "perAbility": {
+            "/abilities/maim": {
+              "dmg": 20093,
+              "hits": 199,
+              "misses": 171
+            },
+            "autoAttack": {
+              "dmg": 265744,
+              "hits": 2010,
+              "misses": 1497
+            },
+            "damageOverTime": {
+              "dmg": 19687,
+              "hits": 585,
+              "misses": 0
+            },
+            "parry": {
+              "dmg": 7854,
+              "hits": 59,
+              "misses": 42
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 313378
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 254,
+            "/abilities/berserk": 253,
+            "/abilities/precision": 253,
+            "/abilities/maim": 370
+          }
+        },
+        {
+          "id": "stab",
+          "label": "Stab",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "puncture",
+              "level": 40
+            }
+          ],
+          "dmg": 358111,
+          "hits": 2721,
+          "misses": 1375,
+          "hitRate": 0.664306640625,
+          "oom": 0,
+          "dps": 46.36483700798426,
+          "squadPctPerMin": 1.4489011564995082,
+          "score": 0.28978023129990166,
+          "perAbility": {
+            "/abilities/puncture": {
+              "dmg": 36494,
+              "hits": 241,
+              "misses": 129
+            },
+            "autoAttack": {
+              "dmg": 321617,
+              "hits": 2480,
+              "misses": 1246
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 358111
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 254,
+            "/abilities/berserk": 254,
+            "/abilities/precision": 254,
+            "/abilities/puncture": 370
+          }
+        },
+        {
+          "id": "bow",
+          "label": "Bow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 301644,
+          "hits": 2515,
+          "misses": 1236,
+          "hitRate": 0.6704878699013597,
+          "oom": 0,
+          "dps": 39.05402206141785,
+          "squadPctPerMin": 1.220438189419308,
+          "score": 0.2440876378838616,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 47103,
+              "hits": 251,
+              "misses": 114
+            },
+            "autoAttack": {
+              "dmg": 254541,
+              "hits": 2264,
+              "misses": 1122
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 301644
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 251,
+            "/abilities/berserk": 251,
+            "/abilities/precision": 250,
+            "/abilities/pestilent_shot": 365
+          }
+        },
+        {
+          "id": "crossbow",
+          "label": "Crossbow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            }
+          ],
+          "dmg": 306968,
+          "hits": 2560,
+          "misses": 861,
+          "hitRate": 0.7483192049108448,
+          "oom": 0,
+          "dps": 39.74332340159033,
+          "squadPctPerMin": 1.241978856299698,
+          "score": 0.2483957712599396,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 49687,
+              "hits": 269,
+              "misses": 93
+            },
+            "autoAttack": {
+              "dmg": 257281,
+              "hits": 2291,
+              "misses": 768
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 306968
+          },
+          "casts": {
+            "/abilities/insanity": 90,
+            "/abilities/frenzy": 252,
+            "/abilities/berserk": 252,
+            "/abilities/precision": 252,
+            "/abilities/pestilent_shot": 362
+          }
+        },
+        {
+          "id": "fire",
+          "label": "Fire",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "fireball",
+              "level": 60
+            }
+          ],
+          "dmg": 386077,
+          "hits": 2272,
+          "misses": 2629,
+          "hitRate": 0.4635788614568455,
+          "oom": 0,
+          "dps": 49.985611102511626,
+          "squadPctPerMin": 1.5620503469534888,
+          "score": 0.31241006939069776,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 111017,
+              "hits": 235,
+              "misses": 245
+            },
+            "blaze": {
+              "dmg": 29554,
+              "hits": 483,
+              "misses": 568
+            },
+            "/abilities/life_drain": {
+              "dmg": 55583,
+              "hits": 222,
+              "misses": 258
+            },
+            "/abilities/fireball": {
+              "dmg": 189923,
+              "hits": 1332,
+              "misses": 1558
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 386077
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/elemental_affinity": 295,
+            "/abilities/smoke_burst": 480,
+            "/abilities/life_drain": 480,
+            "/abilities/fireball": 2890
+          }
+        },
+        {
+          "id": "water",
+          "label": "Water",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "frost_surge",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "water_strike",
+              "level": 60
+            }
+          ],
+          "dmg": 267852,
+          "hits": 1829,
+          "misses": 2094,
+          "hitRate": 0.4662248279378027,
+          "oom": 0,
+          "dps": 34.67895239817432,
+          "squadPctPerMin": 1.0837172624429474,
+          "score": 0.21674345248858948,
+          "perAbility": {
+            "/abilities/frost_surge": {
+              "dmg": 55060,
+              "hits": 282,
+              "misses": 294
+            },
+            "/abilities/smoke_burst": {
+              "dmg": 81195,
+              "hits": 240,
+              "misses": 322
+            },
+            "/abilities/water_strike": {
+              "dmg": 131597,
+              "hits": 1307,
+              "misses": 1478
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 267852
+          },
+          "casts": {
+            "/abilities/insanity": 122,
+            "/abilities/elemental_affinity": 340,
+            "/abilities/frost_surge": 576,
+            "/abilities/smoke_burst": 562,
+            "/abilities/water_strike": 2785
+          }
+        },
+        {
+          "id": "nature",
+          "label": "Nature DPS",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 271588,
+          "hits": 1796,
+          "misses": 2054,
+          "hitRate": 0.4664935064935065,
+          "oom": 0,
+          "dps": 35.1626544655831,
+          "squadPctPerMin": 1.098832952049472,
+          "score": 0.21976659040989438,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 79763,
+              "hits": 233,
+              "misses": 247
+            },
+            "/abilities/life_drain": {
+              "dmg": 79876,
+              "hits": 232,
+              "misses": 248
+            },
+            "/abilities/entangle": {
+              "dmg": 111949,
+              "hits": 1331,
+              "misses": 1559
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 271588
+          },
+          "casts": {
+            "/abilities/insanity": 105,
+            "/abilities/elemental_affinity": 295,
+            "/abilities/smoke_burst": 480,
+            "/abilities/life_drain": 480,
+            "/abilities/entangle": 2890
+          }
+        },
+        {
+          "id": "tank",
+          "label": "WarkTank",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "shield_bash",
+              "level": 40
+            }
+          ],
+          "dmg": 100763,
+          "hits": 779,
+          "misses": 559,
+          "hitRate": 0.5822122571001495,
+          "oom": 0,
+          "dps": 32.614608818463545,
+          "squadPctPerMin": 0.4076826102307943,
+          "score": 0.20384130511539714,
+          "perAbility": {
+            "/abilities/shield_bash": {
+              "dmg": 16391,
+              "hits": 135,
+              "misses": 92
+            },
+            "autoAttack": {
+              "dmg": 84372,
+              "hits": 644,
+              "misses": 467
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 100763
+          },
+          "casts": {
+            "/abilities/fierce_aura": 15,
+            "/abilities/frenzy": 103,
+            "/abilities/berserk": 103,
+            "/abilities/precision": 103,
+            "/abilities/shield_bash": 227,
+            "/abilities/mystic_aura": 15
+          }
+        },
+        {
+          "id": "healer",
+          "label": "Nature Support",
+          "support": true,
+          "n": 5,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 174960,
+          "hits": 1796,
+          "misses": 1874,
+          "hitRate": 0.4893732970027248,
+          "oom": 0,
+          "dps": 22.652171764946978,
+          "squadPctPerMin": 0.7078803676545932,
+          "score": 0.14157607353091864,
+          "perAbility": {
+            "/abilities/smoke_burst": {
+              "dmg": 60327,
+              "hits": 257,
+              "misses": 248
+            },
+            "/abilities/toxic_pollen": {
+              "dmg": 22177,
+              "hits": 228,
+              "misses": 277
+            },
+            "/abilities/entangle": {
+              "dmg": 92456,
+              "hits": 1311,
+              "misses": 1349
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 174960
+          },
+          "casts": {
+            "/abilities/critical_aura": 15,
+            "/abilities/rejuvenate": 340,
+            "/abilities/smoke_burst": 505,
+            "/abilities/toxic_pollen": 505,
+            "/abilities/entangle": 2660,
+            "/abilities/guardian_aura": 15,
+            "/abilities/speed_aura": 15
+          }
+        },
+        {
+          "id": "manaspring",
+          "label": "Mana Spring Support",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "revive",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "mana_spring",
+              "level": 40
+            },
+            {
+              "name": "life_drain",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 72685,
+          "hits": 730,
+          "misses": 738,
+          "hitRate": 0.49727520435967304,
+          "oom": 0,
+          "dps": 23.526421821204433,
+          "squadPctPerMin": 0.29408027276505544,
+          "score": 0.14704013638252772,
+          "perAbility": {
+            "/abilities/mana_spring": {
+              "dmg": 5755,
+              "hits": 86,
+              "misses": 116
+            },
+            "/abilities/life_drain": {
+              "dmg": 30818,
+              "hits": 116,
+              "misses": 86
+            },
+            "/abilities/entangle": {
+              "dmg": 36112,
+              "hits": 528,
+              "misses": 536
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_hedgehog#1": 72685
+          },
+          "casts": {
+            "/abilities/mana_spring": 202,
+            "/abilities/rejuvenate": 136,
+            "/abilities/life_drain": 202,
+            "/abilities/entangle": 1064
+          }
+        }
+      ]
+    },
+    "swarm": {
+      "boss": "Trial Swarm",
+      "level": 150,
+      "preview": {
+        "enemies": [
+          {
+            "name": "trial_beetle",
+            "maxHitpoints": 480000,
+            "armor": 630,
+            "evasion": {
+              "melee": 624,
+              "ranged": 800,
+              "magic": 624
+            }
+          },
+          {
+            "name": "trial_dragonfly",
+            "maxHitpoints": 480000,
+            "armor": 210,
+            "evasion": {
+              "melee": 512,
+              "ranged": 688,
+              "magic": 896
+            }
+          },
+          {
+            "name": "trial_wasp",
+            "maxHitpoints": 480000,
+            "armor": 300,
+            "evasion": {
+              "melee": 688,
+              "ranged": 880,
+              "magic": 512
+            }
+          },
+          {
+            "name": "trial_firefly",
+            "maxHitpoints": 480000,
+            "armor": 180,
+            "evasion": {
+              "melee": 960,
+              "ranged": 512,
+              "magic": 688
+            }
+          }
+        ],
+        "totalHp": 1920000
+      },
+      "outcomes": [
+        "victory",
+        "victory",
+        "victory"
+      ],
+      "seconds": 639.0129250247554,
+      "secondsMin": 624.7234181610801,
+      "secondsMax": 651.9146685876493,
+      "totalHp": 1920000,
+      "partySize": 50,
+      "enemies": [
+        {
+          "hrid": "/monsters/trial_beetle#1",
+          "maxHitpoints": 480000,
+          "currentHitpoints": 0
+        },
+        {
+          "hrid": "/monsters/trial_dragonfly#2",
+          "maxHitpoints": 480000,
+          "currentHitpoints": 0
+        },
+        {
+          "hrid": "/monsters/trial_wasp#3",
+          "maxHitpoints": 480000,
+          "currentHitpoints": 0
+        },
+        {
+          "hrid": "/monsters/trial_firefly#4",
+          "maxHitpoints": 480000,
+          "currentHitpoints": 0
+        }
+      ],
+      "squads": [
+        {
+          "id": "smash",
+          "label": "Smash",
+          "support": false,
+          "n": 6,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "fracturing_impact",
+              "level": 40
+            }
+          ],
+          "dmg": 865886,
+          "hits": 4694,
+          "misses": 2332,
+          "hitRate": 0.668089951608312,
+          "oom": 0,
+          "dps": 75.27981969365362,
+          "squadPctPerMin": 1.411496619256005,
+          "score": 0.2352494365426675,
+          "perAbility": {
+            "/abilities/fracturing_impact": {
+              "dmg": 120839,
+              "hits": 833,
+              "misses": 997
+            },
+            "autoAttack": {
+              "dmg": 745047,
+              "hits": 3861,
+              "misses": 1335
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 182334,
+            "/monsters/trial_dragonfly#2": 370850,
+            "/monsters/trial_wasp#3": 149269,
+            "/monsters/trial_firefly#4": 163433
+          },
+          "casts": {
+            "/abilities/insanity": 138,
+            "/abilities/frenzy": 372,
+            "/abilities/berserk": 372,
+            "/abilities/precision": 372,
+            "/abilities/fracturing_impact": 551
+          }
+        },
+        {
+          "id": "slash",
+          "label": "Slash",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "maim",
+              "level": 40
+            }
+          ],
+          "dmg": 462227,
+          "hits": 3697,
+          "misses": 2718,
+          "hitRate": 0.5763055339049103,
+          "oom": 0,
+          "dps": 48.22302042191017,
+          "squadPctPerMin": 0.7534846940923464,
+          "score": 0.1506969388184693,
+          "perAbility": {
+            "/abilities/maim": {
+              "dmg": 24633,
+              "hits": 227,
+              "misses": 228
+            },
+            "autoAttack": {
+              "dmg": 366762,
+              "hits": 2538,
+              "misses": 2242
+            },
+            "parry": {
+              "dmg": 47616,
+              "hits": 285,
+              "misses": 248
+            },
+            "damageOverTime": {
+              "dmg": 23216,
+              "hits": 647,
+              "misses": 0
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 155426,
+            "/monsters/trial_dragonfly#2": 142219,
+            "/monsters/trial_firefly#4": 93581,
+            "/monsters/trial_wasp#3": 71001
+          },
+          "casts": {
+            "/abilities/insanity": 110,
+            "/abilities/frenzy": 320,
+            "/abilities/berserk": 320,
+            "/abilities/precision": 320,
+            "/abilities/maim": 455
+          }
+        },
+        {
+          "id": "stab",
+          "label": "Stab",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "puncture",
+              "level": 40
+            }
+          ],
+          "dmg": 490256,
+          "hits": 3515,
+          "misses": 2068,
+          "hitRate": 0.6295898262582841,
+          "oom": 0,
+          "dps": 51.14721792531374,
+          "squadPctPerMin": 0.799175280083027,
+          "score": 0.1598350560166054,
+          "perAbility": {
+            "/abilities/puncture": {
+              "dmg": 52483,
+              "hits": 290,
+              "misses": 174
+            },
+            "autoAttack": {
+              "dmg": 437773,
+              "hits": 3225,
+              "misses": 1894
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 173012,
+            "/monsters/trial_dragonfly#2": 141901,
+            "/monsters/trial_wasp#3": 65307,
+            "/monsters/trial_firefly#4": 110036
+          },
+          "casts": {
+            "/abilities/insanity": 115,
+            "/abilities/frenzy": 311,
+            "/abilities/berserk": 311,
+            "/abilities/precision": 311,
+            "/abilities/puncture": 464
+          }
+        },
+        {
+          "id": "bow",
+          "label": "Bow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "penetrating_shot",
+              "level": 40
+            },
+            {
+              "name": "rain_of_arrows",
+              "level": 40
+            }
+          ],
+          "dmg": 481070,
+          "hits": 3829,
+          "misses": 3150,
+          "hitRate": 0.5486459378134403,
+          "oom": 0,
+          "dps": 50.18886485291497,
+          "squadPctPerMin": 0.7842010133267963,
+          "score": 0.15684020266535925,
+          "perAbility": {
+            "/abilities/penetrating_shot": {
+              "dmg": 74110,
+              "hits": 448,
+              "misses": 379
+            },
+            "/abilities/rain_of_arrows": {
+              "dmg": 96051,
+              "hits": 808,
+              "misses": 711
+            },
+            "autoAttack": {
+              "dmg": 310909,
+              "hits": 2573,
+              "misses": 2060
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 123367,
+            "/monsters/trial_dragonfly#2": 133716,
+            "/monsters/trial_wasp#3": 69135,
+            "/monsters/trial_firefly#4": 154852
+          },
+          "casts": {
+            "/abilities/insanity": 115,
+            "/abilities/frenzy": 310,
+            "/abilities/berserk": 310,
+            "/abilities/penetrating_shot": 455,
+            "/abilities/rain_of_arrows": 455
+          }
+        },
+        {
+          "id": "crossbow",
+          "label": "Crossbow",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "frenzy",
+              "level": 40
+            },
+            {
+              "name": "berserk",
+              "level": 40
+            },
+            {
+              "name": "pestilent_shot",
+              "level": 40
+            },
+            {
+              "name": "rain_of_arrows",
+              "level": 40
+            }
+          ],
+          "dmg": 533744,
+          "hits": 4111,
+          "misses": 2566,
+          "hitRate": 0.6156956717088513,
+          "oom": 0,
+          "dps": 55.684215357545156,
+          "squadPctPerMin": 0.8700658649616428,
+          "score": 0.17401317299232857,
+          "perAbility": {
+            "/abilities/pestilent_shot": {
+              "dmg": 44802,
+              "hits": 269,
+              "misses": 183
+            },
+            "/abilities/rain_of_arrows": {
+              "dmg": 121743,
+              "hits": 937,
+              "misses": 563
+            },
+            "autoAttack": {
+              "dmg": 367199,
+              "hits": 2905,
+              "misses": 1820
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 128429,
+            "/monsters/trial_dragonfly#2": 160348,
+            "/monsters/trial_wasp#3": 67966,
+            "/monsters/trial_firefly#4": 177001
+          },
+          "casts": {
+            "/abilities/insanity": 115,
+            "/abilities/frenzy": 310,
+            "/abilities/berserk": 310,
+            "/abilities/pestilent_shot": 452,
+            "/abilities/rain_of_arrows": 450
+          }
+        },
+        {
+          "id": "fire",
+          "label": "Fire",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "smoke_burst",
+              "level": 40
+            },
+            {
+              "name": "firestorm",
+              "level": 40
+            },
+            {
+              "name": "fireball",
+              "level": 60
+            }
+          ],
+          "dmg": 731994,
+          "hits": 6768,
+          "misses": 5770,
+          "hitRate": 0.5397990110065402,
+          "oom": 0,
+          "dps": 76.36715642036427,
+          "squadPctPerMin": 1.1932368190681917,
+          "score": 0.23864736381363832,
+          "perAbility": {
+            "blaze": {
+              "dmg": 127707,
+              "hits": 2039,
+              "misses": 2544
+            },
+            "/abilities/smoke_burst": {
+              "dmg": 109769,
+              "hits": 298,
+              "misses": 302
+            },
+            "/abilities/firestorm": {
+              "dmg": 159340,
+              "hits": 912,
+              "misses": 1078
+            },
+            "/abilities/fireball": {
+              "dmg": 177917,
+              "hits": 1721,
+              "misses": 1846
+            },
+            "damageOverTime": {
+              "dmg": 157261,
+              "hits": 1798,
+              "misses": 0
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 189341,
+            "/monsters/trial_dragonfly#2": 112176,
+            "/monsters/trial_wasp#3": 257462,
+            "/monsters/trial_firefly#4": 173015
+          },
+          "casts": {
+            "/abilities/insanity": 125,
+            "/abilities/elemental_affinity": 365,
+            "/abilities/smoke_burst": 600,
+            "/abilities/firestorm": 600,
+            "/abilities/fireball": 3567
+          }
+        },
+        {
+          "id": "water",
+          "label": "Water",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "frost_surge",
+              "level": 40
+            },
+            {
+              "name": "firestorm",
+              "level": 40
+            },
+            {
+              "name": "water_strike",
+              "level": 60
+            }
+          ],
+          "dmg": 815773,
+          "hits": 5929,
+          "misses": 4353,
+          "hitRate": 0.5766387862283603,
+          "oom": 0,
+          "dps": 85.10761603853287,
+          "squadPctPerMin": 1.3298065006020758,
+          "score": 0.2659613001204152,
+          "perAbility": {
+            "/abilities/frost_surge": {
+              "dmg": 326813,
+              "hits": 1050,
+              "misses": 1321
+            },
+            "/abilities/firestorm": {
+              "dmg": 133641,
+              "hits": 1068,
+              "misses": 1264
+            },
+            "/abilities/water_strike": {
+              "dmg": 223236,
+              "hits": 1690,
+              "misses": 1768
+            },
+            "damageOverTime": {
+              "dmg": 132083,
+              "hits": 2121,
+              "misses": 0
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 195722,
+            "/monsters/trial_dragonfly#2": 118825,
+            "/monsters/trial_wasp#3": 283896,
+            "/monsters/trial_firefly#4": 217330
+          },
+          "casts": {
+            "/abilities/insanity": 151,
+            "/abilities/elemental_affinity": 417,
+            "/abilities/frost_surge": 710,
+            "/abilities/firestorm": 699,
+            "/abilities/water_strike": 3458
+          }
+        },
+        {
+          "id": "nature",
+          "label": "Nature DPS",
+          "support": false,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "elemental_affinity",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "firestorm",
+              "level": 40
+            },
+            {
+              "name": "natures_veil",
+              "level": 40
+            }
+          ],
+          "dmg": 674746,
+          "hits": 6225,
+          "misses": 2974,
+          "hitRate": 0.6767039895640831,
+          "oom": 0,
+          "dps": 70.39461160339445,
+          "squadPctPerMin": 1.099915806303038,
+          "score": 0.21998316126060763,
+          "perAbility": {
+            "/abilities/firestorm": {
+              "dmg": 138761,
+              "hits": 1173,
+              "misses": 917
+            },
+            "/abilities/natures_veil": {
+              "dmg": 303488,
+              "hits": 1163,
+              "misses": 915
+            },
+            "damageOverTime": {
+              "dmg": 137894,
+              "hits": 2334,
+              "misses": 0
+            },
+            "autoAttack": {
+              "dmg": 94603,
+              "hits": 1555,
+              "misses": 1142
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 111058,
+            "/monsters/trial_dragonfly#2": 117738,
+            "/monsters/trial_wasp#3": 261916,
+            "/monsters/trial_firefly#4": 184034
+          },
+          "casts": {
+            "/abilities/insanity": 126,
+            "/abilities/elemental_affinity": 354,
+            "/abilities/precision": 354,
+            "/abilities/firestorm": 630,
+            "/abilities/natures_veil": 625
+          }
+        },
+        {
+          "id": "tank",
+          "label": "WarkTank",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "invincible",
+              "level": 20
+            },
+            {
+              "name": "provoke",
+              "level": 40
+            },
+            {
+              "name": "taunt",
+              "level": 40
+            },
+            {
+              "name": "spike_shell",
+              "level": 40
+            },
+            {
+              "name": "retribution",
+              "level": 40
+            }
+          ],
+          "dmg": 195878,
+          "hits": 6272,
+          "misses": 2888,
+          "hitRate": 0.6847161572052402,
+          "oom": 0,
+          "dps": 51.08869015766561,
+          "squadPctPerMin": 0.31930431348541,
+          "score": 0.159652156742705,
+          "perAbility": {
+            "physicalThorns": {
+              "dmg": 45221,
+              "hits": 3016,
+              "misses": 0
+            },
+            "retaliation": {
+              "dmg": 67229,
+              "hits": 1721,
+              "misses": 2230
+            },
+            "autoAttack": {
+              "dmg": 71692,
+              "hits": 609,
+              "misses": 658
+            },
+            "elementalThorns": {
+              "dmg": 11736,
+              "hits": 926,
+              "misses": 0
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 39948,
+            "/monsters/trial_firefly#4": 47380,
+            "/monsters/trial_dragonfly#2": 62081,
+            "/monsters/trial_wasp#3": 46469
+          },
+          "casts": {
+            "/abilities/fierce_aura": 18,
+            "/abilities/provoke": 66,
+            "/abilities/taunt": 66,
+            "/abilities/spike_shell": 122,
+            "/abilities/retribution": 122,
+            "/abilities/mystic_aura": 18
+          }
+        },
+        {
+          "id": "healer",
+          "label": "Nature Support",
+          "support": true,
+          "n": 5,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "precision",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 350062,
+          "hits": 3446,
+          "misses": 2358,
+          "hitRate": 0.5937284631288766,
+          "oom": 0,
+          "dps": 36.521118357289204,
+          "squadPctPerMin": 0.5706424743326438,
+          "score": 0.11412849486652876,
+          "perAbility": {
+            "/abilities/toxic_pollen": {
+              "dmg": 169753,
+              "hits": 1128,
+              "misses": 876
+            },
+            "/abilities/entangle": {
+              "dmg": 180233,
+              "hits": 2316,
+              "misses": 1480
+            },
+            "autoAttack": {
+              "dmg": 76,
+              "hits": 2,
+              "misses": 2
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 102028,
+            "/monsters/trial_dragonfly#2": 55085,
+            "/monsters/trial_wasp#3": 112718,
+            "/monsters/trial_firefly#4": 80231
+          },
+          "casts": {
+            "/abilities/critical_aura": 18,
+            "/abilities/rejuvenate": 417,
+            "/abilities/precision": 350,
+            "/abilities/toxic_pollen": 550,
+            "/abilities/entangle": 3796,
+            "/abilities/guardian_aura": 18,
+            "/abilities/speed_aura": 18,
+            "/abilities/insanity": 52
+          }
+        },
+        {
+          "id": "manaspring",
+          "label": "Mana Spring Support",
+          "support": true,
+          "n": 2,
+          "kit": [
+            {
+              "name": "insanity",
+              "level": 20
+            },
+            {
+              "name": "rejuvenate",
+              "level": 40
+            },
+            {
+              "name": "mana_spring",
+              "level": 40
+            },
+            {
+              "name": "toxic_pollen",
+              "level": 40
+            },
+            {
+              "name": "entangle",
+              "level": 60
+            }
+          ],
+          "dmg": 158364,
+          "hits": 1466,
+          "misses": 1570,
+          "hitRate": 0.48287220026350464,
+          "oom": 0,
+          "dps": 41.30432885841471,
+          "squadPctPerMin": 0.25815205536509195,
+          "score": 0.12907602768254597,
+          "perAbility": {
+            "/abilities/mana_spring": {
+              "dmg": 45353,
+              "hits": 372,
+              "misses": 456
+            },
+            "/abilities/toxic_pollen": {
+              "dmg": 57186,
+              "hits": 373,
+              "misses": 421
+            },
+            "/abilities/entangle": {
+              "dmg": 55825,
+              "hits": 721,
+              "misses": 693
+            }
+          },
+          "perTarget": {
+            "/monsters/trial_beetle#1": 39335,
+            "/monsters/trial_dragonfly#2": 25061,
+            "/monsters/trial_wasp#3": 54861,
+            "/monsters/trial_firefly#4": 39107
+          },
+          "casts": {
+            "/abilities/insanity": 52,
+            "/abilities/rejuvenate": 166,
+            "/abilities/mana_spring": 250,
+            "/abilities/toxic_pollen": 218,
+            "/abilities/entangle": 1414
+          }
+        }
+      ]
+    }
+  }
+}
