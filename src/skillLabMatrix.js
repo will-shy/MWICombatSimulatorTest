@@ -13,7 +13,8 @@
 // Scenario, per the run brief:
 //   - T6 = room level 150 (tier = (level-100)/10 + 1, docs/group_battle.md §5).
 //   - 50-player group: 2 tanks, 5 nature supports, 2 mana spring supports, 41 mixed DPS.
-//   - Every player's seven skills forced to 125.
+//   - Every player's seven skills forced to 125, every house room at level 4
+//     (+4 all combat skills, +2% attack speed, +0.02 cast speed, +0.12pp regen).
 //   - Ability levels: aura 20, the three 0-cooldown mage spells 60, everything else 40.
 //   - Players take no damage (no wipes) so the measurement is pure DPS.
 //   - Kits are the Arsenal guide's recommended loadout for that boss.
@@ -36,9 +37,16 @@ import {
 // rather than by editing the preset files (which the group-battle page also reads).
 const STAT_LEVEL = 125;
 
-// "aura lvl20, mage's 0cd spell lvl60, other lvl40". Keyed by ability, so a kit can
-// name abilities and the level rule fills itself in.
-const AURA_LEVEL = 20;
+// "assume each player has 4 lvls of each house" — every room in the export is
+// forced to this level (override with HOUSE_LEVEL=n; the gear files ship with 0).
+const HOUSE_LEVEL = process.env.HOUSE_LEVEL !== undefined
+    ? Number(process.env.HOUSE_LEVEL) : 4;
+
+// Ability levels: aura lvl25 (per the later brief; the original said 20), the
+// three 0-cd mage spells lvl60, everything else lvl40. Keyed by ability, so a
+// kit can name abilities and the level rule fills itself in.
+const AURA_LEVEL = process.env.AURA_LEVEL !== undefined
+    ? Number(process.env.AURA_LEVEL) : 25;
 const ZERO_CD_SPELL_LEVEL = 60;
 const DEFAULT_ABILITY_LEVEL = 40;
 
@@ -219,6 +227,9 @@ function registerBuilds() {
         ]) {
             exp.player[skill] = STAT_LEVEL;
         }
+        exp.houseRooms = Object.fromEntries(
+            Object.keys(exp.houseRooms || {}).map((room) => [room, HOUSE_LEVEL])
+        );
         return { id: "set:" + id, name: preset.name + " (125)", export: exp };
     });
     setCustomBuilds(builds);
@@ -332,6 +343,7 @@ async function main() {
         seeds,
         partySize: PARTY_SIZE,
         statLevel: STAT_LEVEL,
+        houseLevel: HOUSE_LEVEL,
         infiniteMana: process.env.INFINITE_MANA === "1",
         abilityLevels: { aura: AURA_LEVEL, zeroCdSpell: ZERO_CD_SPELL_LEVEL, other: DEFAULT_ABILITY_LEVEL },
         roster: {
