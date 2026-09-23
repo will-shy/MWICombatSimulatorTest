@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         [战斗模拟器]配装导入
-// @version      1.6.5
+// @version      1.6.6
 // @description  配装导入模拟器
 // @author       AstroV GPT DiamondMoo
 // @match        https://www.milkywayidle.com/*
@@ -360,18 +360,21 @@ function convertStateToLoadoutJson(state, characterID, loadout) {
   };
 }
 
-// 公会神龛等级。游戏里存成 /guild_buffs/<name> 或 /guild_buffs/<name>_combat，
-// 模拟器按 <name> 找对应的 /shrines/<name>，所以这里把后缀去掉按名字输出，
-// 认不出来的名字模拟器会自己忽略。力量/节奏/精神/学者四个固定输出：没建的龛
-// 就是 0 级，和"整个字段缺失"（模拟器改用自己的缓存）区分开。
+// 战斗神龛：力量 / 节奏 / 精神 / 学者。采集、生产那些技能神龛模拟器用不上，直接丢掉。
+// 游戏里的 key 可能是 /guild_buffs/<name> 也可能带 _combat 后缀，两种都认；白名单之外
+// 的一律不输出。这四个固定输出：没建的龛就是 0 级，和"整个字段缺失"（模拟器改用自己
+// 的缓存）区分开。将来游戏加了新的战斗神龛，这里和模拟器的 shrineDetailMap 都要补。
+const COMBAT_SHRINES = ["force", "tempo", "spirit", "scholar"];
+
 function parseCharacterGuildBuffDict(dict) {
-  const out = { force: 0, tempo: 0, spirit: 0, scholar: 0 };
+  const out = {};
+  for (const name of COMBAT_SHRINES) out[name] = 0;
   if (!dict) return out;
   const entries = typeof dict.entries === "function" ? Array.from(dict.entries()) : Reflect.ownKeys(dict).map(k => [k, dict[k]]);
   for (const [key, buff] of entries) {
     if (typeof key !== "string") continue;
     const m = /^\/guild_buffs\/(.+?)(?:_combat)?$/.exec(key);
-    if (!m) continue;
+    if (!m || !COMBAT_SHRINES.includes(m[1])) continue;
     out[m[1]] = Number(buff?.level) || 0;
   }
   return out;
