@@ -6,7 +6,10 @@
 // workers (see optimizationWorker.js) and the table fills in as results land.
 
 import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
+import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
 import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
+import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json";
+import Player from "./combatsimulator/player.js";
 import { applyLevelGapDebuff, baselineAbilitySlots, importSetToPlayerDTO } from "./combatsimulator/importSet.js";
 import { combatZones, metricsFor, zoneDropItems, zoneFragmentItems } from "./combatsimulator/zoneDrops.js";
 import { gameName, initLanguage, language, onSharedI18nReady, setLanguage, t } from "./optimizationI18n.js";
@@ -298,6 +301,9 @@ function renderSlots() {
                 ? `<span class="dim">${esc(t("noLoadout"))}</span>`
                 : kit.map((entry, i) => `<div class="kit-row"><span class="dim">${esc(slotLabelFor(i))}</span>` +
                     `<span>${entry ? esc(abilityName(entry.hrid)) + " <span class='dim'>Lv " + entry.level + "</span>" : `<span class='dim'>${esc(t("empty"))}</span>`}</span></div>`).join("")}</div>
+            <div class="kit-actions">
+                <button type="button" class="btn small ghost" data-slot="${index}" data-field="previewBaseline"${set ? "" : " disabled"}>${esc(t("preview"))}</button>
+            </div>
             <div class="candidates" data-slot="${index}"></div>
             <button type="button" class="btn small" data-slot="${index}" data-field="addCandidate"${set ? "" : " disabled"}>${esc(t("addKit"))}</button>
             <div class="hint">${t("variantsHint", { n: 1 + slot.candidates.length })}</div>
@@ -322,14 +328,25 @@ function abilityOptionsFor(slotIndex) {
 // rebuilt as a full kit so an existing setup is not silently dropped.
 function migrateCandidate(candidate, baseline, index) {
     if (Array.isArray(candidate?.slots)) {
-        return { name: candidate.name || t("kitName", { n: index + 2 }), slots: candidate.slots };
+        return {
+            name: candidate.name || t("kitName", { n: index + 2 }),
+            loadoutId: candidate.loadoutId ?? "",
+            slots: candidate.slots,
+        };
     }
 
     let kitSlots = baseline.slice();
     if (candidate && candidate.hrid) {
         kitSlots[candidate.slot ?? 1] = { hrid: candidate.hrid, level: Number(candidate.level) || 1 };
     }
-    return { name: candidate?.name || t("kitName", { n: index + 2 }), slots: kitSlots };
+    return { name: candidate?.name || t("kitName", { n: index + 2 }), loadoutId: "", slots: kitSlots };
+}
+
+// A candidate with its own loadoutId brings that loadout's gear, levels and consumables too; an
+// empty one rides on the baseline loadout and only differs in abilities.
+function candidateSet(slotIndex, candidate) {
+    const slot = slots[slotIndex];
+    return resolveImportSet(slot.characterId, candidate?.loadoutId || slot.loadoutId);
 }
 
 // What this kit changes relative to the baseline, for the card hint and the results table.
@@ -361,16 +378,30 @@ function renderCandidates(container, slotIndex, set) {
     const book = abilityBookFor(slot.characterId);
 
     slot.candidates.forEach((candidate, candidateIndex) => {
-        const changes = candidateDiff(candidate, baseline);
+        let changes = candidateDiff(candidate, baseline);
+        if (candidate.loadoutId && candidate.loadoutId !== slot.loadoutId) {
+            const name = loadoutEntries(slot.characterId)
+                .find((entry) => entry.id === candidate.loadoutId)?.name ?? candidate.loadoutId;
+            changes.unshift(t("gearFrom", { name }));
+        }
         const card = document.createElement("div");
         card.className = "candidate-kit";
         card.innerHTML = `
             <div class="candidate-head">
                 <input type="text" value="${esc(candidate.name)}" maxlength="40" title="${esc(t("kitNameTitle"))}"
                        data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="candidateName">
+                <button type="button" class="btn small ghost" data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="previewCandidate">${esc(t("preview"))}</button>
                 <button type="button" class="btn small ghost" data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="copyBaseline"
                         title="${esc(t("resetTitle"))}">${esc(t("reset"))}</button>
                 <button type="button" class="btn small danger" data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="removeCandidate">✕</button>
+            </div>
+            <div class="candidate-row">
+                <span class="dim">${esc(t("candidateFrom"))}</span>
+                <select data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="candidateLoadout">
+                    <option value="">${esc(t("baselineLoadoutOption"))}</option>
+                    ${loadoutEntries(slot.characterId).map((l) =>
+                        `<option value="${esc(l.id)}"${l.id === candidate.loadoutId ? " selected" : ""}>${esc(l.name)}</option>`).join("")}
+                </select>
             </div>
             ${candidate.slots.map((entry, i) => {
                 const options = abilityOptionsFor(i);
@@ -402,6 +433,7 @@ function newCandidate(slotIndex) {
     const set = resolveImportSet(slot.characterId, slot.loadoutId);
     return {
         name: t("kitName", { n: slot.candidates.length + 2 }),
+        loadoutId: "",
         slots: set ? baselineAbilitySlots(set) : [null, null, null, null, null],
     };
 }
@@ -436,6 +468,22 @@ function onSlotInput(event) {
         case "candidateName":
             candidate.name = target.value.trim() || t("kitName", { n: candidateIndex + 2 });
             break;
+        case "candidateLoadout": {
+            candidate.loadoutId = target.value;
+            // Pulling in another loadout means its abilities and their levels too — that is the
+            // point of loading one rather than hand-editing five slots.
+            const loaded = candidateSet(slotIndex, candidate);
+            if (loaded) {
+                candidate.slots = baselineAbilitySlots(loaded);
+            }
+            break;
+        }
+        case "previewBaseline":
+            openPreview(slotIndex, null);
+            return;
+        case "previewCandidate":
+            openPreview(slotIndex, candidateIndex);
+            return;
         case "copyBaseline": {
             const set = resolveImportSet(slot.characterId, slot.loadoutId);
             if (set) {
@@ -469,6 +517,108 @@ function onSlotInput(event) {
 
     renderSlots();
     saveSetup();
+}
+
+// ------------------------------------------------------------------ preview
+
+const GEAR_SLOTS = [
+    ["head", "slotHead"], ["body", "slotBody"], ["legs", "slotLegs"], ["feet", "slotFeet"],
+    ["hands", "slotHands"], ["main_hand", "slotMainHand"], ["two_hand", "slotTwoHand"],
+    ["off_hand", "slotOffHand"], ["pouch", "slotPouch"], ["neck", "slotNeck"],
+    ["earrings", "slotEarrings"], ["ring", "slotRing"], ["back", "slotBack"], ["charm", "slotCharm"],
+];
+
+function previewSection(title, rows) {
+    if (rows.length === 0) {
+        rows = [[t("none"), ""]];
+    }
+    return `<div class="preview-section"><h4>${esc(title)}</h4>` +
+        rows.map(([label, value]) =>
+            `<div class="preview-row"><span class="dim">${esc(label)}</span><span>${esc(value)}</span></div>`).join("") +
+        `</div>`;
+}
+
+// Everything the simulation will actually be handed for this variant, read back out of the DTO so
+// the preview cannot drift from what runs.
+function openPreview(slotIndex, candidateIndex) {
+    const slot = slots[slotIndex];
+    const variants = playerVariants(slotIndex);
+    const variant = variants[candidateIndex === null ? 0 : candidateIndex + 1];
+    if (!variant) {
+        return;
+    }
+
+    const dto = importSetToPlayerDTO(variant.set, PLAYER_HRIDS[slotIndex], variant.abilities);
+    applyLevelGapDebuff([dto]);
+
+    const levels = [
+        ["stamina", dto.staminaLevel], ["intelligence", dto.intelligenceLevel],
+        ["attack", dto.attackLevel], ["melee", dto.meleeLevel], ["defense", dto.defenseLevel],
+        ["ranged", dto.rangedLevel], ["magic", dto.magicLevel],
+    ].map(([name, value]) => [name, String(value)]);
+    levels.unshift([t("combatLevel"), (dto.combatLevel ?? 0).toFixed(1)]);
+
+    const gear = GEAR_SLOTS
+        .map(([key, labelKey]) => [labelKey, dto.equipment["/equipment_types/" + key]])
+        .filter(([, item]) => item)
+        .map(([labelKey, item]) => [t(labelKey),
+            itemLabel(item.hrid) + (item.enhancementLevel > 0 ? ` +${item.enhancementLevel}` : "")]);
+
+    const abilities = variant.abilities
+        .map((entry, i) => entry ? [slotLabelFor(i), `${abilityName(entry.hrid)}  Lv ${entry.level}`] : null)
+        .filter(Boolean);
+
+    const consumables = [...dto.food, ...dto.drinks].map((entry) => ["", itemLabel(entry.hrid)]);
+
+    const shrines = Object.entries(dto.shrines)
+        .filter(([hrid]) => shrineDetailMap[hrid])
+        .map(([hrid, level]) => [
+            gameName("common:shrineNames", hrid, shrineDetailMap[hrid].name), "Lv " + level]);
+
+    const rooms = Object.entries(dto.houseRooms)
+        .filter(([hrid, level]) => level > 0 && houseRoomDetailMap[hrid])
+        .map(([hrid, level]) => [
+            gameName("houseRoomNames", hrid, houseRoomDetailMap[hrid].name), "Lv " + level]);
+
+    const achievementCount = Object.values(dto.achievements).filter(Boolean).length;
+
+    // Gear and levels only: shrines, zone buffs and community buffs are applied by the simulator
+    // at run time, not here, and the note in the dialog says so.
+    let stats = [];
+    try {
+        const player = Player.createFromDTO(structuredClone(dto));
+        player.updateCombatDetails();
+        const details = player.combatDetails;
+        const style = (details.combatStats.combatStyleHrid ?? "").split("/").pop();
+        const styleKey = ["stab", "slash", "smash", "ranged", "magic"].includes(style) ? style : "smash";
+        stats = [
+            [t("maxHp"), String(details.maxHitpoints)],
+            [t("maxMp"), String(details.maxManapoints)],
+            [t("attackInterval"), (details.combatStats.attackInterval / 1e9).toFixed(2) + "s"],
+            [t("accuracy"), Math.round(details[styleKey + "AccuracyRating"]).toString()],
+            [t("maxDamage"), Math.round(details[styleKey + "MaxDamage"]).toString()],
+        ];
+    } catch (e) {
+        stats = [[t("none"), e.message]];
+    }
+
+    el("previewTitle").textContent = `${t("player", { n: slotIndex + 1 })} · ${variant.label}`;
+    el("previewBody").innerHTML =
+        previewSection(t("secLevels"), levels) +
+        previewSection(t("secStats"), stats) +
+        `<div class="hint">${esc(t("statNote"))}</div>` +
+        previewSection(t("secGear"), gear) +
+        previewSection(t("secAbilities"), abilities) +
+        previewSection(t("secConsumables"), consumables) +
+        previewSection(t("secShrines"), shrines) +
+        previewSection(t("secRooms"), rooms) +
+        previewSection(t("secAchievements"), [[t("achievementsDone", { n: achievementCount }), ""]]);
+
+    el("previewModal").classList.remove("hidden");
+}
+
+function closePreview() {
+    el("previewModal").classList.add("hidden");
 }
 
 // ------------------------------------------------------------------ conditions
@@ -507,11 +657,19 @@ function playerVariants(slotIndex) {
 
     slot.candidates.forEach((raw, index) => {
         const candidate = migrateCandidate(raw, baseline, index);
+        // A candidate may bring its own loadout, in which case its gear and levels come from there.
+        const ownSet = candidateSet(slotIndex, candidate) ?? set;
+        let detail = candidateDiff(candidate, baseline);
+        if (candidate.loadoutId && candidate.loadoutId !== slot.loadoutId) {
+            const name = loadoutEntries(slot.characterId)
+                .find((entry) => entry.id === candidate.loadoutId)?.name ?? candidate.loadoutId;
+            detail.unshift(t("gearFrom", { name }));
+        }
         variants.push({
             label: candidate.name,
             // The diff is what the table's tooltip explains; the name alone keeps columns narrow.
-            detail: candidateDiff(candidate, baseline).join(" · ") || t("sameAsBaseline"),
-            set,
+            detail: detail.join(" · ") || t("sameAsBaseline"),
+            set: ownSet,
             abilities: candidate.slots,
         });
     });
@@ -811,7 +969,8 @@ function init() {
     renderSlots();
 
     el("playerSlots").addEventListener("change", onSlotInput);
-    const CLICK_FIELDS = ["addCandidate", "removeCandidate", "copyBaseline"];
+    const CLICK_FIELDS = ["addCandidate", "removeCandidate", "copyBaseline",
+        "previewBaseline", "previewCandidate"];
     el("playerSlots").addEventListener("click", (event) => {
         if (CLICK_FIELDS.includes(event.target.dataset.field)) {
             onSlotInput(event);
@@ -830,6 +989,18 @@ function init() {
     el("comExp").addEventListener("change", saveSetup);
     el("comDrop").addEventListener("change", saveSetup);
     el("sortSelect").addEventListener("change", renderResults);
+    el("previewClose").addEventListener("click", closePreview);
+    el("previewModal").addEventListener("click", (event) => {
+        // Clicking the backdrop closes; clicking inside the dialog does not.
+        if (event.target.id === "previewModal") {
+            closePreview();
+        }
+    });
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+            closePreview();
+        }
+    });
     el("langToggle").addEventListener("click", (event) => {
         const next = event.target.dataset.lang;
         if (next && next !== language()) {
