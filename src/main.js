@@ -46,6 +46,10 @@ let food = [null, null, null];
 let drinks = [null, null, null];
 let abilities = [null, null, null, null];
 let triggerMap = {};
+// Every ability this character has a level for, not just the five equipped ones: { <abilityHrid>:
+// level }. Imports carry it, it is cached per character, and swapping a slot reads its level from
+// here so a build can be re-run with a different ability at the level you actually have.
+let knownAbilityLevels = {};
 let modalTriggers = [];
 let currentSimResults = {};
 
@@ -264,6 +268,7 @@ function createLevelledBonusInput(section, entry) {
 // which is what keeps these values across a set imported straight from the game.
 function loadLevelledBonusesIntoUI(set, playerId = currentPlayerTabId) {
     const cached = getCachedLevelledBonuses(playerId);
+    knownAbilityLevels = abilityLevelsFromSet(set, cached);
 
     for (const section of LEVELLED_BONUS_SECTIONS) {
         const levels = set?.[section.playerKey] ?? cached?.[section.playerKey];
@@ -278,6 +283,26 @@ function loadLevelledBonusesIntoUI(set, playerId = currentPlayerTabId) {
     }
 
     cacheLevelledBonusesForCharacter(playerId);
+}
+
+// The ability book is per character like the bonuses above: a set that carries one replaces it,
+// otherwise the character's cached book stands. Either way the five equipped slots are folded in on
+// top, so a set exported before the book existed still teaches us the levels it does carry. Handles
+// both shapes in play: imports use { abilityHrid, level }, saved gear sets use { ability, level }.
+function abilityLevelsFromSet(set, cached) {
+    const imported = set?.abilityLevels;
+    const base = imported && Object.keys(imported).length > 0 ? imported : cached?.abilityLevels;
+    let levels = Object.assign({}, base);
+
+    for (const slot of Object.values(set?.abilities ?? {})) {
+        const hrid = slot?.abilityHrid ?? slot?.ability;
+        const level = Number(slot?.level);
+        if (hrid && level > 0) {
+            levels[hrid] = level;
+        }
+    }
+
+    return levels;
 }
 
 // Levelled bonuses belong to a character rather than to a gear set, so they are cached under the
@@ -310,6 +335,43 @@ function getCachedLevelledBonuses(playerId) {
     return name ? loadCharacterBonusCache()[name] ?? null : null;
 }
 
+// The in-game exporter reports guild shrine levels as { force, tempo, spirit }, keyed by the guild
+// buff name instead of by shrine hrid. Translate that into the { <shrineHrid>: level } shape the
+// rest of the app uses, dropping names this build has no shrine for. Returns null when the set
+// carries no guild shrine information at all.
+function shrineLevelsFromGuildShrine(guildShrine) {
+    if (!guildShrine || typeof guildShrine !== "object") {
+        return null;
+    }
+
+    let levels = {};
+    for (const [name, level] of Object.entries(guildShrine)) {
+        const hrid = "/shrines/" + name;
+        if (shrineDetailMap[hrid]) {
+            levels[hrid] = Number(level) || 0;
+        }
+    }
+
+    return Object.keys(levels).length > 0 ? levels : null;
+}
+
+// Shrines are a character bonus, so an import only speaks for the shrines it names: those override,
+// everything else keeps the character's cached level. A set with no shrine information at all is
+// left untouched so loadLevelledBonusesIntoUI falls back to the cache wholesale.
+function normalizeImportedShrines(set, playerId = currentPlayerTabId) {
+    if (!set || typeof set !== "object" || set.shrines) {
+        return set;
+    }
+
+    const fromGuild = shrineLevelsFromGuildShrine(set.guildShrine);
+    if (!fromGuild) {
+        return set;
+    }
+
+    set.shrines = Object.assign({}, getCachedLevelledBonuses(playerId)?.shrines, fromGuild);
+    return set;
+}
+
 function cacheLevelledBonusesForCharacter(playerId = currentPlayerTabId) {
     const name = getCharacterName(playerId);
     if (!name) {
@@ -317,7 +379,7 @@ function cacheLevelledBonusesForCharacter(playerId = currentPlayerTabId) {
     }
 
     let cache = loadCharacterBonusCache();
-    let entry = {};
+    let entry = { abilityLevels: { ...knownAbilityLevels } };
     for (const section of LEVELLED_BONUS_SECTIONS) {
         entry[section.playerKey] = { ...player[section.playerKey] };
     }
@@ -1226,6 +1288,7 @@ function initAbilitiesSection() {
         }
 
         selectElement.addEventListener("change", abilitySelectHandler);
+        inputElement.addEventListener("change", abilityLevelInputHandler);
     }
 
     document.getElementById('abilityOrderSwitch').addEventListener('change', function() {
@@ -1256,9 +1319,49 @@ function initAbilitiesSection() {
 
 }
 
-function abilitySelectHandler() {
+function abilitySelectHandler(event) {
+    applyKnownAbilityLevel(event?.target);
     updateAbilityState();
     updateAbilityUI();
+}
+
+// Swapping a slot to a different ability is the "what if I ran X instead" move, so the level box
+// follows the ability: it jumps to the level this character actually has for the one just picked.
+// An ability we have never seen a level for leaves the box alone.
+function applyKnownAbilityLevel(selectElement) {
+    const id = selectElement?.id ?? "";
+    if (!id.startsWith("selectAbility_")) {
+        return;
+    }
+
+    const index = Number(id.slice("selectAbility_".length));
+    const hrid = selectElement.value;
+    // abilities[] still holds the pre-change pick, so this skips a "change" that changed nothing.
+    if (!hrid || hrid === abilities[index]) {
+        return;
+    }
+
+    const level = Number(knownAbilityLevels[hrid]);
+    if (level > 0) {
+        document.getElementById("inputAbilityLevel_" + index).value = level;
+    }
+}
+
+// A level typed by hand is this character's level for that ability from here on, so put it in the
+// book: swap the slot away and back and the level comes with it.
+function abilityLevelInputHandler(event) {
+    const id = event?.target?.id ?? "";
+    if (!id.startsWith("inputAbilityLevel_")) {
+        return;
+    }
+
+    const index = Number(id.slice("inputAbilityLevel_".length));
+    const hrid = document.getElementById("selectAbility_" + index).value;
+    const level = Number(event.target.value);
+    if (hrid && level > 0) {
+        knownAbilityLevels[hrid] = level;
+        cacheLevelledBonusesForCharacter();
+    }
 }
 
 function updateAbilityState() {
@@ -3714,7 +3817,7 @@ function parsePlayerJson(playerJson, hrid) {
         ...playerJson.player,
         houseRooms: playerJson.houseRooms,
         labyrinthUpgrades: playerJson.labyrinthUpgrades,
-        shrines: playerJson.shrines,
+        shrines: playerJson.shrines ?? shrineLevelsFromGuildShrine(playerJson.guildShrine),
     };
     playerData.equipment = {};
     const triggerMap = playerJson.triggerMap;
@@ -4584,7 +4687,8 @@ function doSoloExport() {
         houseRooms: player.houseRooms,
         achievements: player.achievements,
         labyrinthUpgrades: player.labyrinthUpgrades,
-        shrines: player.shrines
+        shrines: player.shrines,
+        abilityLevels: knownAbilityLevels
     };
     try {
         navigator.clipboard.writeText(JSON.stringify(state)).then(() => alert("Current set has been copied to clipboard."));
@@ -4627,6 +4731,7 @@ function doGroupImport() {
 function doSoloImport() {
     let importSet = document.getElementById("inputSetSolo").value;
     importSet = JSON.parse(importSet);
+    normalizeImportedShrines(importSet);
     ["stamina", "intelligence", "attack", "melee", "defense", "ranged", "magic"].forEach((skill) => {
         let levelInput = document.getElementById("inputLevel_" + skill);
         if (skill == "melee" && !importSet.player["meleeLevel"] && importSet.player["powerLevel"]) {
@@ -4817,7 +4922,8 @@ function savePreviousPlayer(playerId) {
         houseRooms: player.houseRooms,
         achievements: player.achievements,
         labyrinthUpgrades: player.labyrinthUpgrades,
-        shrines: player.shrines
+        shrines: player.shrines,
+        abilityLevels: knownAbilityLevels
     };
     try {
         playerDataMap[playerId] = JSON.stringify(state);
@@ -4829,6 +4935,7 @@ function savePreviousPlayer(playerId) {
 function updateNextPlayer(currentPlayerNumber) {
     let playerImportData = playerDataMap[currentPlayerNumber];
     let importSet = JSON.parse(playerImportData);
+    normalizeImportedShrines(importSet, currentPlayerNumber);
     ["stamina", "intelligence", "attack", "melee", "defense", "ranged", "magic"].forEach((skill) => {
         let levelInput = document.getElementById("inputLevel_" + skill);
         if (skill == "melee" && !importSet.player["meleeLevel"] && importSet.player["powerLevel"]) {
