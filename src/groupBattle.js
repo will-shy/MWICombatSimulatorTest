@@ -1009,6 +1009,50 @@ function styleLabel(summary) {
     return base;
 }
 
+// AoE abilities carried as a debuff or as support rather than for their damage. What they are
+// there for lands whatever the target count, so they earn their slot even against one enemy and
+// must not be flagged.
+//   Debuffs:  Fracturing Impact (+5% damage taken), Toxic Pollen (-12 armor, -15/-20/-15
+//             resistances), Frost Surge (-10% evasion), Crippling Slash (-12% enemy damage)
+//   Support:  Mana Spring (+50% MP regen to all allies - the answer to a mana-starved roster
+//             rather than a damage ability at all)
+const AOE_DEBUFF_OR_SUPPORT_ABILITIES = new Set([
+    "/abilities/fracturing_impact", "/abilities/toxic_pollen", "/abilities/frost_surge",
+    "/abilities/mana_spring", "/abilities/crippling_slash",
+]);
+
+// Abilities not worth a bar slot in a trial, whatever the enemy count.
+//   Vampirism: buffs life steal, but CombatUtilities only applies life steal on AUTO-ATTACKS
+//   (the `!abilityEffect` branch). On an ability-driven rotation it returns almost nothing for a
+//   slot, 65 mana a cast and a 20s window on a 30s cooldown.
+const LOW_VALUE_ABILITIES = new Set(["/abilities/vampirism"]);
+
+// An ability spreads its damage across the enemy group either by targeting allEnemies outright, or
+// by piercing: processAbilityDamageEffect continues to the next target instead of breaking when
+// pierceChance rolls, so Penetrating Shot / Strike (pierceChance 1) hit everything. Both are paid
+// for in the ability's damage ratio and both are wasted on a single target.
+function spreadsAcrossTargets(effect) {
+    if (effect.effectType !== "/ability_effect_types/damage") {
+        return false;
+    }
+    return effect.targetType === "allEnemies" || effect.pierceChance > 0;
+}
+
+// Abilities that spread their damage and whose only reason to be there IS that damage. Against a
+// group of one or two they land on (almost) a single target, so they are usually a loss next to a
+// single-target ability of the same tier.
+const AOE_DAMAGE_ABILITIES = new Set(
+    Object.entries(abilityDetailMap)
+        .filter(([hrid, detail]) => !AOE_DEBUFF_OR_SUPPORT_ABILITIES.has(hrid)
+            && (detail.abilityEffects || []).some(spreadsAcrossTargets))
+        .map(([hrid]) => hrid)
+);
+
+// Below this many enemies an AoE ability is not meaningfully hitting more than one target. Trial
+// Badger fields two and the guild still treats that as a single-target fight; Trial Swarm's four
+// is the only group where AoE genuinely pays.
+const SINGLE_TARGET_ENEMY_COUNT = 3;
+
 // Auras the group is expected to field exactly one of. Speed Aura is deliberately absent: it is
 // not run as a single-carrier role the way these four are, so duplicates there are not a problem.
 const EXPECTED_UNIQUE_AURAS = [
@@ -1092,6 +1136,36 @@ function sanityCheckHtml() {
         issues.push({
             text: t("sanityNoLoadout", { count: noLoadout.length }),
             detail: noLoadout.map((p) => p.name).join(", "),
+        });
+    }
+
+    // Who is carrying abilities from a given set, as "Name (Ability, Ability)".
+    const carriersOf = (hrids) => importedPlayers
+        .map((p) => ({
+            name: p.name,
+            abilities: (p.dto.abilities || [])
+                .filter((a) => a && hrids.has(a.hrid))
+                .map((a) => abilityName(a.hrid)),
+        }))
+        .filter((entry) => entry.abilities.length);
+
+    // AoE / piercing carried into a single-target fight.
+    if (enemyGroup.length > 0 && enemyGroup.length < SINGLE_TARGET_ENEMY_COUNT) {
+        let carriers = carriersOf(AOE_DAMAGE_ABILITIES);
+        if (carriers.length) {
+            issues.push({
+                text: t("sanityAoeInSingleTarget", { count: carriers.length, enemies: enemyGroup.length }),
+                detail: carriers.map((c) => `${c.name} (${c.abilities.join(", ")})`).join(", "),
+            });
+        }
+    }
+
+    // Abilities that do not earn their slot here at all.
+    let lowValue = carriersOf(LOW_VALUE_ABILITIES);
+    if (lowValue.length) {
+        issues.push({
+            text: t("sanityLowValueAbility", { count: lowValue.length }),
+            detail: lowValue.map((c) => `${c.name} (${c.abilities.join(", ")})`).join(", "),
         });
     }
 
@@ -1492,6 +1566,10 @@ function setEnemyGroupFromSelection() {
     const specs = resolveSelectedEnemySpecs();
     enemyGroup = specs.map((spec) => structuredClone(spec));
     renderEnemyGroup();
+    // The sanity check flags AoE abilities against a small enemy group, so it depends on this.
+    if (importedPlayers.length) {
+        renderPlayerList();
+    }
 }
 
 function enemyMaxHp(e) {
@@ -1924,7 +2002,7 @@ async function runTrialMode() {
                 result: simResult,
             });
 
-            renderTrialModeResult(tiers, null); // live progress
+            renderTrialModeResult(tiers, null, remainingSeconds); // live progress
 
             if (simResult.battleOutcome === "victory") {
                 continue; // advance to next tier
@@ -1943,7 +2021,7 @@ async function runTrialMode() {
         document.getElementById("trialStatus").textContent = "";
     }
 
-    renderTrialModeResult(tiers, stopReason);
+    renderTrialModeResult(tiers, stopReason, remainingSeconds);
 }
 
 function trialOutcomeLabel(outcome) {
@@ -2051,10 +2129,10 @@ function mergeHealGroups(into, from) {
 // Renders the trial-mode summary + per-tier table. `stopReason` is null while
 // the run is still in progress.
 let lastTrialRun = null;
-function renderTrialModeResult(tiers, stopReason) {
+function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
     const container = document.getElementById("trialModeResult");
     if (!tiers.length) { container.innerHTML = ""; return; }
-    lastTrialRun = { tiers, stopReason };
+    lastTrialRun = { tiers, stopReason, remainingSeconds };
 
     let reached = tiers[tiers.length - 1];
     let clearedThrough = tiers.filter((x) => x.outcome === "victory").length;
@@ -2086,6 +2164,14 @@ function renderTrialModeResult(tiers, stopReason) {
         </tr>`;
     }).join("");
 
+    let wipeNote = "";
+    if (stopReason === "defeat") {
+        wipeNote = `<p class="hint">${escapeHtml(t("trialWipedTimeLeft", {
+            tier: reached.tier, level: reached.level,
+            time: fmtTime(Math.max(0, remainingSeconds) * ONE_SECOND),
+        }))}</p>`;
+    }
+
     let lastBossNote = "";
     if (stopReason && stopReason !== "completed" && reached.bossHpFrac != null &&
         reached.outcome !== "victory") {
@@ -2097,6 +2183,7 @@ function renderTrialModeResult(tiers, stopReason) {
 
     container.innerHTML = `
         <h4 style="margin:6px 0;">${escapeHtml(headline)}</h4>
+        ${wipeNote}
         ${lastBossNote}
         <table class="tbl">
             <thead><tr>
@@ -3108,7 +3195,7 @@ window.addEventListener("DOMContentLoaded", () => {
             renderResult(window.__lastBattleResult, false);
         }
         if (lastTrialRun) {
-            renderTrialModeResult(lastTrialRun.tiers, lastTrialRun.stopReason);
+            renderTrialModeResult(lastTrialRun.tiers, lastTrialRun.stopReason, lastTrialRun.remainingSeconds);
         }
     });
 

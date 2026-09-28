@@ -332,6 +332,16 @@
         .detail-cols h5 { margin: 0 0 4px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
         .detail-abilities { margin: 0; padding-left: 18px; font-size: 12px; }
         .detail-abilities li { padding: 1px 0; }
+        /* Trigger conditions listed under each ability in the detail dialog. */
+        .detail-triggers {
+            margin: 2px 0 6px;
+            padding-left: 14px;
+            list-style: none;
+            font-size: 11px;
+            color: var(--dim);
+        }
+        .detail-triggers li { padding: 0; }
+        .detail-triggers li::before { content: "↳ "; opacity: 0.7; }
         .ability-detail {
             border: 1px solid var(--border);
             border-radius: 6px;

@@ -268,10 +268,19 @@ export function playerDetailHtml(d, t = defaultT) {
         ? `<table class="tbl">${equipRows.join("")}</table>`
         : `<div class="empty">${escapeHtml(t("noCombatEquipment"))}</div>`;
 
-    // Abilities
+    // Abilities, each with the trigger conditions it fires on. The triggers decide what the sim
+    // actually casts, so they belong next to the ability rather than behind the detailed-status
+    // button - a bar that looks right can still behave oddly because of one condition.
     let abilityItems = (d.abilities || [])
         .filter(Boolean)
-        .map((a) => `<li>${escapeHtml(abilityName(a.hrid))} <span class="dim">L${a.level}</span></li>`);
+        .map((a) => {
+            let triggers = (a.triggers || []).map(
+                (tr) => `<li>${escapeHtml(describeTrigger(tr))}</li>`).join("");
+            let triggerHtml = triggers
+                ? `<ul class="detail-triggers">${triggers}</ul>`
+                : `<div class="detail-triggers dim">${t("noTriggerCondition")}</div>`;
+            return `<li>${escapeHtml(abilityName(a.hrid))} <span class="dim">L${a.level}</span>${triggerHtml}</li>`;
+        });
     let abilityHtml = abilityItems.length
         ? `<ul class="detail-abilities">${abilityItems.join("")}</ul>`
         : `<div class="empty">${escapeHtml(t("noAbilities"))}</div>`;
