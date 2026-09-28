@@ -7,6 +7,7 @@ import Shrine from "./combatsimulator/shrine";
 import Monster from "./combatsimulator/monster";
 import GroupBattleMonster from "./combatsimulator/groupBattleMonster";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+import { guildBuildingBuffs } from "./combatsimulator/data/guildBuildings";
 import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
 
 
@@ -205,10 +206,19 @@ onmessage = async function (event) {
 
             let battlePlayers = [];
             let battlePlayersData = event.data.players;
+            // Guild buildings are a guild-wide bonus on top of each player's own house rooms, so
+            // they apply to every member of the group for every tier of a trial. Levels are set in
+            // the page and travel with the request; an unset guild sends none and nothing changes.
+            const guildBuffs = guildBuildingBuffs(event.data.guildBuildingLevels);
             for (let i = 0; i < battlePlayersData.length; i++) {
                 let currentPlayer = Player.createFromDTO(structuredClone(battlePlayersData[i]));
                 currentPlayer.zoneBuffs = battleZone.buffs;
-                currentPlayer.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
+                // Shrines are permanent per-character combat bonuses, so they apply here exactly
+                // as they do in a solo simulation. A roster built from presets carries none and is
+                // unaffected; one imported from a guild trial export carries the guild's real levels.
+                currentPlayer.extraBuffs = GROUP_BATTLE_REGEN_BUFFS
+                    .concat(guildBuffs)
+                    .concat(Shrine.buffsFromLevels(currentPlayer.shrines));
                 battlePlayers.push(currentPlayer);
             }
 

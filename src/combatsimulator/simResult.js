@@ -204,7 +204,10 @@ class SimResult {
         this.abilityCastCounts[unit.hrid][abilityHrid] += 1;
     }
 
-    addAttack(source, target, ability, hit) {
+    // premitigatedHit, when given, is the damage before armour/resistance reduction. It is
+    // logged alongside the real hit so a result view can show incoming vs. absorbed damage;
+    // callers with nothing to report (damage over time) simply leave it out.
+    addAttack(source, target, ability, hit, premitigatedHit) {
         if (!this.attacks[source.hrid]) {
             this.attacks[source.hrid] = {};
         }
@@ -229,6 +232,7 @@ class SimResult {
             targetIsPlayer: !!target.isPlayer,
             ability: ability,
             hit: hit, // number = damage, "miss" = missed
+            premitigatedHit: typeof premitigatedHit === "number" ? premitigatedHit : undefined,
             targetHpAfter: target.combatDetails.currentHitpoints,
             targetMaxHp: target.combatDetails.maxHitpoints,
         });

@@ -1,32 +1,37 @@
 {
-  "_comment": "Predefined enemy groups for Group Battle. Each group's members reference a monster by its game-data hrid (see combatMonsterDetailMap.json) with a count. Selecting a group in the Select Enemy Group section fills the enemy group with all members (count copies each).",
+  "_comment": "Predefined enemy groups for Group Battle. Each group's members reference a monster by its game-data hrid (see combatMonsterDetailMap.json) with a count. Selecting a group in the Select Enemy Group section fills the enemy group with all members (count copies each). trialHrid is the guild combat trial this group stands in for, so importing a guild trial roster can switch the enemy group to match the trial the roster was exported for.",
   "groups": [
     {
       "name": "Trial Badger",
+      "trialHrid": "/guild_combat/badger",
       "members": [
         { "hrid": "/monsters/trial_badger", "count": 2 }
       ]
     },
     {
       "name": "Trial Chameleon",
+      "trialHrid": "/guild_combat/chameleon",
       "members": [
         { "hrid": "/monsters/trial_chameleon", "count": 1 }
       ]
     },
     {
       "name": "Trial Jellyfish",
+      "trialHrid": "/guild_combat/jellyfish",
       "members": [
         { "hrid": "/monsters/trial_jellyfish", "count": 1 }
       ]
     },
     {
       "name": "Trial Hedgehog",
+      "trialHrid": "/guild_combat/hedgehog",
       "members": [
         { "hrid": "/monsters/trial_hedgehog", "count": 1 }
       ]
     },
     {
       "name": "Trial Swarm",
+      "trialHrid": "/guild_combat/swarm",
       "members": [
         { "hrid": "/monsters/trial_beetle", "count": 1 },
         { "hrid": "/monsters/trial_dragonfly", "count": 1 },

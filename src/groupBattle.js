@@ -2,17 +2,21 @@ import Player from "./combatsimulator/player.js";
 import Ability from "./combatsimulator/ability.js";
 import Zone from "./combatsimulator/zone.js";
 import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
+import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import combatMonsterDetailMap from "./combatsimulator/data/combatMonsterDetailMap.json";
 import monsterGroupsData from "./combatsimulator/data/monsterGroups.json";
 import GroupBattleMonster from "./combatsimulator/groupBattleMonster.js";
+import Shrine from "./combatsimulator/shrine.js";
 import { t, onLanguageChange } from "./groupBattleI18nSetup.js";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+import { GUILD_BUILDINGS, guildBuildingBuffs } from "./combatsimulator/data/guildBuildings";
 import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
 import changelogData from "./combatsimulator/data/changelogGroupBattle.json";
 import {
     itemName, abilityName, skillName, combatStyleName, damageTypeName,
     playerDetailHtml, renderDetailedStatus, dtoToSoloExport,
 } from "./playerDetailView.js";
+import { parseGuildTrialRoster, guildTrialEntryToPlayerDTO } from "./guildTrialImport.js";
 
 // Auto-load every predefined preset from the testPlayers folder. Each JSON file
 // is one solo-export; the preset's display name is derived from the filename
@@ -38,13 +42,17 @@ const PREDEFINED_PRESETS = TEST_PLAYER_CTX.keys()
     .sort((a, b) => a.key.localeCompare(b.key));
 
 const ONE_SECOND = 1e9;
+// Guild building levels persist across sessions - they describe the guild, not one roster, so
+// re-importing a trial export should not make you re-enter them.
+const LS_GUILD_BUILDINGS_KEY = "mwiGuildBuildingLevels";
 // Handoff key read by the original simulator (main.js) to auto-import a preset.
 // Must match SOLO_IMPORT_HANDOFF_KEY in src/main.js.
 const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
 
 let worker = new Worker(new URL("worker.js", import.meta.url));
 
-// Imported players: array of { name, dto }
+// Imported players: array of { name, dto, noLoadout? }. noLoadout is set only by the guild trial
+// import, for members who never saved a loadout for the trial.
 let importedPlayers = [];
 // OOM (out-of-mana blocked casts) totals from the most recent run, keyed by
 // player dto.hrid. Accumulated across all tiers in Trial Mode; single battle in
@@ -52,6 +60,39 @@ let importedPlayers = [];
 let rosterOom = {};
 // Enemy group: array of monster specs (spec objects) to fight.
 let enemyGroup = [];
+// { <buildingId>: level }, every building defaulting to 0 until the user sets one.
+let guildBuildingLevels = loadGuildBuildingLevels();
+
+function loadGuildBuildingLevels() {
+    let stored = {};
+    try {
+        stored = JSON.parse(localStorage.getItem(LS_GUILD_BUILDINGS_KEY)) || {};
+    } catch (e) {
+        stored = {};
+    }
+    let levels = {};
+    for (const building of GUILD_BUILDINGS) {
+        levels[building.id] = Math.max(0, Number(stored[building.id]) || 0);
+    }
+    return levels;
+}
+
+function saveGuildBuildingLevels() {
+    try {
+        localStorage.setItem(LS_GUILD_BUILDINGS_KEY, JSON.stringify(guildBuildingLevels));
+    } catch (e) {
+        // Private browsing / storage disabled: the levels still apply for this session.
+    }
+}
+
+// The full extra-buff stack a player fights with in a group battle: the no-food/drink regen
+// compensation, the guild's buildings, and that player's own shrines. worker.js builds the same
+// stack for the real sim; every preview in this page goes through here so they cannot drift.
+function groupBattleExtraBuffs(playerOrDto) {
+    return GROUP_BATTLE_REGEN_BUFFS
+        .concat(guildBuildingBuffs(guildBuildingLevels))
+        .concat(Shrine.buffsFromLevels(playerOrDto.shrines));
+}
 
 // ------------------------------------------------------------------ Import ---
 
@@ -266,6 +307,238 @@ function doImport(append) {
         textarea.value = "";
     }
     document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// --------------------------------------------------------- Guild buildings ---
+// A guild-wide bonus every member fights with, on top of their own house rooms. Set once in the
+// banner at the top of the page and kept in localStorage, since it describes the guild rather than
+// any one roster.
+
+function renderGuildBuildings() {
+    const container = document.getElementById("guildBuildingList");
+    if (!container) return;
+
+    container.innerHTML = GUILD_BUILDINGS.map((building) => `
+        <label style="display:flex; align-items:center; gap:8px; padding:3px 0;">
+            <span style="flex:1;">${escapeHtml(t(building.labelKey))}</span>
+            <input type="number" min="0" step="1" style="width:64px;"
+                data-guild-building="${building.id}" value="${guildBuildingLevels[building.id] || 0}" />
+        </label>`).join("");
+
+    container.querySelectorAll("[data-guild-building]").forEach((input) => {
+        // "input" fires per keystroke; committing on "change" (blur / Enter / stepper) means the
+        // roster is rebuilt once per edit instead of once per digit. That rebuild is what would
+        // otherwise interrupt an in-progress inline rename - it never touches the imported roster
+        // itself, which survives a level change untouched.
+        input.addEventListener("change", () => {
+            const level = Math.max(0, Number(input.value) || 0);
+            if (guildBuildingLevels[input.dataset.guildBuilding] === level) return;
+
+            guildBuildingLevels[input.dataset.guildBuilding] = level;
+            input.value = level; // normalise a negative or blank entry back into the field
+            saveGuildBuildingLevels();
+            renderGuildBuildingSummary();
+            // The levels feed every player's stats, so the cached per-DTO summaries are now stale.
+            // Only the derived stats are dropped; the DTOs they were derived from are untouched.
+            derivedSummaryCache = new WeakMap();
+            renderPlayerList();
+        });
+    });
+
+    renderGuildBuildingSummary();
+}
+
+// One line naming the stats currently granted, so the effect is visible without opening the panel
+// or doing the arithmetic. Says so explicitly when every building is 0.
+function renderGuildBuildingSummary() {
+    const el = document.getElementById("guildBuildingSummary");
+    if (!el) return;
+
+    let totals = {};
+    for (const buff of guildBuildingBuffs(guildBuildingLevels)) {
+        totals[buff.typeHrid] = (totals[buff.typeHrid] || 0) + buff.flatBoost;
+    }
+
+    const entries = Object.entries(totals).map(([typeHrid, value]) => {
+        const stat = typeHrid.split("/")[2];
+        // Regen buffs are fractions of a percentage point; level buffs are whole levels.
+        return stat.endsWith("_regen")
+            ? `${guildStatLabel(stat)} +${(value * 100).toFixed(1)}%`
+            : `${guildStatLabel(stat)} +${value}`;
+    });
+
+    el.innerHTML = entries.length
+        ? `<span class="dim">${escapeHtml(t("guildBuildingsActive"))}</span> ` +
+          entries.map((e) => `<span class="chip">${escapeHtml(e)}</span>`).join(" ")
+        : `<span class="dim">${escapeHtml(t("guildBuildingsNone"))}</span>`;
+}
+
+// "stamina_level" -> the translated skill name; "hp_regen" -> "HP Regen".
+function guildStatLabel(stat) {
+    if (stat.endsWith("_level")) return skillName("/skills/" + stat.replace("_level", ""));
+    if (stat === "hp_regen") return "HP " + t("regen");
+    if (stat === "mp_regen") return "MP " + t("regen");
+    return stat;
+}
+
+// ------------------------------------------------------- Guild trial import ---
+// The Guild Trial sub-tab reads the guild's own combat-trial roster export (one JSON file, one
+// entry per member) instead of pasted solo exports. The whole guild fights one monster, so
+// importing also switches the enemy group to the trial the file was exported for. Every hook below
+// no-ops when those elements are absent.
+
+// The trial the last imported file was exported for, kept so the status panel can be re-rendered
+// in the other language without re-reading the file.
+let lastGuildTrialImport = null;
+
+function initGuildTrialImport() {
+    const fileInput = document.getElementById("guildTrialFile");
+    if (!fileInput) return;
+
+    const readFile = (file) => {
+        if (!file) return;
+        file.text()
+            .then((text) => importGuildTrialRoster(text, file.name))
+            .catch((e) => showError(t("guildTrialReadFailed", { msg: e.message })));
+    };
+
+    fileInput.addEventListener("change", () => {
+        readFile(fileInput.files[0]);
+        // Reset so re-picking the same file (after a re-export) fires "change" again.
+        fileInput.value = "";
+    });
+
+    const drop = document.getElementById("guildTrialDrop");
+    if (drop) {
+        drop.addEventListener("click", () => fileInput.click());
+        ["dragenter", "dragover"].forEach((type) => drop.addEventListener(type, (ev) => {
+            ev.preventDefault();
+            drop.classList.add("dragging");
+        }));
+        ["dragleave", "drop"].forEach((type) => drop.addEventListener(type, (ev) => {
+            ev.preventDefault();
+            drop.classList.remove("dragging");
+        }));
+        drop.addEventListener("drop", (ev) => readFile(ev.dataTransfer?.files?.[0]));
+    }
+}
+
+// Replaces the roster with every member of a guild trial export. Unlike the Group Builder this
+// does NOT reassign auras: these are real players, and the aura each one actually carries is part
+// of what the run is meant to measure.
+function importGuildTrialRoster(text, sourceName) {
+    let roster;
+    try {
+        roster = parseGuildTrialRoster(text);
+    } catch (e) {
+        showError(t("guildTrialParseFailed", { msg: e.message }));
+        return;
+    }
+    if (!roster.members.length) {
+        showError(t("noPlayerDataFound"));
+        return;
+    }
+
+    importedPlayers = [];
+    rosterOom = {}; // stale OOM from a prior run no longer applies
+    let errors = [];
+    for (const member of roster.members) {
+        try {
+            let dto = guildTrialEntryToPlayerDTO(member.entry, "player" + (importedPlayers.length + 1));
+            importedPlayers.push({ name: member.name, dto, noLoadout: !member.hasLoadout });
+        } catch (e) {
+            errors.push(member.name + ": " + e.message);
+        }
+    }
+
+    lastGuildTrialImport = { roster, sourceName, switched: switchEnemyGroupToTrial(roster.primaryTrial) };
+    renderPlayerList();
+    renderGuildTrialStatus();
+
+    if (errors.length) {
+        showError(t("importedWithErrors", { count: errors.length, errors: errors.join("\n") }));
+    } else {
+        clearError();
+    }
+    document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+// Points the enemy dropdown at the monster group that stands in for `trialHrid` and rebuilds the
+// enemy group from it. Returns the group's name, or "" when this build has no group for the trial.
+function switchEnemyGroupToTrial(trialHrid) {
+    if (!trialHrid) return "";
+
+    const tail = String(trialHrid).replace(/^.*\//, "");
+    let index = MONSTER_GROUPS.findIndex((g) => g.trialHrid === trialHrid);
+    if (index < 0) {
+        // No explicit mapping: fall back to a group built from the trial's own monster, so a
+        // trial added to the game after this build still lands on the right enemy.
+        index = MONSTER_GROUPS.findIndex((g) => g.members.some((m) => m.hrid === "/monsters/trial_" + tail));
+    }
+    if (index < 0) return "";
+
+    document.getElementById("enemySelect").value = "group:" + index;
+    syncEnemyLevelSelect();
+    selectedPreviewMemberIndex = 0;
+    setEnemyGroupFromSelection();
+    if (document.getElementById("enemyPreviewPanel").style.display !== "none") {
+        renderEnemyPreview();
+    }
+    return MONSTER_GROUPS[index].name;
+}
+
+// Short label for a trial hrid: the game data has no name for "/guild_combat/hedgehog", so use
+// the mapped monster group's name where there is one and the bare tail otherwise.
+function trialLabel(trialHrid) {
+    const tail = String(trialHrid || "").replace(/^.*\//, "");
+    const group = MONSTER_GROUPS.find((g) => g.trialHrid === trialHrid);
+    return group ? group.name : tail;
+}
+
+// The panel under the file picker: what was imported, how many members are missing a loadout, and
+// whether the file mixes several trials (the roster is meant to be one guild against one monster).
+function renderGuildTrialStatus() {
+    const panel = document.getElementById("guildTrialStatus");
+    if (!panel) return;
+    if (!lastGuildTrialImport) {
+        panel.innerHTML = "";
+        return;
+    }
+
+    const { roster, sourceName, switched } = lastGuildTrialImport;
+    const noLoadout = roster.members.filter((m) => !m.hasLoadout);
+
+    let html = `<div class="trial-status-line">${escapeHtml(t("guildTrialImported", {
+        count: roster.members.length, file: sourceName,
+    }))}</div>`;
+
+    if (switched) {
+        html += `<div class="trial-status-line">${escapeHtml(t("guildTrialSwitchedMonster", { group: switched }))}</div>`;
+    } else if (roster.primaryTrial) {
+        html += `<div class="warn-box">${escapeHtml(t("guildTrialNoMonsterGroup", { trial: roster.primaryTrial }))}</div>`;
+    }
+
+    // More than one combatTrial in one file means the export is not a single trial's roster —
+    // every member is still imported, but they are all simulated against the most common trial.
+    if (roster.trials.length > 1) {
+        let summary = roster.trials
+            .map((tr) => `${trialLabel(tr.hrid)} ×${tr.count}`)
+            .join(", ");
+        let strays = roster.members
+            .filter((m) => m.combatTrial !== roster.primaryTrial)
+            .map((m) => `${m.name} (${trialLabel(m.combatTrial) || "—"})`)
+            .join(", ");
+        html += `<div class="warn-box">${escapeHtml(t("guildTrialMixedTrials", {
+            summary, chosen: trialLabel(roster.primaryTrial),
+        }))}<div class="hint" style="margin:4px 0 0;">${escapeHtml(strays)}</div></div>`;
+    }
+
+    if (noLoadout.length) {
+        html += `<div class="warn-box">${escapeHtml(t("guildTrialNoLoadoutCount", { count: noLoadout.length }))}
+            <div class="hint" style="margin:4px 0 0;">${escapeHtml(noLoadout.map((m) => m.name).join(", "))}</div></div>`;
+    }
+
+    panel.innerHTML = html;
 }
 
 // ------------------------------------------------------------ Group Builder ---
@@ -644,7 +917,7 @@ function auraColor(hrid) {
 // Cache of derived summaries keyed by dto reference, so we build each Player
 // only once per import (constructing a Player + combat details is expensive and
 // renderPlayerList runs on every roster change).
-const derivedSummaryCache = new WeakMap();
+let derivedSummaryCache = new WeakMap();
 
 function derivePlayerSummary(dto) {
     if (derivedSummaryCache.has(dto)) return derivedSummaryCache.get(dto);
@@ -654,7 +927,8 @@ function derivePlayerSummary(dto) {
         let zone = new Zone("/actions/combat/fly");
         let player = Player.createFromDTO(structuredClone(dto));
         player.zoneBuffs = zone.buffs;
-        player.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
+        // Same buff stack the worker builds for a group battle, so the row's HP/MP match the run.
+        player.extraBuffs = groupBattleExtraBuffs(player);
         player.reset(0);
         player.generatePermanentBuffs();
         player.reset(0);
@@ -666,9 +940,15 @@ function derivePlayerSummary(dto) {
             maxManapoints: cd.maxManapoints,
             combatStyleHrid: cs.combatStyleHrid || "",
             damageType: cs.damageType || "",
+            // Effective levels, i.e. after house-room level buffs. An aura scales off the caster's
+            // effective skill, so a Gym-8 house really does make that player's Fierce Aura stronger.
+            levels: {
+                attack: cd.attackLevel, melee: cd.meleeLevel, defense: cd.defenseLevel,
+                ranged: cd.rangedLevel, magic: cd.magicLevel,
+            },
         };
     } catch (e) {
-        summary = { maxHitpoints: 0, maxManapoints: 0, combatStyleHrid: "", damageType: "" };
+        summary = { maxHitpoints: 0, maxManapoints: 0, combatStyleHrid: "", damageType: "", levels: {} };
     }
 
     // Weapon (main_hand preferred, else two_hand) + enhancement level.
@@ -678,9 +958,11 @@ function derivePlayerSummary(dto) {
     // Defensive ("wark") if the equipped weapon is a bulwark.
     summary.isWark = weapon ? isBulwark(weapon.hrid) : false;
 
-    // Aura: an equipped aura ability, if any (used for the distinct border).
-    let aura = (dto.abilities || []).find((a) => a && AURA_ABILITY_HRIDS.has(a.hrid));
-    summary.auraHrid = aura ? aura.hrid : null;
+    // Auras: every special/aura ability on the bar, in slot order. A player can carry more than
+    // one - Invincible alongside Guardian Aura, say - and taking only the first hid the rest.
+    summary.auras = (dto.abilities || [])
+        .filter((a) => a && AURA_ABILITY_HRIDS.has(a.hrid))
+        .map((a) => ({ hrid: a.hrid, level: Number(a.level) || 0 }));
 
     derivedSummaryCache.set(dto, summary);
     return summary;
@@ -727,6 +1009,148 @@ function styleLabel(summary) {
     return base;
 }
 
+// Auras the group is expected to field exactly one of. Speed Aura is deliberately absent: it is
+// not run as a single-carrier role the way these four are, so duplicates there are not a problem.
+const EXPECTED_UNIQUE_AURAS = [
+    "/abilities/fierce_aura", "/abilities/critical_aura",
+    "/abilities/guardian_aura", "/abilities/mystic_aura",
+];
+
+// How an aura's strength is built, read out of the game data rather than hardcoded. From
+// processAbilityBuffEffect + Buff:
+//
+//     buff = [base + (abilityLevel - 1) * perAbilityLevel] * (1 + casterSkillLevel * perSkillLevel)
+//
+// applied to every buff the aura carries. Each aura's buffs all share one skill and one per-skill
+// rate, so the first buff is a faithful stand-in for ranking carriers - only the label differs.
+function auraScaling(auraHrid) {
+    const buff = abilityDetailMap[auraHrid]?.abilityEffects?.[0]?.buffs?.[0];
+    if (!buff) return null;
+    return {
+        skill: (buff.multiplierForSkillHrid || "").split("/")[2] || "",
+        perSkillLevel: buff.multiplierPerSkillLevel || 0,
+        base: buff.ratioBoost || buff.flatBoost || 0,
+        perAbilityLevel: buff.ratioBoostLevelBonus || buff.flatBoostLevelBonus || 0,
+        buffType: (buff.typeHrid || "").split("/")[2] || "",
+    };
+}
+
+// For each expected-unique aura: who is carrying it and how strong theirs is, plus the roster
+// member whose skill would make it strongest. Both terms matter - the aura's own level and the
+// caster's effective skill - so a low-skill player with a high aura level can still lose to a
+// high-skill one. The export only carries levels for abilities a member has EQUIPPED, so a
+// non-carrier can be ranked on the skill term alone; that is called out in the UI.
+function auraPlan() {
+    return EXPECTED_UNIQUE_AURAS.map((hrid) => {
+        const scaling = auraScaling(hrid);
+        if (!scaling) return { hrid, scaling: null, carriers: [], best: null };
+
+        const candidates = importedPlayers.map((p, index) => {
+            const summary = derivePlayerSummary(p.dto);
+            const equipped = (p.dto.abilities || []).find((a) => a && a.hrid === hrid);
+            const skillLevel = Number(summary.levels?.[scaling.skill]) || 0;
+            const abilityLevel = equipped ? Number(equipped.level) || 0 : 0;
+            return {
+                index, name: p.name, playerHrid: p.dto.hrid,
+                skillLevel, abilityLevel, carrying: !!equipped,
+                potency: equipped
+                    ? (scaling.base + (abilityLevel - 1) * scaling.perAbilityLevel)
+                        * (1 + skillLevel * scaling.perSkillLevel)
+                    : 0,
+            };
+        });
+
+        return {
+            hrid,
+            scaling,
+            carriers: candidates.filter((c) => c.carrying).sort((a, b) => b.potency - a.potency),
+            best: candidates.slice().sort((a, b) => b.skillLevel - a.skillLevel)[0] ?? null,
+        };
+    });
+}
+
+// The carrier to keep for each aura (the strongest one actually carrying it), by player hrid, so
+// roster cards and the analysis table can star them.
+function bestCarrierByAura() {
+    let best = {};
+    for (const plan of auraPlan()) {
+        if (plan.carriers.length) best[plan.hrid] = plan.carriers[0].playerHrid;
+    }
+    return best;
+}
+
+// Pre-flight check on the roster as assembled: who is missing a loadout, and whether each
+// expected-unique aura has exactly one carrier. Rendered above the roster grid so a gap is caught
+// before a run rather than explained after one.
+function sanityCheckHtml() {
+    if (!importedPlayers.length) return "";
+
+    let issues = [];
+
+    let noLoadout = importedPlayers.filter((p) => p.noLoadout);
+    if (noLoadout.length) {
+        issues.push({
+            text: t("sanityNoLoadout", { count: noLoadout.length }),
+            detail: noLoadout.map((p) => p.name).join(", "),
+        });
+    }
+
+    for (const plan of auraPlan()) {
+        const aura = abilityName(plan.hrid);
+        if (!plan.scaling) continue;
+
+        const skillLabel = skillName("/skills/" + plan.scaling.skill);
+        const pct = (value) => (value * 100).toFixed(1) + "%";
+        const who = (c) => t("sanityAuraWho", {
+            name: c.name, level: c.abilityLevel, skill: skillLabel, skillLevel: Math.round(c.skillLevel),
+        });
+
+        // Only the two states the check is meant to catch: no coverage, or more than one carrier.
+        // An aura that is covered once is left alone - whether some other member's skill would
+        // make it stronger can't be answered from this export, which carries levels only for
+        // abilities a member has equipped.
+        if (!plan.carriers.length) {
+            issues.push({
+                text: t("sanityAuraMissing", { aura }),
+                detail: plan.best
+                    ? t("sanityAuraCandidate", {
+                        name: plan.best.name, skill: skillLabel, skillLevel: Math.round(plan.best.skillLevel),
+                    }) + " " + t("sanityAuraLevelUnknown")
+                    : "",
+            });
+            continue;
+        }
+
+        if (plan.carriers.length > 1) {
+            const keep = plan.carriers[0];
+            issues.push({
+                text: t("sanityAuraDuplicate", { aura, count: plan.carriers.length }),
+                detail: t("sanityAuraKeep", { who: who(keep), pct: pct(keep.potency) }) +
+                    " — " + t("sanityAuraDrop", { names: plan.carriers.slice(1).map((c) => c.name).join(", ") }),
+            });
+        }
+    }
+
+    // Inline styles rather than a CSS class: this block renders on every group-battle page, and
+    // only the guild trial page carries the warning-box styles.
+    const box = (color, bg, body) => `<div style="border:1px solid ${color}; background:${bg};
+        border-radius:6px; padding:8px 10px; margin:4px 0 10px; font-size:13px;">${body}</div>`;
+    const heading = `<div style="font-weight:600; margin-bottom:${issues.length ? "4px" : "0"};">${escapeHtml(t("sanityCheckTitle"))}</div>`;
+
+    if (!issues.length) {
+        return box("rgba(76,175,80,0.5)", "rgba(76,175,80,0.10)",
+            `${heading}<span style="color:#9fd8a3;">✓ ${escapeHtml(t("sanityAllClear"))}</span>`);
+    }
+
+    let list = issues.map((issue) =>
+        `<li style="padding:1px 0;">${escapeHtml(issue.text)}` +
+        (issue.detail ? `<div class="hint" style="margin:0; color:rgba(255,205,133,0.75);">${escapeHtml(issue.detail)}</div>` : "") +
+        "</li>").join("");
+
+    return box("rgba(255,179,71,0.5)", "rgba(255,179,71,0.12)",
+        `<div style="color:#ffcd85;">${heading}<ul style="margin:0; padding-left:18px;">${list}</ul></div>`);
+}
+
 function renderPlayerList() {
     const container = document.getElementById("playerList");
     document.getElementById("playerCount").textContent = importedPlayers.length;
@@ -740,7 +1164,7 @@ function renderPlayerList() {
     }
 
     // Display in a fixed style order (Wark, Ranged, Stab, Smash, Slash, Magic
-    // by element, then others), while keeping each card's ORIGINAL import index
+    // by element, then others), while keeping each row's ORIGINAL import index
     // so remove/rename/modal still target the right entry. A stable sort keeps
     // import order within a style group.
     let ordered = importedPlayers
@@ -750,7 +1174,7 @@ function renderPlayerList() {
     // Aura-count-by-type subtitle (only auras actually present in the roster).
     let auraCounts = {};
     for (const { s } of ordered) {
-        if (s.auraHrid) auraCounts[s.auraHrid] = (auraCounts[s.auraHrid] || 0) + 1;
+        for (const aura of s.auras) auraCounts[aura.hrid] = (auraCounts[aura.hrid] || 0) + 1;
     }
     let auraChips = Object.entries(auraCounts)
         .sort((a, b) => b[1] - a[1])
@@ -761,41 +1185,58 @@ function renderPlayerList() {
         ? `<div class="roster-aura-summary"><span class="dim">${escapeHtml(t("aurasLabel"))}</span> ${auraChips}</div>`
         : "";
 
-    html += '<div class="roster-grid">';
-    ordered.forEach(({ p, i, s }) => {
-        let accent = styleColor(s);
-        let auraClass = s.auraHrid ? " has-aura" : "";
-        let auraName = s.auraHrid ? abilityName(s.auraHrid) : "";
-        let auraCol = s.auraHrid ? auraColor(s.auraHrid) : "";
-        let auraVar = s.auraHrid ? ` --accent-aura:${auraCol};` : "";
+    html += sanityCheckHtml();
 
-        let weaponLine = s.weaponName
+    const bestCarriers = bestCarrierByAura();
+    // A row per player rather than a card grid: at guild size the roster is a list you scan down
+    // one column at a time (who has no loadout, who carries what), not a set of portraits.
+    html += `<div style="max-height:460px; overflow-y:auto; margin-top:4px;">
+        <table class="tbl"><thead><tr>
+            <th></th>
+            <th>${escapeHtml(t("player"))}</th>
+            <th>${escapeHtml(t("style"))}</th>
+            <th>${escapeHtml(t("weapon"))}</th>
+            <th>${escapeHtml(t("aurasColumn"))}</th>
+            <th>HP</th><th>MP</th>
+            <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th>
+            <th></th>
+        </tr></thead><tbody>`;
+
+    ordered.forEach(({ p, i, s }, position) => {
+        let accent = styleColor(s);
+
+        let weaponCell = s.weaponName
             ? `${escapeHtml(s.weaponName)}${s.weaponEnh ? " +" + s.weaponEnh : ""}`
             : `<span class="dim">${escapeHtml(t("noWeapon"))}</span>`;
 
-        // OOM badge (from the most recent run), keyed by this player's hrid.
+        // OOM (from the most recent run), keyed by this player's hrid.
         let oom = rosterOom[p.dto.hrid] || 0;
-        let oomBadge = oom > 0
-            ? `<span class="rc-oom" title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))} ${oom}</span>`
-            : "";
+        let oomCell = oom > 0 ? `<span style="color:#ffb347;">${oom}</span>` : `<span class="dim">—</span>`;
 
-        // Percentages are 100% at import (players start full); bars still convey
-        // relative HP/MP magnitude via the numeric label.
-        html += `<div class="roster-card${auraClass}" data-open="${i}" style="--accent-style:${accent};${auraVar}" title="${escapeHtml(t("clickForDetails"))}">
-            <button class="rc-remove" data-remove="${i}" title="${escapeHtml(t("removePlayer"))}">✕</button>
-            ${oomBadge}
-            <div class="rc-name">${escapeHtml(p.name)}</div>
-            <div class="rc-weapon">${weaponLine}</div>
-            ${auraName ? `<div class="rc-aura" style="color:${auraCol};">✦ ${escapeHtml(auraName)}</div>` : ""}
-            <div class="rc-style" style="background:${accent};">${escapeHtml(styleLabel(s))}</div>
-            <div class="rc-bar rc-hp"><div class="rc-bar-fill" style="width:100%;"></div><span class="rc-bar-label">HP ${fmtNum(s.maxHitpoints)}</span></div>
-            <div class="rc-bar rc-mp"><div class="rc-bar-fill" style="width:100%;"></div><span class="rc-bar-label">MP ${fmtNum(s.maxManapoints)}</span></div>
-        </div>`;
+        // Guild trial import only: a member with no saved loadout is fighting whatever they
+        // happened to have equipped at export time, so their numbers are a guess. Flag the row.
+        let warn = p.noLoadout
+            ? `<span style="color:#ffb347;" title="${escapeHtml(t("guildTrialNoLoadoutTooltip"))}">⚠ </span>`
+            : "";
+        let nameColor = p.noLoadout ? "#ffb347" : "#fff";
+
+        html += `<tr class="roster-row" data-open="${i}" style="cursor:pointer;" title="${escapeHtml(t("clickForDetails"))}">
+            <td class="dim" style="border-left:3px solid ${accent}; padding-left:6px;">${position + 1}</td>
+            <td>${warn}<span class="roster-name" style="font-weight:600; color:${nameColor};">${escapeHtml(p.name)}</span></td>
+            <td><span style="display:inline-block; padding:1px 8px; border-radius:10px; font-size:11px;
+                font-weight:600; color:#12151a; background:${accent};">${escapeHtml(styleLabel(s))}</span></td>
+            <td>${weaponCell}</td>
+            <td>${auraTagsHtml(s.auras, p.dto.hrid, bestCarriers) || `<span class="dim">—</span>`}</td>
+            <td>${fmtNum(s.maxHitpoints)}</td><td>${fmtNum(s.maxManapoints)}</td>
+            <td>${oomCell}</td>
+            <td><button class="btn-x" data-remove="${i}" title="${escapeHtml(t("removePlayer"))}">✕</button></td>
+        </tr>`;
     });
-    html += "</div>";
+
+    html += "</tbody></table></div>";
     container.innerHTML = html;
 
-    container.querySelectorAll(".rc-remove").forEach((btn) => {
+    container.querySelectorAll("[data-remove]").forEach((btn) => {
         btn.addEventListener("click", (ev) => {
             ev.stopPropagation(); // don't also open the detail modal
             importedPlayers.splice(Number(btn.dataset.remove), 1);
@@ -803,13 +1244,13 @@ function renderPlayerList() {
             renderPlayerList();
         });
     });
-    container.querySelectorAll(".roster-card").forEach((card) => {
-        card.addEventListener("click", () => openPlayerModal(Number(card.dataset.open)));
+    container.querySelectorAll(".roster-row").forEach((row) => {
+        row.addEventListener("click", () => openPlayerModal(Number(row.dataset.open)));
         // Rename via double-click on the name (keeps single-click for details).
-        let nameEl = card.querySelector(".rc-name");
+        let nameEl = row.querySelector(".roster-name");
         nameEl.addEventListener("dblclick", (ev) => {
             ev.stopPropagation();
-            beginRename(card, Number(card.dataset.open), nameEl);
+            beginRename(row, Number(row.dataset.open), nameEl);
         });
     });
 }
@@ -864,7 +1305,7 @@ function openDetailModal(title, dto) {
                 statusEl.style.display = "none";
                 statusBtn.textContent = t("showDetailedStatus");
             } else {
-                renderDetailedStatus(statusEl, dto, t);
+                renderDetailedStatus(statusEl, dto, t, groupBattleExtraBuffs(dto));
                 statusEl.style.display = "block";
                 statusBtn.textContent = t("hideDetailedStatus");
             }
@@ -950,6 +1391,7 @@ function monsterName(hrid) {
 // against typos in the JSON).
 const MONSTER_GROUPS = (monsterGroupsData.groups || []).map((g) => ({
     name: g.name,
+    trialHrid: g.trialHrid || "",
     members: (g.members || [])
         .filter((mem) => combatMonsterDetailMap[mem.hrid] != null)
         .map((mem) => ({ hrid: mem.hrid, count: mem.count || 1 })),
@@ -1348,6 +1790,7 @@ function runBattleOnWorker({ players, enemies, timeCapSeconds }) {
             players,
             enemies,
             timeCapSeconds,
+            guildBuildingLevels,
         });
     });
 }
@@ -1512,11 +1955,106 @@ function trialOutcomeLabel(outcome) {
     }
 }
 
+// Folds one tier's damage groups into a running total. Both sides are the shape aggregateAttacks
+// produces, and the keys are stable across tiers (player hrids, and the uniqueHrid buildWorkerEnemies
+// assigns each enemy copy), so the same unit accumulates instead of splitting into a row per tier.
+function mergeDamageGroups(into, from) {
+    for (const [key, g] of Object.entries(from)) {
+        if (!into[key]) {
+            into[key] = { name: g.name, isPlayer: g.isPlayer, dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
+        }
+        let total = into[key];
+        total.dmg += g.dmg;
+        total.raw += g.raw || 0;
+        total.hits += g.hits;
+        total.misses += g.misses;
+        total.casts += g.casts;
+        if (g.auras) total.auras = g.auras;
+
+        for (const [abilityHrid, a] of Object.entries(g.byAbility)) {
+            if (!total.byAbility[abilityHrid]) {
+                total.byAbility[abilityHrid] = { name: a.name, dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0 };
+            }
+            let totalAbility = total.byAbility[abilityHrid];
+            totalAbility.dmg += a.dmg;
+            totalAbility.raw += a.raw || 0;
+            totalAbility.hits += a.hits;
+            totalAbility.misses += a.misses;
+            totalAbility.casts += a.casts;
+        }
+    }
+}
+
+// Drops the trial monsters, leaving only the roster. The run analysis is about the guild's own
+// output, and the monster's rows just restate it from the other side.
+function playersOnly(groups) {
+    return Object.fromEntries(Object.entries(groups).filter(([, g]) => g.isPlayer));
+}
+
+// Damage done, damage taken and healing done by every PLAYER across the WHOLE trial run. A tier's
+// own modal answers "what happened at T4"; this answers "who carried the run". Rates are over the
+// summed combat time of every tier, so the between-tier recovery doesn't dilute them.
+function aggregateTrialRun(tiers) {
+    let done = {}, taken = {}, healed = {};
+    let durationSeconds = 0;
+
+    for (const tier of tiers) {
+        if (!tier.result) continue;
+        const result = tier.result;
+        durationSeconds += tier.durationSeconds || 0;
+
+        let tierDone = aggregateAttacks(result.battleLog, "source");
+        mergeAbilityCastCounts(tierDone, result);
+        tagAuraCasters(tierDone, result);
+        mergeDamageGroups(done, tierDone);
+
+        let tierTaken = aggregateAttacks(result.battleLog, "target");
+        mergeSelfInflictedDamage(tierTaken, result);
+        mergeDamageGroups(taken, tierTaken);
+
+        let tierHealed = aggregateHeals(result.battleLog, { excludeRegen: true });
+        mergeHealCastCounts(tierHealed, result);
+        mergeHealGroups(healed, tierHealed);
+    }
+
+    return {
+        done: playersOnly(done),
+        taken: playersOnly(taken),
+        healed: playersOnly(healed),
+        durationSeconds,
+    };
+}
+
+// Healing counterpart to mergeDamageGroups: "count" is heals landed, "casts" is spells cast.
+function mergeHealGroups(into, from) {
+    for (const [key, g] of Object.entries(from)) {
+        if (!into[key]) {
+            into[key] = { name: g.name, isPlayer: g.isPlayer, healed: 0, count: 0, casts: 0, byAbility: {} };
+        }
+        let total = into[key];
+        total.healed += g.healed;
+        total.count += g.count;
+        total.casts += g.casts;
+
+        for (const [abilityHrid, a] of Object.entries(g.byAbility)) {
+            if (!total.byAbility[abilityHrid]) {
+                total.byAbility[abilityHrid] = { name: a.name, healed: 0, count: 0, casts: 0 };
+            }
+            let totalAbility = total.byAbility[abilityHrid];
+            totalAbility.healed += a.healed;
+            totalAbility.count += a.count;
+            totalAbility.casts += a.casts;
+        }
+    }
+}
+
 // Renders the trial-mode summary + per-tier table. `stopReason` is null while
 // the run is still in progress.
+let lastTrialRun = null;
 function renderTrialModeResult(tiers, stopReason) {
     const container = document.getElementById("trialModeResult");
     if (!tiers.length) { container.innerHTML = ""; return; }
+    lastTrialRun = { tiers, stopReason };
 
     let reached = tiers[tiers.length - 1];
     let clearedThrough = tiers.filter((x) => x.outcome === "victory").length;
@@ -1571,8 +2109,25 @@ function renderTrialModeResult(tiers, stopReason) {
                 <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("trialColOom"))}</th>
             </tr></thead>
             <tbody>${rows}</tbody>
-        </table>`;
+        </table>
+        <details class="log-details" open style="margin-top:10px;">
+            <summary><h4 style="display:inline; margin:0;">${escapeHtml(t("trialAnalysisTitle"))}</h4></summary>
+            <p class="hint">${escapeHtml(t("trialAnalysisHint"))}</p>
+            <div class="row" style="margin-bottom:6px;">
+                <button id="trialExportDiscord" class="secondary">${escapeHtml(t("copyForDiscord"))}</button>
+                <span id="trialExportStatus" class="hint"></span>
+            </div>
+            <div id="trialRunAnalysis"></div>
+        </details>`;
     container.style.display = "block";
+
+    const run = aggregateTrialRun(tiers);
+    renderTrialAnalysisTable("trialRunAnalysis", run);
+
+    document.getElementById("trialExportDiscord").addEventListener("click", (ev) => {
+        ev.preventDefault();
+        copyTrialSummary(tiers, run);
+    });
 
     // Wire tier-row clicks to open the combat-detail modal for that tier.
     container.querySelectorAll(".trial-tier-row").forEach((row) => {
@@ -1774,18 +2329,21 @@ function aggregateAttacks(battleLog, groupBy) {
         let key = hrid + "|" + isPlayer;
 
         if (!groups[key]) {
-            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
+            groups[key] = { name: nameFor(hrid, isPlayer), isPlayer, dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
         }
         let g = groups[key];
-        if (isHit) { g.dmg += entry.hit; g.hits += 1; } else { g.misses += 1; }
+        // raw = damage before armour/resistance mitigation. Older logs (and damage over time) carry
+        // no pre-mitigation figure, so fall back to the real hit rather than under-reporting.
+        let raw = isHit ? (typeof entry.premitigatedHit === "number" ? entry.premitigatedHit : entry.hit) : 0;
+        if (isHit) { g.dmg += entry.hit; g.raw += raw; g.hits += 1; } else { g.misses += 1; }
         g.casts += 1;
 
         let abilityKey = entry.ability;
         if (!g.byAbility[abilityKey]) {
-            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), dmg: 0, hits: 0, misses: 0, casts: 0 };
+            g.byAbility[abilityKey] = { name: abilityOrItemName(abilityKey), dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0 };
         }
         let a = g.byAbility[abilityKey];
-        if (isHit) { a.dmg += entry.hit; a.hits += 1; } else { a.misses += 1; }
+        if (isHit) { a.dmg += entry.hit; a.raw += raw; a.hits += 1; } else { a.misses += 1; }
         a.casts += 1;
     }
     return groups;
@@ -1845,8 +2403,8 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
     rows.forEach((r, i) => {
         let rowId = rowIdPrefix + i;
         let acc = accuracyPct(r.hits, r.misses);
-        let displayName = r.auraHrid ? `${r.name} (${abilityOrItemName(r.auraHrid)})` : r.name;
-        let auraCls = r.auraHrid ? " has-aura" : "";
+        let displayName = auraTaggedName(r.name, r.auras);
+        let auraCls = r.auras?.length ? " has-aura" : "";
         html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}${auraCls}" data-detail-toggle="${rowId}">
             <td>${escapeHtml(displayName)}</td><td>${Math.round(r.dmg).toLocaleString()}</td>
             <td>${r.casts}</td><td>${r.hits}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
@@ -1888,18 +2446,35 @@ const NAME_TAG_AURA_HRIDS = new Set(
     [...AURA_ABILITY_HRIDS].filter((h) => h !== "/abilities/insanity" && h !== "/abilities/revive")
 );
 
-// Tags each Damage Done group with the (first, if somehow more than one)
-// non-insanity/revive aura its caster cast during the battle, so the row can
-// be highlighted and labeled "PlayerName (Aura)". Players only - trial/enemy
-// monsters can carry abilities that share an hrid with a player aura (e.g. a
-// monster's own "fierce_aura"-alike attack), and this tag is meant to call
-// out the roster's aura-carrier role, not enemy abilities.
+// The name-tag auras a roster player has EQUIPPED, as { hrid, level }, by their DTO hrid.
+function rosterAuras(playerHrid) {
+    let player = importedPlayers.find((p) => p.dto.hrid === playerHrid);
+    return (player?.dto.abilities || [])
+        .filter((a) => a && NAME_TAG_AURA_HRIDS.has(a.hrid))
+        .map((a) => ({ hrid: a.hrid, level: Number(a.level) || 0 }));
+}
+
+// Tags each player's row with the auras they carry, so it can be highlighted and labeled
+// "PlayerName (Aura, Aura)". The equipped bar is the source of truth: carrying an aura is a roster
+// fact, and one whose trigger never fired - a low-HP Invincible on a player who stayed healthy -
+// casts zero times during a run yet still belongs next to the name. Cast counts are only a
+// fallback, for a result rendered against a roster that has since changed. Players only: enemy
+// monsters can carry abilities sharing an hrid with a player aura, and this tag is about the
+// roster's aura-carrier roles, not enemy abilities.
 function tagAuraCasters(groups, result) {
-    for (const [casterHrid, castsByAbility] of Object.entries(result.abilityCastCounts || {})) {
-        let key = Object.keys(groups).find((k) => k.startsWith(casterHrid + "|"));
-        if (!key || !groups[key].isPlayer) continue;
-        let auraHrid = Object.keys(castsByAbility).find((h) => NAME_TAG_AURA_HRIDS.has(h));
-        if (auraHrid) groups[key].auraHrid = auraHrid;
+    for (const [key, group] of Object.entries(groups)) {
+        if (!group.isPlayer) continue;
+        const playerHrid = key.split("|")[0];
+
+        let auras = rosterAuras(playerHrid);
+        if (!auras.length) {
+            // Fallback for a result rendered against a roster that has since changed: the cast log
+            // knows which auras fired, but not what level they were.
+            auras = Object.keys(result.abilityCastCounts?.[playerHrid] ?? {})
+                .filter((hrid) => NAME_TAG_AURA_HRIDS.has(hrid))
+                .map((hrid) => ({ hrid, level: 0 }));
+        }
+        if (auras.length) group.auras = auras;
     }
 }
 
@@ -1936,19 +2511,22 @@ function mergeSelfInflictedDamage(groups, result) {
             let isPlayer = key ? groups[key].isPlayer : victimHrid.startsWith("player");
             if (!key) {
                 key = victimHrid + "|" + isPlayer;
-                groups[key] = { name: nameFor(victimHrid, isPlayer), isPlayer, dmg: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
+                groups[key] = { name: nameFor(victimHrid, isPlayer), isPlayer, dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0, byAbility: {} };
             }
             let g = groups[key];
             let casts = result.abilityCastCounts?.[victimHrid]?.[abilityHrid] || 0;
 
             if (!g.byAbility[abilityHrid]) {
-                g.byAbility[abilityHrid] = { name: abilityOrItemName(abilityHrid), dmg: 0, hits: 0, misses: 0, casts: 0 };
+                g.byAbility[abilityHrid] = { name: abilityOrItemName(abilityHrid), dmg: 0, raw: 0, hits: 0, misses: 0, casts: 0 };
             }
             let a = g.byAbility[abilityHrid];
+            // Spending your own HP goes around armour entirely, so raw and real are the same here.
             a.dmg += totalSpent;
+            a.raw += totalSpent;
             a.hits += casts;
             a.casts += casts;
             g.dmg += totalSpent;
+            g.raw += totalSpent;
             g.hits += casts;
             g.casts += casts;
         }
@@ -1958,10 +2536,17 @@ function mergeSelfInflictedDamage(groups, result) {
 // Groups "heal" log entries by the healer (the caster), and within each healer
 // by the healing ability/source - so the Healing Done table can show a per-
 // player total and expand to show which abilities did the healing.
-function aggregateHeals(battleLog) {
+// The per-10s passive HP recovery tick is logged as a heal with this source (see
+// addHitpointsGained(unit, "regen", ...)). It is recovery, not healing anyone did, so the run
+// analysis leaves it out - with the group-battle +3pp regen buff it would otherwise dominate the
+// column and read as though every tank were a healer.
+const PASSIVE_REGEN_HEAL_SOURCE = "regen";
+
+function aggregateHeals(battleLog, { excludeRegen = false } = {}) {
     let groups = {};
     for (const entry of battleLog || []) {
         if (entry.kind !== "heal") continue;
+        if (excludeRegen && entry.healSource === PASSIVE_REGEN_HEAL_SOURCE) continue;
         // Older logs may lack a healer field; fall back to the healed unit.
         let hrid = entry.healer || entry.unit;
         let isPlayer = entry.healer != null ? !!entry.healerIsPlayer : !!entry.isPlayer;
@@ -2012,9 +2597,13 @@ function renderHealingDone(result, ids = IDS_MAIN) {
     let dur = result.battleDurationNs / ONE_SECOND || 1;
     let groups = aggregateHeals(result.battleLog);
     mergeHealCastCounts(groups, result);
-    let showTitle = ids === IDS_MAIN;
-    let rowIdPrefix = ids.healingDone + "_hd";
-    const container = document.getElementById(ids.healingDone);
+    renderExpandableHealingTable(ids.healingDone, groups, dur, ids.healingDone + "_hd", ids === IDS_MAIN);
+}
+
+// One row per healer with total healed / casts / HPS, expandable to a per-ability breakdown.
+// Parallel to renderExpandableDamageTable, and shared by the single battle and the trial run total.
+function renderExpandableHealingTable(containerId, groups, dur, rowIdPrefix, showTitle = true) {
+    const container = document.getElementById(containerId);
     if (!container) return;
 
     let rows = Object.values(groups).sort((a, b) => b.healed - a.healed);
@@ -2059,6 +2648,278 @@ function renderHealingDone(result, ids = IDS_MAIN) {
             row.classList.toggle("open", !open);
         });
     });
+}
+
+// One accent per metric, so a row reads across at a glance instead of by chasing column headers.
+const ANALYSIS_COLORS = {
+    damage: "#f0894c",   // orange - damage dealt
+    healing: "#6fd08a",  // green  - healing done
+    taken: "#ff6b6b",    // red    - damage arriving, before reduction
+};
+
+// One row per player for the whole trial run: damage done, healing done, and the damage that
+// arrived before armour/resistance reduced it. Expanding a row shows the per-ability breakdown of
+// all three, which is why this is its own renderer rather than three stacked tables - a player's
+// output and what it cost them read as one line.
+function renderTrialAnalysisTable(containerId, run) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const dur = run.durationSeconds || 1;
+    // Roster position by player hrid, so a row can open that player's detail dialog. A player
+    // removed from the roster after the run simply gets no button.
+    let rosterIndexByHrid = {};
+    importedPlayers.forEach((p, i) => (rosterIndexByHrid[p.dto.hrid] = i));
+    const bestCarriers = bestCarrierByAura();
+    // The roster, keyed the same way every group map is, so the three views line up per player.
+    let keys = [...new Set([...Object.keys(run.done), ...Object.keys(run.healed), ...Object.keys(run.taken)])];
+    if (!keys.length) {
+        container.innerHTML = `<div class="empty">${escapeHtml(t("noPlayersImported"))}</div>`;
+        return;
+    }
+
+    let rows = keys
+        .map((key) => ({
+            key,
+            name: (run.done[key] ?? run.healed[key] ?? run.taken[key]).name,
+            auras: run.done[key]?.auras,
+            done: run.done[key],
+            healed: run.healed[key],
+            taken: run.taken[key],
+        }))
+        .sort((a, b) => (b.done?.dmg ?? 0) - (a.done?.dmg ?? 0));
+
+    const num = (v) => Math.round(v || 0).toLocaleString();
+    const tint = (color) => ` style="color:${color};"`;
+
+    // Each metric as a share of the party's total for that metric, so a row answers "how much of
+    // this was me" without reading every other row. Each column is its own denominator - a share
+    // of party healing means nothing measured against party damage. Two decimals below 1%, where
+    // one would round every small contributor to the same 0.0%.
+    const partyTotals = {
+        damage: rows.reduce((sum, r) => sum + (r.done?.dmg || 0), 0),
+        healing: rows.reduce((sum, r) => sum + (r.healed?.healed || 0), 0),
+        taken: rows.reduce((sum, r) => sum + (r.taken?.raw || 0), 0),
+    };
+    const share = (value, total) => {
+        if (!total || !value) return "";
+        const pct = (100 * value) / total;
+        return ` (${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%)`;
+    };
+    const pctSpan = (value, total) =>
+        `<span style="opacity:0.7; font-size:11px;">${share(value, total)}</span>`;
+
+    let html = `<table class="tbl"><thead><tr>
+        <th>${escapeHtml(t("player"))}</th>
+        <th${tint(ANALYSIS_COLORS.damage)}>${escapeHtml(t("totalDmg"))}</th>
+        <th${tint(ANALYSIS_COLORS.healing)}>${escapeHtml(t("totalHealed"))}</th>
+        <th${tint(ANALYSIS_COLORS.taken)} title="${escapeHtml(t("preMitigationTooltip"))}">${escapeHtml(t("preMitigation"))}</th>
+    </tr></thead><tbody>`;
+
+    rows.forEach((r, i) => {
+        let rowId = containerId + "_" + i;
+        let rosterIndex = rosterIndexByHrid[r.key.split("|")[0]];
+        let openBtn = rosterIndex === undefined ? "" :
+            `<button class="expand-btn" data-open-player="${rosterIndex}" title="${escapeHtml(t("clickForDetails"))}">ⓘ</button>`;
+
+        // Same flag the roster cards carry: this member never saved a loadout for the trial, so
+        // their whole line is a guess built from whatever they had equipped at export time.
+        let noLoadout = rosterIndex !== undefined && importedPlayers[rosterIndex]?.noLoadout;
+        let warnBadge = noLoadout
+            ? `<span style="color:#ffb347;" title="${escapeHtml(t("guildTrialNoLoadoutTooltip"))}">⚠ </span>`
+            : "";
+        let nameStyle = noLoadout ? ' style="color:#ffb347;"' : "";
+
+        // No has-aura class here: it golds the entire cell, which would flatten the per-aura colours.
+        html += `<tr class="expandable src-player" data-detail-toggle="${rowId}">
+            <td>${openBtn}${warnBadge}<span${nameStyle}>${escapeHtml(r.name)}</span>${auraTagsHtml(r.auras, r.key.split("|")[0], bestCarriers)}</td>
+            <td${tint(ANALYSIS_COLORS.damage)}>${num(r.done?.dmg)}${pctSpan(r.done?.dmg, partyTotals.damage)}</td>
+            <td${tint(ANALYSIS_COLORS.healing)}>${num(r.healed?.healed)}${pctSpan(r.healed?.healed, partyTotals.healing)}</td>
+            <td${tint(ANALYSIS_COLORS.taken)}>${num(r.taken?.raw)}${pctSpan(r.taken?.raw, partyTotals.taken)}</td>
+        </tr>`;
+
+        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="4"><div class="detail-inner">
+            ${damageBreakdownHtml(t("damageDone"), r.done, dur, false, ANALYSIS_COLORS.damage)}
+            ${healBreakdownHtml(t("healingDone"), r.healed, dur, ANALYSIS_COLORS.healing)}
+            ${damageBreakdownHtml(t("damageTaken"), r.taken, dur, true, ANALYSIS_COLORS.taken)}
+        </div></td></tr>`;
+    });
+
+    html += "</tbody></table>";
+    container.innerHTML = html;
+
+    container.querySelectorAll("[data-detail-toggle]").forEach((row) => {
+        row.addEventListener("click", () => {
+            let detail = document.getElementById("detailrow-" + row.dataset.detailToggle);
+            let open = detail.style.display !== "none";
+            detail.style.display = open ? "none" : "table-row";
+            row.classList.toggle("open", !open);
+        });
+    });
+    container.querySelectorAll("[data-open-player]").forEach((btn) => {
+        btn.addEventListener("click", (ev) => {
+            ev.stopPropagation(); // don't also expand/collapse the row
+            openPlayerModal(Number(btn.dataset.openPlayer));
+        });
+    });
+}
+
+// Per-ability rows for one damage group inside an expanded analysis row. `showRaw` adds the
+// pre-mitigation column, which only means anything on the Damage Taken side.
+function damageBreakdownHtml(title, group, dur, showRaw = false, color = "") {
+    let abilities = Object.values(group?.byAbility ?? {}).sort((a, b) => b.dmg - a.dmg || b.casts - a.casts);
+    if (!abilities.length) return "";
+
+    let head = `<th>${escapeHtml(t("abilities"))}</th><th>${escapeHtml(t("totalDmg"))}</th>` +
+        (showRaw ? `<th>${escapeHtml(t("preMitigation"))}</th>` : "") +
+        `<th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("hits"))}</th><th>${escapeHtml(t("accuracy"))}</th><th>${escapeHtml(t("dps"))}</th>`;
+
+    let body = abilities.map((a) =>
+        `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.dmg).toLocaleString()}</td>` +
+        (showRaw ? `<td>${Math.round(a.raw || 0).toLocaleString()}</td>` : "") +
+        `<td>${a.casts}</td><td>${a.hits}</td><td>${accuracyPct(a.hits, a.misses)}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`
+    ).join("");
+
+    return breakdownHeading(title, color) +
+        `<table class="sub-tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function breakdownHeading(title, color) {
+    return `<h5 class="dim" style="margin:6px 0 2px; font-size:11px; text-transform:uppercase;` +
+        ` letter-spacing:0.05em;${color ? `color:${color};` : ""}">${escapeHtml(title)}</h5>`;
+}
+
+function healBreakdownHtml(title, group, dur, color = "") {
+    let abilities = Object.values(group?.byAbility ?? {}).sort((a, b) => b.healed - a.healed);
+    if (!abilities.length) return "";
+
+    let body = abilities.map((a) =>
+        `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.healed).toLocaleString()}</td>
+             <td>${a.casts}</td><td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`
+    ).join("");
+
+    return breakdownHeading(title, color) +
+        `<table class="sub-tbl"><thead><tr>
+            <th>${escapeHtml(t("abilities"))}</th><th>${escapeHtml(t("totalHealed"))}</th>
+            <th>${escapeHtml(t("castCount"))}</th><th>${escapeHtml(t("healCount"))}</th><th>${escapeHtml(t("hps"))}</th>
+        </tr></thead><tbody>${body}</tbody></table>`;
+}
+
+// "PlayerName (Aura)" - or "(Aura, Aura)" for someone carrying several. Plain text, for the
+// damage tables that highlight the whole cell rather than each aura.
+function auraTaggedName(name, auras) {
+    if (!auras?.length) return name;
+    return `${name} (${auras.map((a) => abilityOrItemName(a.hrid)).join(", ")})`;
+}
+
+// Auras as inline tags with their level, each in its own colour. Insanity is deliberately left
+// uncoloured: it is a self-damaging gamble rather than a team buff, so it should not read as one
+// of the support roles the colours are there to pick out.
+function auraTagsHtml(auras, playerHrid, bestCarriers = {}) {
+    return (auras ?? []).map((a) => {
+        let color = a.hrid === "/abilities/insanity" ? "var(--dim)" : auraColor(a.hrid);
+        let level = a.level > 0 ? ` L${a.level}` : "";
+        // ★ marks the roster's strongest carrier of an aura the group wants exactly one of, so a
+        // duplicate reads as "this is the one to keep" rather than just "two people have it".
+        let star = bestCarriers[a.hrid] === playerHrid
+            ? `<span title="${escapeHtml(t("recommendedCarrier"))}">★ </span>` : "";
+        return `<span style="margin-left:6px; font-size:11px; font-weight:600; color:${color};">` +
+            `${star}✦ ${escapeHtml(abilityOrItemName(a.hrid))}${escapeHtml(level)}</span>`;
+    }).join("");
+}
+
+// A Discord-ready summary of the run: the tier ladder, then the per-player table. Wrapped in a
+// ``` block so Discord renders it monospaced and the columns stay aligned; padded by hand for the
+// same reason. Kept short enough to clear Discord's 2000-character message limit for a normal
+// roster, with a note if it had to be truncated.
+const DISCORD_MESSAGE_LIMIT = 2000;
+
+function trialSummaryText(tiers, run) {
+    let cleared = tiers.filter((x) => x.outcome === "victory").length;
+    let reached = tiers[tiers.length - 1];
+
+    let lines = [];
+    lines.push(`**${t("trialAnalysisTitle")}** — ${t("trialReachedTier", {
+        tier: reached.tier, level: reached.level, cleared,
+    })}`);
+    lines.push("```");
+
+    for (const x of tiers) {
+        lines.push(`T${x.tier} (L${x.level})  ${trialOutcomeLabel(x.outcome)}  ${fmtTime(x.durationSeconds * 1e9)}` +
+            `  ${t("trialColWiped")} ${x.wiped}/${x.totalPlayers}`);
+    }
+    lines.push("");
+
+    // Column widths from the content, so names of any length still line up.
+    let rows = Object.keys(run.done)
+        .concat(Object.keys(run.healed), Object.keys(run.taken))
+        .filter((key, i, all) => all.indexOf(key) === i)
+        .map((key) => ({
+            name: (run.done[key] ?? run.healed[key] ?? run.taken[key]).name,
+            dmg: Math.round(run.done[key]?.dmg || 0),
+            heal: Math.round(run.healed[key]?.healed || 0),
+            taken: Math.round(run.taken[key]?.raw || 0),
+        }))
+        .sort((a, b) => b.dmg - a.dmg);
+
+    const num = (v) => v.toLocaleString();
+    // Each column carries its share of the party total for that metric, as in the table.
+    const totals = {
+        dmg: rows.reduce((sum, r) => sum + r.dmg, 0),
+        heal: rows.reduce((sum, r) => sum + r.heal, 0),
+        taken: rows.reduce((sum, r) => sum + r.taken, 0),
+    };
+    const withShare = (value, total) => {
+        if (!total || !value) return num(value);
+        const pct = (100 * value) / total;
+        return `${num(value)} (${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%)`;
+    };
+    const cells = (r) => [
+        withShare(r.dmg, totals.dmg), withShare(r.heal, totals.heal), withShare(r.taken, totals.taken),
+    ];
+
+    const nameWidth = Math.max(6, ...rows.map((r) => r.name.length));
+    const headers = [t("totalDmg"), t("totalHealed"), t("preMitigation")];
+    const widths = headers.map((header, i) =>
+        Math.max(header.length, ...rows.map((r) => cells(r)[i].length)));
+
+    lines.push(`${"".padEnd(nameWidth)}  ${headers[0].padStart(widths[0])}  ${headers[1].padStart(widths[1])}  ${headers[2].padStart(widths[2])}`);
+    for (const r of rows) {
+        const [dmg, heal, taken] = cells(r);
+        lines.push(`${r.name.padEnd(nameWidth)}  ${dmg.padStart(widths[0])}` +
+            `  ${heal.padStart(widths[1])}  ${taken.padStart(widths[2])}`);
+    }
+    lines.push("```");
+
+    let text = lines.join("\n");
+    if (text.length > DISCORD_MESSAGE_LIMIT) {
+        // Trim players off the bottom (the smallest contributors) until it fits, closing the block.
+        while (lines.length > 4 && lines.join("\n").length + 40 > DISCORD_MESSAGE_LIMIT) {
+            lines.splice(lines.length - 2, 1);
+        }
+        lines.splice(lines.length - 1, 0, t("summaryTruncated"));
+        text = lines.join("\n");
+    }
+    return text;
+}
+
+async function copyTrialSummary(tiers, run) {
+    const status = document.getElementById("trialExportStatus");
+    const text = trialSummaryText(tiers, run);
+    try {
+        await navigator.clipboard.writeText(text);
+        status.textContent = t("copiedToClipboard");
+    } catch (e) {
+        // Fallback for browsers/contexts without clipboard access (same approach the detail
+        // modal's Export JSON uses).
+        let ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); status.textContent = t("copiedToClipboard"); }
+        catch (e2) { status.textContent = t("copyFailed"); }
+        ta.remove();
+    }
 }
 
 // The ability/source hrids carried by a log entry, used to detect aura info.
@@ -2234,7 +3095,9 @@ window.addEventListener("DOMContentLoaded", () => {
     // on their own the way data-i18n elements do.
     onLanguageChange(() => {
         renderPredefinedPresets();
+        renderGuildBuildings();
         renderPlayerList();
+        renderGuildTrialStatus();
         renderEnemyGroup();
         refreshEnemySelect();
         // Changelog notes are per-language; re-render if it's currently open.
@@ -2243,6 +3106,9 @@ window.addEventListener("DOMContentLoaded", () => {
         }
         if (window.__lastBattleResult) {
             renderResult(window.__lastBattleResult, false);
+        }
+        if (lastTrialRun) {
+            renderTrialModeResult(lastTrialRun.tiers, lastTrialRun.stopReason);
         }
     });
 
@@ -2285,10 +3151,19 @@ window.addEventListener("DOMContentLoaded", () => {
     const clearRoster = () => {
         importedPlayers = [];
         rosterOom = {};
+        lastGuildTrialImport = null;
         renderPlayerList();
+        renderGuildTrialStatus();
     };
     document.getElementById("clearPlayers").addEventListener("click", clearRoster);
     document.getElementById("clearPlayers2").addEventListener("click", clearRoster);
+    document.getElementById("clearPlayers3")?.addEventListener("click", clearRoster);
+
+    // Players — Guild Trial sub-tab.
+    initGuildTrialImport();
+
+    // Guild buildings banner (top of the page).
+    renderGuildBuildings();
 
     // Players — Group Builder sub-tab
     document.getElementById("buildRoster").addEventListener("click", buildRoster);

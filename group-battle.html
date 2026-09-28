@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MWI Group Battle Simulator (WIP) v0.9</title>
+    <title>MWI Group Battle Simulator (WIP) v1.0</title>
     <link rel="icon" href="data:," />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -220,6 +220,7 @@
         .dim { color: var(--dim); }
         b { color: #fff; }
 
+        .tbl tr.roster-row:hover { background: rgba(91,155,213,0.08); }
         .tbl tr.expandable { cursor: pointer; }
         .tbl tr.expandable:hover { background: rgba(91,155,213,0.08); }
         .tbl tr.expandable td:first-child::before { content: "▸ "; color: var(--dim); }
@@ -404,106 +405,38 @@
         }
         .rules-banner li { padding: 2px 0; }
 
-        /* ---- Roster grid of player cards ---- */
-        .roster-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-            gap: 10px;
-            margin-top: 4px;
-            max-height: 420px;
-            overflow-y: auto;
-            /* room so card hover glow/lift isn't clipped by the scroll box */
-            padding: 4px;
-        }
-        .roster-card {
-            position: relative;
-            border: 1px solid var(--border);
-            border-left: 4px solid var(--accent-style, var(--dim));
+        /* ---- Guild trial import (this page only) ---- */
+        .drop-zone {
+            border: 1px dashed var(--border);
             border-radius: 8px;
             background: var(--panel2);
-            padding: 10px 10px 12px;
-            cursor: pointer;
-            transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.06s ease;
-        }
-        .roster-card:hover {
-            box-shadow: 0 0 0 1px var(--accent-style, var(--accent)), 0 4px 14px rgba(0,0,0,0.35);
-            transform: translateY(-1px);
-        }
-        /* Aura players get a distinct glowing full border, tinted per aura via
-           the --accent-aura variable set inline on the card. */
-        .roster-card.has-aura {
-            border-color: var(--accent-aura, #f0c250);
-            box-shadow: 0 0 0 1px var(--accent-aura, #f0c250), 0 0 12px color-mix(in srgb, var(--accent-aura, #f0c250) 35%, transparent);
-        }
-        .roster-card.has-aura:hover {
-            box-shadow: 0 0 0 1px var(--accent-aura, #f0c250), 0 0 16px color-mix(in srgb, var(--accent-aura, #f0c250) 55%, transparent), 0 4px 14px rgba(0,0,0,0.35);
-        }
-        .rc-remove {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: transparent;
-            border: none;
-            color: var(--dim);
-            font-size: 12px;
-            padding: 2px 5px;
-            line-height: 1;
-        }
-        .rc-remove:hover { filter: none; color: #ff6b6b; }
-        .rc-oom {
-            position: absolute;
-            top: 4px;
-            right: 22px;
-            background: rgba(255,179,71,0.18);
-            color: #ffb347;
-            border: 1px solid rgba(255,179,71,0.5);
-            border-radius: 8px;
-            padding: 0 6px;
-            font-size: 10px;
-            font-weight: 600;
-            line-height: 15px;
-        }
-        .rc-name {
-            font-weight: 600;
-            font-size: 14px;
-            color: #fff;
-            padding-right: 18px;
-            word-break: break-word;
-        }
-        .roster-card .name-edit { width: 100%; font-size: 14px; margin: 0; }
-        .rc-weapon { font-size: 12px; color: var(--text); margin-top: 3px; word-break: break-word; }
-        .rc-aura { font-size: 11px; color: #f0c250; margin-top: 2px; }
-        .rc-style {
-            display: inline-block;
-            margin-top: 6px;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #12151a;
-            letter-spacing: 0.02em;
-        }
-        .rc-bar {
-            position: relative;
-            height: 16px;
-            margin-top: 6px;
-            background: rgba(255,255,255,0.08);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        .rc-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; }
-        .rc-hp .rc-bar-fill { background: linear-gradient(90deg, #3ea55a, #57c874); }
-        .rc-mp .rc-bar-fill { background: linear-gradient(90deg, #3877c4, #4c9be8); }
-        .rc-bar-label {
-            position: relative;
-            z-index: 1;
-            display: block;
+            padding: 18px 14px;
+            margin-top: 8px;
             text-align: center;
-            font-size: 10px;
-            line-height: 16px;
-            color: #fff;
-            text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+            cursor: pointer;
+            transition: border-color 0.12s ease, background 0.12s ease;
         }
+        .drop-zone:hover, .drop-zone.dragging {
+            border-color: var(--accent);
+            background: rgba(91,155,213,0.10);
+        }
+        .drop-zone .drop-title { font-weight: 600; color: var(--accent); }
+        .drop-zone .drop-sub { color: var(--dim); font-size: 12px; margin-top: 4px; }
+
+        #guildTrialStatus { margin-top: 10px; }
+        #guildTrialStatus .trial-status-line { font-size: 13px; padding: 2px 0; }
+        .warn-box {
+            background: rgba(255,179,71,0.12);
+            border: 1px solid rgba(255,179,71,0.5);
+            border-radius: 6px;
+            color: #ffcd85;
+            padding: 8px 10px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .warn-box .hint { color: rgba(255,205,133,0.75); }
+
+
 
         /* ---- Player detail modal ---- */
         .modal-overlay {
@@ -604,7 +537,7 @@
     <header>
         <div class="header-left">
             <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator (WIP)</h1>
-            <div class="build-info"><button type="button" id="buildVersion" class="version-badge" data-i18n-title="common:groupBattle.changelogTooltip" title="View changelog">v0.9</button> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-08-13 UTC</span></div>
+            <div class="build-info"><button type="button" id="buildVersion" class="version-badge" data-i18n-title="common:groupBattle.changelogTooltip" title="View changelog">v1.0</button> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-08-13 UTC</span></div>
             <div class="disclaimer" data-i18n="common:groupBattle.disclaimer">For IC guild Arsenal internal use only.</div>
             <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
         </div>
@@ -619,6 +552,16 @@
         </ul>
     </details>
 
+    <details class="rules-banner" id="guildBuildingsBanner">
+        <summary><b data-i18n="common:groupBattle.guildBuildingsTitle">Guild Buildings:</b>
+            <span id="guildBuildingSummary" style="margin-left:8px; font-weight:400;"></span></summary>
+        <p class="hint" style="padding:0 20px;" data-i18n="common:groupBattle.guildBuildingsHint">
+            Guild-wide bonuses applied to every member of the roster, on top of each player's own house rooms.
+            Levels are remembered in this browser and apply to every tier of a trial.
+        </p>
+        <div id="guildBuildingList" style="padding:0 20px 12px 38px; max-width:420px;"></div>
+    </details>
+
     <div id="errorBox"></div>
 
     <!-- ======================= BATTLE TAB ======================= -->
@@ -630,12 +573,32 @@
 
             <!-- Import sub-tabs -->
             <div class="subtabbar">
-                <button class="subtab active" data-subtab="groupBuilderTab" data-i18n="common:groupBattle.subtabGroupBuilder">Group Builder</button>
+                <button class="subtab active" data-subtab="guildTrialTab" data-i18n="common:groupBattle.subtabGuildTrial">Guild Trial File</button>
+                <button class="subtab" data-subtab="groupBuilderTab" data-i18n="common:groupBattle.subtabGroupBuilder">Group Builder</button>
                 <button class="subtab" data-subtab="pasteJsonTab" data-i18n="common:groupBattle.subtabPasteJson">Paste JSON</button>
             </div>
 
+            <!-- ---- Guild Trial file sub-tab (this page's reason to exist) ---- -->
+            <div id="guildTrialTab" class="subtabpanel">
+                <p class="hint" data-i18n="common:groupBattle.guildTrialHint">
+                    Load the guild's combat trial export (one JSON file, one entry per member). Each member is
+                    built from their saved combat loadout — gear, abilities and ability triggers — falling back to
+                    whatever they had equipped when they never saved one. Importing replaces the roster and switches
+                    the enemy to the trial's monster. Food &amp; drinks are ignored, as in every group battle.
+                </p>
+                <input type="file" id="guildTrialFile" accept="application/json,.json" style="display:none;" />
+                <div id="guildTrialDrop" class="drop-zone">
+                    <div class="drop-title" data-i18n="common:groupBattle.guildTrialChooseFile">Choose JSON file…</div>
+                    <div class="drop-sub" data-i18n="common:groupBattle.guildTrialDropHint">or drop the export here</div>
+                </div>
+                <div id="guildTrialStatus"></div>
+                <div class="row" style="margin-top:10px;">
+                    <button id="clearPlayers3" class="secondary" data-i18n="common:groupBattle.clearAll">Clear all</button>
+                </div>
+            </div>
+
             <!-- ---- Group Builder sub-tab ---- -->
-            <div id="groupBuilderTab" class="subtabpanel">
+            <div id="groupBuilderTab" class="subtabpanel" style="display:none;">
                 <p class="hint" data-i18n="common:groupBattle.groupBuilderHint">Set a count for each preset, then build the roster. Building replaces the current roster. Food &amp; drinks are always ignored — levels, equipment, and abilities are used.</p>
 
                 <!-- Predefined presets -->

@@ -184,6 +184,12 @@ class CombatUtilities {
 
         let damageDone = 0;
         let thornDamageDone = 0;
+        // The same three numbers before armour/resistance mitigation (and before the overkill clip
+        // on a killing blow). Reported alongside the real damage so a defensive build can be read
+        // as "how much came in vs. how much landed"; nothing in the sim itself uses them.
+        let premitigatedDamageDone = 0;
+        let premitigatedThornDamageDone = 0;
+        let premitigatedRetaliationDamageDone = 0;
 
         let didHit = false;
         if (Math.random() < hitChance) {
@@ -200,6 +206,7 @@ class CombatUtilities {
             }
 
             let mitigatedDamage = Math.ceil(targetDamageTakenRatio * damageRoll);
+            premitigatedDamageDone = damageRoll;
             damageDone = Math.min(mitigatedDamage, target.combatDetails.currentHitpoints);
             target.combatDetails.currentHitpoints -= damageDone;
         }
@@ -228,6 +235,7 @@ class CombatUtilities {
 
             let mitigatedThornsDamage = Math.ceil(sourceDamageTakenRatio * thornsDamageRoll);
 
+            premitigatedThornDamageDone = thornsDamageRoll;
             thornDamageDone = Math.min(mitigatedThornsDamage, source.combatDetails.currentHitpoints);
             source.combatDetails.currentHitpoints -= thornDamageDone;
         }
@@ -261,6 +269,7 @@ class CombatUtilities {
 
                 let retaliationDamageRoll = CombatUtilities.randomInt(retaliationMinDamage, retaliationMaxDamage);
                 let mitigatedRetaliationDamage = Math.ceil(sourceDamageTakenRatio * retaliationDamageRoll);
+                premitigatedRetaliationDamageDone = retaliationDamageRoll;
                 retaliationDamageDone = Math.min(mitigatedRetaliationDamage, source.combatDetails.currentHitpoints);
                 source.combatDetails.currentHitpoints -= retaliationDamageDone;
             }
@@ -282,7 +291,11 @@ class CombatUtilities {
             manaLeechMana = source.addManapoints(Math.floor(source.combatDetails.combatStats.manaLeech * damageDone));
         }
 
-        return { damageDone, didHit, thornDamageDone, thornType, retaliationDamageDone, lifeStealHeal, hpDrain, manaLeechMana, isCrit};
+        return {
+            damageDone, didHit, thornDamageDone, thornType, retaliationDamageDone,
+            lifeStealHeal, hpDrain, manaLeechMana, isCrit,
+            premitigatedDamageDone, premitigatedThornDamageDone, premitigatedRetaliationDamageDone,
+        };
     }
 
     static processHeal(source, abilityEffect, target) {

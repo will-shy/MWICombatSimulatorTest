@@ -1,5 +1,36 @@
 {
   "_comment": "Changelog for the Group Battle page, shown by clicking the version badge in the header. Newest version FIRST - render order follows key order. Each entry: date (YYYY-MM-DD) plus parallel en/zh note arrays; the renderer picks the array matching the active language and falls back to en. Add a new block here whenever #buildVersion in group-battle.html is bumped.",
+  "v1.0": {
+    "date": "2026-09-28",
+    "en": [
+      "New Guild Trial import: load the guild's combat trial export and the whole roster is built from it in one step — each member from their saved combat loadout (gear, abilities and ability triggers), falling back to whatever they had equipped if they never saved one. The enemy switches to the trial's own monster automatically.",
+      "Members with no saved loadout are flagged throughout, since their numbers are a guess rather than a declared setup.",
+      "New Sanity check above the roster: who is missing a loadout, and whether Fierce, Critical, Guardian and Mystic Aura each have exactly one carrier.",
+      "New Guild Buildings panel in the header: set your guild's building levels once and they apply to every member, in every tier of a trial. Remembered in your browser.",
+      "Guild shrines now apply in group battles. They were being ignored before — a roster with real shrine levels will now fight measurably differently.",
+      "The player detail dialog now shows combat house rooms, guild shrines, and whether the Elite achievement tier (+2% damage) is active.",
+      "The roster is now a list of rows instead of cards, so a large guild can be scanned one column at a time.",
+      "Trial Mode has a new whole-run Analysis section: damage done, healing done and damage taken for each player across every tier, each with its share of the party total. Expand a row for the per-ability breakdown, or click the ⓘ next to a name to open that player's build.",
+      "Damage taken is now reported before armour and resistances reduce it, so a defensive build can be read as \"how much came in\" rather than only \"how much landed\".",
+      "Healing totals no longer count the passive per-10s HP regen — only healing someone actually did.",
+      "Copy summary for Discord: one click puts the tier ladder and the per-player table on your clipboard, formatted to stay aligned in a Discord message.",
+      "Auras: a player carrying more than one now shows all of them, with their level and their own colour, and ★ marks the strongest carrier of each aura the group wants exactly one of. An aura whose trigger never fired during a run is no longer missed."
+    ],
+    "zh": [
+      "新增公会试炼导入：载入公会战斗试炼导出文件，一步构建整个队伍——每位成员按其保存的战斗配装（装备、技能、触发条件）构建；未保存配装的成员则使用导出时身上穿戴的装备。敌人会自动切换为该试炼对应的怪物。",
+      "未保存配装的成员会在各处标注，因为他们的数据只是推测，而非本人确定的配置。",
+      "队伍上方新增配置检查：谁没有配装，以及物理、暴击、守护、元素四个光环是否各有且仅有一人携带。",
+      "页首新增公会建筑面板：设置一次公会建筑等级，即可作用于全体成员、试炼的每一层。等级保存在本浏览器中。",
+      "公会神龛现在会在团队战斗中生效。此前被忽略——拥有真实神龛等级的队伍，战斗结果会有明显变化。",
+      "玩家详情弹窗现在会显示战斗相关的房屋等级、公会神龛，以及精英成就层（+2% 伤害）是否已激活。",
+      "队伍改为按行显示（不再是卡片），便于逐列扫读大规模公会名单。",
+      "试炼模式新增全程数据分析：每位玩家在所有层数中的总伤害、总治疗与承伤，并分别显示其在队伍中的占比。点击行可展开各技能明细，点击名字旁的 ⓘ 可查看该玩家的配装。",
+      "承伤改为显示护甲与抗性减免之前的数值，从而可以看出“打进来多少”，而不只是“最终受到多少”。",
+      "治疗统计不再计入每 10 秒的被动生命恢复，只统计真正施放的治疗。",
+      "复制摘要（Discord）：一键将层数进度与玩家数据表复制到剪贴板，格式经过对齐处理，可直接粘贴到 Discord。",
+      "光环：携带多个光环的玩家现在会全部显示，并标注等级与各自颜色；★ 标记每个「应只有一人携带」光环的最强携带者。运行期间从未触发的光环也不会再被遗漏。"
+    ]
+  },
   "v0.9": {
     "date": "2026-08-13",
     "en": [

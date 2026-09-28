@@ -663,7 +663,8 @@ class CombatSimulator extends EventTarget {
                     source,
                     target,
                     attackType,
-                    attackResult.didHit ? attackResult.damageDone : "miss"
+                    attackResult.didHit ? attackResult.damageDone : "miss",
+                    attackResult.premitigatedDamageDone
                 );
             }
 
@@ -676,7 +677,7 @@ class CombatSimulator extends EventTarget {
             }
 
             if (attackResult.thornDamageDone > 0) {
-                this.simResult.addAttack(target, source, attackResult.thornType, attackResult.thornDamageDone);
+                this.simResult.addAttack(target, source, attackResult.thornType, attackResult.thornDamageDone, attackResult.premitigatedThornDamageDone);
             }
             if (this.zone?.isDungeon && attackResult.thornDamageDone > 0 && source.isPlayer) {
                 const log = this.buildCombatLog(target, attackResult.thornType, source, attackResult.thornDamageDone);
@@ -684,7 +685,7 @@ class CombatSimulator extends EventTarget {
             }
 
             if (target.combatDetails.combatStats.retaliation > 0) {
-                this.simResult.addAttack(target, source, "retaliation", attackResult.retaliationDamageDone > 0?attackResult.retaliationDamageDone:"miss");
+                this.simResult.addAttack(target, source, "retaliation", attackResult.retaliationDamageDone > 0 ? attackResult.retaliationDamageDone : "miss", attackResult.premitigatedRetaliationDamageDone);
             }
             if (this.zone?.isDungeon && attackResult.retaliationDamageDone > 0 && source.isPlayer) {
                 const log = this.buildCombatLog(target, "retaliation", source, attackResult.retaliationDamageDone);
@@ -1434,7 +1435,8 @@ class CombatSimulator extends EventTarget {
                     tempSource,
                     tempTarget,
                     "parry",
-                    attackResult.didHit ? attackResult.damageDone : "miss"
+                    attackResult.didHit ? attackResult.damageDone : "miss",
+                    attackResult.premitigatedDamageDone
                 );
 
                 if (attackResult.lifeStealHeal > 0) {
@@ -1446,10 +1448,10 @@ class CombatSimulator extends EventTarget {
                 }
 
                 if (attackResult.thornDamageDone > 0) {
-                    this.simResult.addAttack(tempTarget, tempSource, attackResult.thornType, attackResult.thornDamageDone);
+                    this.simResult.addAttack(tempTarget, tempSource, attackResult.thornType, attackResult.thornDamageDone, attackResult.premitigatedThornDamageDone);
                 }
                 if (tempTarget.combatDetails.combatStats.retaliation > 0) {
-                    this.simResult.addAttack(tempTarget, tempSource, "retaliation", attackResult.retaliationDamageDone > 0 ? attackResult.retaliationDamageDone : "miss");
+                    this.simResult.addAttack(tempTarget, tempSource, "retaliation", attackResult.retaliationDamageDone > 0 ? attackResult.retaliationDamageDone : "miss", attackResult.premitigatedRetaliationDamageDone);
                 }
 
                 if (tempTarget.combatDetails.currentHitpoints == 0) {
@@ -1660,11 +1662,12 @@ class CombatSimulator extends EventTarget {
                     source,
                     target,
                     ability.hrid,
-                    attackResult.didHit ? attackResult.damageDone : "miss"
+                    attackResult.didHit ? attackResult.damageDone : "miss",
+                    attackResult.premitigatedDamageDone
                 );
 
                 if (attackResult.thornDamageDone > 0) {
-                    this.simResult.addAttack(target, source, attackResult.thornType, attackResult.thornDamageDone);
+                    this.simResult.addAttack(target, source, attackResult.thornType, attackResult.thornDamageDone, attackResult.premitigatedThornDamageDone);
                 }
                 if (this.zone?.isDungeon && attackResult.thornDamageDone > 0 && source.isPlayer) {
                     const log = this.buildCombatLog(target, attackResult.thornType, source, attackResult.thornDamageDone);
@@ -1672,7 +1675,7 @@ class CombatSimulator extends EventTarget {
                 }
 
                 if (target.combatDetails.combatStats.retaliation > 0) {
-                    this.simResult.addAttack(target, source, "retaliation", attackResult.retaliationDamageDone > 0 ? attackResult.retaliationDamageDone : "miss");
+                    this.simResult.addAttack(target, source, "retaliation", attackResult.retaliationDamageDone > 0 ? attackResult.retaliationDamageDone : "miss", attackResult.premitigatedRetaliationDamageDone);
                 }
                 if (this.zone?.isDungeon && attackResult.retaliationDamageDone > 0 && source.isPlayer) {
                     const log = this.buildCombatLog(target, "retaliation", source, attackResult.retaliationDamageDone);

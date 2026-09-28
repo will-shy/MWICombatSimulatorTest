@@ -15,7 +15,12 @@ import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTriggerDependencyDetailMap.json";
 import combatTriggerConditionDetailMap from "./combatsimulator/data/combatTriggerConditionDetailMap.json";
 import combatTriggerComparatorDetailMap from "./combatsimulator/data/combatTriggerComparatorDetailMap.json";
+import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
+import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json";
+import achievementTierDetailMap from "./combatsimulator/data/achievementTierDetailMap.json";
+import achievementDetailMap from "./combatsimulator/data/achievementDetailMap.json";
 import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
+import Shrine from "./combatsimulator/shrine.js";
 
 const ONE_SECOND = 1e9;
 
@@ -39,6 +44,14 @@ const DEFAULT_LABELS = {
     castTime: "Cast Time",
     triggersWhen: "Triggers when:",
     noTriggerCondition: "No trigger condition (casts whenever off cooldown &amp; affordable)",
+    characterBonuses: "Character Bonuses",
+    houseCombatRooms: "House (combat)",
+    guildShrines: "Guild Shrines",
+    achievementTiers: "Achievements",
+    damage: "Damage",
+    bonusOn: "ON",
+    bonusOff: "OFF",
+    none: "None",
 };
 const defaultT = (key) => DEFAULT_LABELS[key] ?? key;
 
@@ -81,6 +94,9 @@ export function dtoToSoloExport(dto) {
         triggerMap,
         houseRooms: dto.houseRooms || {},
         achievements: dto.achievements || {},
+        // Only set on DTOs that came from a real character (guild trial import); carrying it keeps
+        // the shrine levels through an export / "open in original simulator" round trip.
+        ...(dto.shrines && Object.keys(dto.shrines).length ? { shrines: dto.shrines } : {}),
     };
 }
 
@@ -136,6 +152,98 @@ export const EQUIP_SLOT_ORDER = [
     "pouch", "back",
 ];
 
+// The buff types combatUnit.js actually reads off a house room's actionBuffs. A room whose action
+// buffs are all outside this set (a kitchen's cooking efficiency, the observatory's enhancing
+// success) is passed to the sim but contributes nothing to combat, so it has no place here.
+const COMBAT_HOUSE_BUFF_TYPES = new Set([
+    "/buff_types/attack_level", "/buff_types/melee_level", "/buff_types/defense_level",
+    "/buff_types/ranged_level", "/buff_types/magic_level", "/buff_types/stamina_level",
+    "/buff_types/intelligence_level", "/buff_types/attack_speed", "/buff_types/cast_speed",
+    "/buff_types/hp_regen", "/buff_types/mp_regen",
+]);
+const COMBAT_HOUSE_ROOMS = Object.keys(houseRoomDetailMap).filter((hrid) =>
+    (houseRoomDetailMap[hrid].actionBuffs ?? []).some((b) => COMBAT_HOUSE_BUFF_TYPES.has(b.typeHrid))
+);
+
+// Achievement tiers are all-or-nothing: completing every achievement in a tier grants that tier's
+// buff. Only Elite's is a combat buff (+2% damage) - the others are efficiency, gathering,
+// enhancing success, wisdom and rare find, none of which combatUnit.js reads for damage or survival.
+const COMBAT_ACHIEVEMENT_TIERS = Object.entries(achievementTierDetailMap)
+    .filter(([, tier]) => tier.buff?.typeHrid === "/buff_types/damage")
+    .map(([hrid, tier]) => ({
+        hrid,
+        name: tier.name,
+        pct: ((tier.buff.ratioBoost || tier.buff.flatBoost) * 100).toFixed(0),
+        // The achievements that must ALL be complete for this tier's buff to apply.
+        required: Object.values(achievementDetailMap).filter((a) => a.tierHrid === hrid).map((a) => a.hrid),
+    }));
+
+function houseRoomName(hrid) {
+    if (typeof i18next !== "undefined" && i18next.exists("houseRoomNames." + hrid)) {
+        return i18next.t("houseRoomNames." + hrid);
+    }
+    return houseRoomDetailMap[hrid]?.name ?? hrid.split("/").pop();
+}
+
+function shrineName(hrid) {
+    if (typeof i18next !== "undefined" && i18next.exists("shrineNames." + hrid)) {
+        return i18next.t("shrineNames." + hrid);
+    }
+    return shrineDetailMap[hrid]?.name ?? hrid.split("/").pop();
+}
+
+function chip(label, value, color) {
+    let style = color ? ` style="color:${color};border-color:${color};"` : "";
+    return `<span class="chip"${style}><span class="dim">${escapeHtml(label)}</span> ${escapeHtml(String(value))}</span>`;
+}
+
+// House / shrines / achievement tiers - the per-character bonuses that apply on top of gear and
+// abilities. Only the combat-relevant ones are listed; the rest are carried into the sim but never
+// read during a fight. Returns "" when the DTO carries none of them (a preset-built player).
+function characterBonusesHtml(d, t) {
+    const houseRooms = d.houseRooms ?? {};
+    const shrines = d.shrines ?? {};
+    const achievements = d.achievements ?? {};
+
+    if (!Object.keys(houseRooms).length && !Object.keys(shrines).length && !Object.keys(achievements).length) {
+        return "";
+    }
+
+    let houseChips = COMBAT_HOUSE_ROOMS
+        .map((hrid) => ({ hrid, level: Number(houseRooms[hrid]) || 0 }))
+        .filter((room) => room.level > 0)
+        .sort((a, b) => b.level - a.level)
+        .map((room) => chip(houseRoomName(room.hrid), room.level))
+        .join("");
+
+    // Every combat shrine is listed, including the ones at 0, so a shrine the guild never built is
+    // visibly missing rather than just absent from the row. A DTO with no shrine data at all (a
+    // preset-built player) gets no row, rather than a misleading row of zeros.
+    let shrineChips = Object.keys(shrines).length
+        ? Object.keys(shrineDetailMap).map((hrid) => chip(shrineName(hrid), Number(shrines[hrid]) || 0)).join("")
+        : "";
+
+    let achievementChips = COMBAT_ACHIEVEMENT_TIERS.map((tier) => {
+        let earned = tier.required.length > 0 && tier.required.every((hrid) => achievements[hrid]);
+        let missing = tier.required.filter((hrid) => !achievements[hrid]).length;
+        let label = `${tier.name} +${tier.pct}% ${t("damage")}`;
+        let value = earned ? t("bonusOn") : `${t("bonusOff")} (${missing})`;
+        return chip(label, value, earned ? "#4caf50" : "#9aa0aa");
+    }).join("");
+
+    const row = (labelKey, chips) => chips
+        ? `<div style="display:flex; align-items:baseline; gap:8px; margin-bottom:4px;">
+               <span class="dim" style="flex:0 0 110px; font-size:12px;">${escapeHtml(t(labelKey))}</span>
+               <span class="detail-skills" style="margin-bottom:0;">${chips}</span>
+           </div>`
+        : "";
+
+    return `<h5 style="margin-top:10px;">${escapeHtml(t("characterBonuses"))}</h5>
+        ${row("houseCombatRooms", houseChips || chip("", t("none")))}
+        ${row("guildShrines", shrineChips)}
+        ${row("achievementTiers", achievementChips)}`;
+}
+
 export function playerDetailHtml(d, t = defaultT) {
     // Skills
     let skills = [
@@ -170,6 +278,7 @@ export function playerDetailHtml(d, t = defaultT) {
 
     return `<div class="detail-body">
         ${skillHtml}
+        ${characterBonusesHtml(d, t)}
         <div class="detail-cols">
             <div><h5>${escapeHtml(t("equipment"))}</h5>${equipHtml}</div>
             <div><h5>${escapeHtml(t("abilities"))}</h5>${abilityHtml}</div>
@@ -286,14 +395,17 @@ const STAT_LABELS = {
 };
 
 // Builds a real Player from the DTO (same construction the worker uses,
-// including the group-battle +3% HP/MP regen buff) and renders its fully
+// including the group-battle +3% HP/MP regen buff and the character's shrines) and renders its fully
 // computed combat stats + per-ability cooldown/mana/trigger info, so you can
 // verify the sim's actual decision inputs rather than guessing from the log.
-export function renderDetailedStatus(container, dto, t = defaultT) {
+// extraBuffs, when given, replaces the default stack - the group-battle page passes the same one
+// its worker uses (regen compensation + guild buildings + shrines) so this panel matches the run.
+export function renderDetailedStatus(container, dto, t = defaultT, extraBuffs = null) {
     let zone = new Zone("/actions/combat/fly");
     let player = Player.createFromDTO(structuredClone(dto));
     player.zoneBuffs = zone.buffs;
-    player.extraBuffs = GROUP_BATTLE_REGEN_BUFFS;
+    player.extraBuffs = extraBuffs
+        ?? GROUP_BATTLE_REGEN_BUFFS.concat(Shrine.buffsFromLevels(player.shrines));
     player.reset(0);
     player.generatePermanentBuffs();
     player.reset(0);
