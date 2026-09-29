@@ -2,6 +2,8 @@
 node_modules/
 dist/
 plans/
-scripts/
+# Local helpers stay untracked; sim-sweep.mjs is the one docs/harness.md depends on.
+scripts/*
+!scripts/sim-sweep.mjs
 .DS_Store
 dist-node/
