@@ -14,24 +14,31 @@ re-verified rather than trusted.
 A second entry point next to the standard simulator (`index.html`). Instead of "one player
 grinds a zone for N hours", it answers **"can this raid roster kill this monster group?"**:
 
-- N players (10–50+) fight a **fixed** enemy group, **once**, to completion.
+- N players (10–60) fight a **fixed** enemy group, **once**, to completion.
 - No respawns, no drops, no XP-rate output. The outputs are: win/lose, duration,
-  who died, damage/healing breakdowns, and a full combat log.
+  who died, damage/healing breakdowns, a whole-run analysis, and a full combat log.
 - Two modes: **Single Tier** (one fight at a chosen level) and **Trial Mode** (default —
   a ladder of escalating tiers on one shared time budget).
+- The primary input is a **guild combat-trial export**: one JSON file holding the whole guild,
+  which builds the entire roster and points the enemy group at the right monster in one step.
 
-### Special rules (also shown in the page's collapsible rules banner, `group-battle.html:575-582`)
+### Special rules (also shown in the page's collapsible rules banner, `group-battle.html:556-562`)
 
 | Rule | Where implemented |
 | --- | --- |
 | No food/drinks. Every player instead gets a flat **+3 percentage points** to HP regen and MP regen per 10s (1% → 4%) | `src/combatsimulator/data/groupBattleBuffs.js` |
+| **Guild buildings** apply to every member, on top of their own house rooms | `src/combatsimulator/data/guildBuildings.js` (§4.6) |
+| **Shrines** apply per character, as in a solo simulation | `worker.js:210-216`, `Shrine.buffsFromLevels` |
 | Monsters scale with group size — **per player**: +1% max HP, +2% attack speed, +2% cast speed, +2 ability haste | `data/groupBattleScaling.js` → `groupBattleMonster.js` `applyPartyScaling()` |
-| Monster **enrage**: +10% damage and +10% accuracy per 10 minutes alive, capped at 10 stacks (+100%/+100%) | `src/combatsimulator/combatSimulator.js:1075-1119` |
+| Monster **enrage**: +10% damage and +10% accuracy per 10 minutes alive, capped at 10 stacks (+100%/+100%) | `src/combatsimulator/combatSimulator.js` `EnrageTickEvent` |
 
 The regen buff must be `flatBoost`, not `ratioBoost` — `CombatUnit.updateCombatDetails`
 applies ratio first as a multiplier on existing regen, so a ratio of 0.03 would add 3% *of*
 current regen instead of 3 percentage points. The comment at the top of `groupBattleBuffs.js`
-documents this; don't "fix" it.
+documents this; don't "fix" it. `guildBuildings.js` follows the same rule for its regen entries.
+
+> The rules banner still describes only the three original rules. Guild buildings and shrines
+> are not mentioned there — worth adding if the banner is ever revised.
 
 ---
 
@@ -40,9 +47,12 @@ documents this; don't "fix" it.
 | File | Role |
 | --- | --- |
 | `group-battle.html` | Markup + all CSS (self-contained, dark theme). No logic beyond relocating the i18n language switcher into the header. |
-| `src/groupBattle.js` (~2.5k lines) | All page logic: import/roster, presets, aura assignment, enemy selection/preview, running battles, rendering results and the combat log. |
+| `src/groupBattle.js` (~3.3k lines) | All page logic: imports/roster, presets, guild buildings, sanity check, aura planning, enemy selection/preview, running battles, rendering results, the run analysis and the combat log. |
+| `src/guildTrialImport.js` | Guild combat-trial export → import set → player DTO (§4.1). |
+| `src/combatsimulator/data/guildBuildings.js` | Guild building definitions and `guildBuildingBuffs()` (§4.6). |
+| `src/playerDetailView.js` | Shared detail dialog: equipment, abilities **with their triggers**, character bonuses, detailed combat status. Also used by `skill-lab.html`. |
 | `src/groupBattleI18nSetup.js` | `t()` + `onLanguageChange()` for this page. |
-| `src/worker.js` — `case "start_battle"` (`:199-246`) | Web-worker entry for a single group battle. |
+| `src/worker.js` — `case "start_battle"` (`:201`) | Web-worker entry for a single group battle. |
 | `src/combatsimulator/groupBattleMonster.js` | `GroupBattleMonster extends Monster` — unique hrid + `applyPartyScaling()`. |
 | `src/combatsimulator/data/groupBattleScaling.js` | The per-player scaling constants, shared by the worker and the UI preview. |
 | `src/combatsimulator/monster.js` | Base monster derivation, including the level (labyrinth) scale factor. |
@@ -58,18 +68,24 @@ all-zones/all-labyrinths sweeps.
 ## 3. UI structure (`group-battle.html`)
 
 ```
-header (title, build version, disclaimer, back-link, language switcher)
+header (title, build version v1.0, disclaimer, back-link, language switcher)
 <details> rules banner
+<details> #guildBuildingsBanner      guild building levels + live summary line
 #errorBox
 #battleTab
   .layout (2 columns, collapses <1100px)
     card 1 — "Build Roster (N)"
-      subtabs: #groupBuilderTab | #pasteJsonTab
-      #predefinedPresetList     role presets + count inputs
-      #userPresetList           equipment-set presets (+ hidden JSON-preset UI)
-      aura level inputs         Fierce/Mystic/Crit/Guardian/Speed
-      #buildRoster / #clearPlayers
-      #playerList               roster grid of player cards
+      subtabs: #guildTrialTab (default) | #groupBuilderTab | #pasteJsonTab
+      #guildTrialTab:
+        #guildTrialDrop         click / drag-drop zone, hidden #guildTrialFile input
+        #guildTrialStatus       what was imported, mismatches, no-loadout members
+        #clearPlayers3
+      #groupBuilderTab:
+        #predefinedPresetList   role presets + count inputs
+        #userPresetList         equipment-set presets (+ hidden JSON-preset UI)
+        aura level inputs       Fierce/Mystic/Crit/Guardian/Speed
+        #buildRoster / #clearPlayers
+      #playerList               aura chips + sanity check + roster TABLE (one row per player)
     card 2 — "Select Enemy Group" + "Battle Settings"
       mode subtabs: #trialMode (default) | #singleBossMode
       #enemySelect  #enemyLevelSelect  #previewEnemyBtn
@@ -77,6 +93,8 @@ header (title, build version, disclaimer, back-link, language switcher)
       #enemyGroup               flat table of the resolved enemies
       #singleBossMode: #timeCap, #runBattle
       #trialMode:     #trialTimeCap, #runTrial, #trialModeResult
+                      └─ tier table + <details> "Analysis — whole run"
+                           #trialExportDiscord, #trialRunAnalysis
   #resultPanel (hidden until a run)
     #resultSummary #damageTotals #damageTaken #healingDone
     <details> combat log + filters
@@ -84,44 +102,101 @@ header (title, build version, disclaimer, back-link, language switcher)
 #trialResultModalOverlay     per-tier combat detail modal (mirrors #resultPanel)
 ```
 
-Wiring lives in the `DOMContentLoaded` handler at `src/groupBattle.js:2429-2553`.
+Wiring lives in the `DOMContentLoaded` handler at the end of `src/groupBattle.js` (`:3173+`).
 
 ---
 
 ## 4. Building the roster
 
-Three preset sources feed `importedPlayers` (`[{ name, dto }]`):
+`importedPlayers` is `[{ name, dto, noLoadout? }]`. Four routes fill it — the guild trial import
+(§4.1) plus three preset sources:
 
 1. **Predefined presets** — every `.json` under `src/combatsimulator/data/testPlayers/`, loaded
-   at build time via `require.context` (`groupBattle.js:19-36`). Adding a file adds a preset with
+   at build time via `require.context` (`groupBattle.js:25`). Adding a file adds a preset with
    no code change; the display name is the filename prettified (`bow_insanity.json` → "Bow Insanity").
    Default counts are matched by substring of the filename in `PREDEFINED_DEFAULT_COUNTS`
-   (`:324-334`) — e.g. `crossbow`→10, `smash`→10, `nature`→5. Unmatched presets default to 0.
+   (`:557`) — e.g. `crossbow`→10, `smash`→10, `nature`→5. Unmatched presets default to 0.
 2. **Equipment-set presets** — read from `localStorage["equipmentSets"]`, the sets the *standard*
-   simulator saves (`refreshEquipmentSetPresets`, `:348-374`). The ↻ Refresh button re-reads them and
+   simulator saves (`refreshEquipmentSetPresets`, `:581`). The ↻ Refresh button re-reads them and
    preserves per-set counts by name.
 3. **JSON presets** — pasted solo exports. The UI for these is currently **hidden**
-   (`group-battle.html:611-619` `display:none`) but the code path is live.
+   (`group-battle.html:622-630` `display:none`) but the code path is live.
 
-**Build roster (replace)** (`buildRoster`, `:525-565`) clears the roster and appends `count` copies of
+**Build roster (replace)** (`buildRoster`) clears the roster and appends `count` copies of
 each preset, naming them `"<Preset> <i>"` and assigning hrids `player1..playerN`. Then it calls
 `assignAuras()`.
 
-Alternatively the **Paste JSON** sub-tab imports raw exports (`doImport`, `:266-309`). `parseImport`
-(`:239-264`) accepts: a single solo export, a JSON array, newline-separated JSON, or the
+Alternatively the **Paste JSON** sub-tab imports raw exports (`doImport`, `:267`). `parseImport`
+(`:240`) accepts: a single solo export, a JSON array, newline-separated JSON, or the
 "group export" object keyed `"1".."5"`.
 
-### The three JSON shapes → one DTO
+### 4.1 Guild trial import (the default tab)
+
+`src/guildTrialImport.js`. The game's guild API produces one JSON array, one entry per member:
+
+```js
+{ characterId, characterName, role, combatTrial, trialCombatLevel, profile, combatLoadout }
+```
+
+`profile` is what the member has equipped **right now**; `combatLoadout` is the loadout they saved
+for this trial. The loadout wins wherever it has something to say, field by field, and a member who
+never saved one falls back to their live profile (`preferLoadout`, `:107`). An **empty** map or array
+on the loadout counts as "says nothing" — one member in the sample export had gear but zero
+abilities saved.
+
+| Source field | Becomes |
+| --- | --- |
+| `wearableItemMap` | equipment (skilling tools drop out — `importSetToPlayerDTO` keeps only combat slots) |
+| `equippedAbilities` | abilities, placed by their own `slotNumber` |
+| `abilityCombatTriggersMap` | ability triggers (profile's merged under the loadout's) |
+| `profile.characterSkills` | combat levels |
+| `profile.characterHouseRoomMap` | house rooms |
+| `profile.characterAchievements` | `{hrid: isCompleted}` |
+| `profile.guildBuffLevelMap` | `{force, tempo, spirit, scholar}` → shrines |
+
+`guildTrialEntryToImportSet` produces the same "import set" shape the standard simulator's Solo
+import accepts, so conversion goes through the shared `importSetToPlayerDTO`
+(`combatsimulator/importSet.js`) rather than a fourth bespoke converter. Food and drinks are empty
+by construction. `guildTrialEntryToPlayerDTO` (`:150`) then pads the ability list back to five slots,
+because `importSetToPlayerDTO` compacts it and the aura logic indexes by slot.
+
+`parseGuildTrialRoster` (`:165`) returns `{ members, trials, primaryTrial }`, where `trials` counts
+members per `combatTrial`, most common first.
+
+On import (`importGuildTrialRoster`, `groupBattle.js:429`):
+
+- The roster is **replaced**, and members with `hasLoadout: false` are marked `noLoadout`.
+- Auras are **not** reassigned — these are real players, and the aura each one carries is part of
+  what the run measures.
+- The enemy group switches to the trial's monster (`switchEnemyGroupToTrial`, `:468`).
+- `#guildTrialStatus` reports the import, any trial mismatch, and who has no loadout.
+
+**Known limitation:** the export carries ability levels only for abilities a member has
+**equipped**. There is no way to know what level an unequipped ability would be, which is why the
+sanity check can rank current aura carriers exactly but can only rank a non-carrier on their skill.
+
+### 4.2 Trial → monster group mapping
+
+Each group in `monsterGroups.json` carries a `trialHrid` (`/guild_combat/badger`, `…/hedgehog`, …).
+`switchEnemyGroupToTrial` matches on it, falling back to a group built from `/monsters/trial_<tail>`
+so a trial added to the game later still lands on the right enemy. No match leaves the selection
+alone and says so in the status panel.
+
+### 4.3 The JSON shapes → one DTO
 
 | Converter | Input | Notes |
 | --- | --- | --- |
-| `soloExportToDTO` (`:58-114`) | solo export from the standard sim | equipment is an array of `{itemLocationHrid,itemHrid,enhancementLevel}` |
-| `equipmentSetToDTO` (`:169-235`) | localStorage equipment set | levels/equipment/abilities are keyed objects; a single `weapon` slot is resolved to `main_hand` vs `two_hand` from the item's own type; extra `charm` slot |
-| `dtoToSoloExport` (`:125-161`) | internal DTO → solo export | inverse, for handing a preset back to `index.html` |
+| `guildTrialEntryToPlayerDTO` (`guildTrialImport.js:150`) | guild combat-trial entry | goes through the shared `importSetToPlayerDTO`; carries house rooms, achievements and shrines (§4.1) |
+| `soloExportToDTO` (`:101`) | solo export from the standard sim | equipment is an array of `{itemLocationHrid,itemHrid,enhancementLevel}` |
+| `equipmentSetToDTO` (`:170`) | localStorage equipment set | levels/equipment/abilities are keyed objects; a single `weapon` slot is resolved to `main_hand` vs `two_hand` from the item's own type; extra `charm` slot |
+| `dtoToSoloExport` (`playerDetailView.js:50`) | internal DTO → solo export | inverse, for handing a preset back to `index.html`; carries `shrines` through when present |
 
-All converters force `food = drinks = [null,null,null]` — group battles never eat or drink.
+All routes force `food = drinks = [null,null,null]` — group battles never eat or drink.
 
-### Aura auto-assignment (`:572-620`)
+Only the guild-trial route populates `shrines`; the two preset converters leave it unset, which is
+why preset-built rosters are unaffected by shrines applying.
+
+### 4.4 Aura auto-assignment (Group Builder only)
 
 Five auras are assigned in this fixed priority order, each to the highest-skill player not yet
 holding an assigned aura (one aura per player):
@@ -139,37 +214,165 @@ holding an assigned aura (one aura per player):
 > failed to load, and has been corrected to match.
 
 `setPlayerAura` overwrites the player's existing aura slot if there is one, else the first empty
-slot, else slot 0. `AURA_ABILITY_HRIDS` (`:906-910`) is the recognized aura set — note it also
-includes `insanity`, `invincible`, and `revive`, which are auras despite not ending in `_aura`.
+slot, else slot 0. `AURA_ABILITY_HRIDS` is the recognized aura set — note it also includes
+`insanity`, `invincible`, and `revive`, which are auras despite not ending in `_aura`.
 
-### Roster cards
+This runs on **Build roster** only. A guild trial import keeps each member's real auras.
 
-`renderPlayerList` (`:1012+`) draws a grid of cards. Each card is colored on the left by combat
-style (`STYLE_COLORS`, `:885-892`); magic is further split by damage element; a weapon carrying
-`defensiveDamage` is classified as the synthetic **wark** (bulwark/tank) style. Aura holders get a
-full glowing border tinted per aura (`AURA_COLORS`, `:912-921`). Cards show HP/MP bars and an
-**OOM** badge (ability casts blocked by lack of mana) from the most recent run (`rosterOom`).
+### 4.5 How an aura's strength is actually computed
 
-Derived stats per card are cached in a `WeakMap` keyed by DTO reference (`:929`) because building a
-`Player` is expensive; `assignAuras` invalidates the entry it mutates.
+Relevant because the sanity check ranks carriers on it, and because the skill mapping above is not
+arbitrary. From `processAbilityBuffEffect` (`combatSimulator.js:1367-1377`) and `Buff`:
 
-Clicking a card opens the detail modal, which calls `renderDetailedStatus` (`:827-867`). That builds
-a **real** `Player` with `zoneBuffs` from `/actions/combat/fly` and `extraBuffs = GROUP_BATTLE_REGEN_BUFFS`
-— i.e. exactly what the worker builds — so the preview never drifts from the sim.
+```
+buff = [ base + (abilityLevel - 1) * perAbilityLevel ] * ( 1 + casterSkillLevel * perSkillLevel )
+         └─────────── the aura's own level ──────────┘   └──────── the CASTER's skill ─────────┘
+```
+
+Both terms matter. The skill is the caster's **effective** level, i.e. after house-room level
+buffs, so a Gym-8 house genuinely strengthens that player's Fierce Aura. The multiplier applies
+only to `isSpecialAbility` buffs on `allAllies` effects — `self` buffs (Insanity, Invincible) take
+the unmultiplied path.
+
+| Aura | Buffs | Base / per aura level | Scales off | per skill level |
+| --- | --- | --- | --- | --- |
+| Fierce | physical amplify | 4% / +0.08% | Melee | 0.005 |
+| Critical | crit rate + crit damage | 2% / +0.04% each | Ranged | 0.005 |
+| Guardian | healing amp, evasion, armor, 3 resistances | 5% / +0.1% (armor +5/+0.1) | Defense | 0.005 |
+| Mystic | water + nature + fire amplify | 6% / +0.12% each | Magic | 0.005 |
+| Speed | attack speed + cast speed | 3% / +0.06% | Attack | 0.005 |
+
+Every buff on a given aura shares one skill and one per-skill rate, so ranking carriers on the
+first buff gives the same order as any other — which is what `auraScaling()` (`:1070`) relies on.
+It reads all four numbers out of `abilityDetailMap` rather than hardcoding them.
+
+### 4.6 Guild buildings
+
+A guild-wide bonus applied to every member, on top of their own house rooms. Set in the
+`#guildBuildingsBanner` at the top of the page; levels persist in
+`localStorage["mwiGuildBuildingLevels"]`, defaulting to 0, because they describe the guild rather
+than any one roster.
+
+| Building | Per level |
+| --- | --- |
+| Dining Room | +2 Stamina, +0.3% HP regen |
+| Library | +2 Intelligence, +0.3% MP regen |
+| Dojo | +2 Attack |
+| Armory | +2 Defense |
+| Gym | +2 Melee |
+| Archery Range | +2 Ranged |
+| Mystical Study | +2 Magic |
+
+They are expressed as **ordinary buffs**, so the sim needed no new concept: the `*_level` buff
+types are the same ones `CombatUnit.updateCombatDetails` already reads for house rooms, and
+`hp_regen`/`mp_regen` the same ones the regen compensation uses. Each buff gets a `uniqueHrid` keyed
+by building **and** stat, since `CombatUnit` keeps one buff per `uniqueHrid` and two buildings
+granting the same stat would otherwise collide.
+
+The levels travel with every `start_battle` message, so they hold for every tier of a trial.
+Editing a level commits on `change` (not `input`), clears the derived-summary cache and re-renders
+the roster — per keystroke would rebuild every `Player` and interrupt an in-progress rename.
+
+### 4.7 Sanity check
+
+Rendered above the roster (`sanityCheckHtml`, `:1129`), re-evaluated on every roster or enemy
+change. Green when clean, amber with a bullet list otherwise.
+
+| Check | Fires when |
+| --- | --- |
+| Members with no saved loadout | always (guild trial import only) |
+| Aura with no carrier | always, for Fierce / Critical / Guardian / Mystic |
+| Aura with more than one carrier | always — names who to keep, ranked on real potency (§4.5) |
+| AoE or piercing ability | only when **fewer than 3** enemies |
+| Ability that doesn't earn its slot | always |
+
+`EXPECTED_UNIQUE_AURAS` deliberately excludes **Speed Aura** — the guild doesn't run it as a
+single-carrier role.
+
+An ability "spreads across targets" if it has an `allEnemies` damage effect **or** `pierceChance > 0`
+(`spreadsAcrossTargets`, `:1035`). Pierce counts because `processAbilityDamageEffect` continues to
+the next target instead of breaking when the roll succeeds, so Penetrating Shot / Strike at
+`pierceChance: 1` hit everything and pay for it in their damage ratio.
+
+`SINGLE_TARGET_ENEMY_COUNT = 3`: Trial Badger fields two monsters and is still played as a
+single-target fight; Trial Swarm's four is the only group where spreading pays.
+
+`AOE_DEBUFF_OR_SUPPORT_ABILITIES` exempts five, because what they are carried for lands whatever
+the target count — Fracturing Impact (+5% damage taken), Toxic Pollen (−12 armor, −15/−20/−15
+resistances), Frost Surge (−10% evasion), Crippling Slash (−12% enemy damage), and Mana Spring
+(+50% MP regen to all allies). Firestorm and Nature's Veil stay flagged: a DoT or a blind on one
+target is still one DoT or one blind.
+
+`LOW_VALUE_ABILITIES` currently holds **Vampirism** — `processAttack` applies `lifeSteal` only in
+the `!abilityEffect` branch, i.e. on auto-attacks, so on an ability-driven rotation it returns
+almost nothing for a slot, 65 mana a cast and a 20s window on a 30s cooldown.
+
+### 4.8 Roster rows
+
+`renderPlayerList` (`:1228`) draws a **table, one row per player** — at guild size the roster is a
+list you scan down one column at a time, not a set of portraits. (It was a card grid until v1.0;
+the `.roster-card` / `.rc-*` CSS is gone.)
+
+| Column | Notes |
+| --- | --- |
+| # | display position |
+| Player | ⚠ + amber name when `noLoadout`; double-click to rename |
+| Style | chip coloured by `STYLE_COLORS`; magic split by element; a weapon with `defensiveDamage` is the synthetic **wark** (bulwark/tank) style |
+| Weapon | name + enhancement |
+| Auras | **every** aura the player carries, with level, each in its own colour (`AURA_COLORS`); ★ marks the strongest carrier of a single-carrier aura; Insanity is deliberately uncoloured |
+| HP / MP | derived max values |
+| OOM | ability casts blocked by lack of mana in the most recent run (`rosterOom`) |
+| ✕ | remove |
+
+Rows are ordered by `styleRank` (Wark → Ranged → Stab → Smash → Slash → Magic by element → other)
+while keeping each player's **original import index**, so remove/rename/modal target the right entry.
+
+Derived stats are cached in a `WeakMap` keyed by DTO reference because building a `Player` is
+expensive. `assignAuras` invalidates the entry it mutates; a guild-building change replaces the
+whole cache.
+
+`derivePlayerSummary` (`:922`) builds the preview `Player` with the **same** buff stack the worker
+uses, via the shared `groupBattleExtraBuffs()` — regen compensation + guild buildings + that
+player's shrines — so the roster's HP/MP cannot drift from the sim.
+
+### 4.9 Detail dialog
+
+Clicking a row opens `playerDetailHtml` + `renderDetailedStatus` from `src/playerDetailView.js`
+(shared with `skill-lab.html`). Beyond skills, equipment and the on-demand combat-status panel it
+shows:
+
+- **Abilities with their trigger conditions inline** (`describeTrigger`). The triggers decide what
+  the sim actually casts, so a bar that reads correctly can still behave oddly because of one
+  condition — that belongs next to the ability, not behind the detailed-status button.
+- **Character Bonuses** (`characterBonusesHtml`, `playerDetailView.js:203`):
+  - *House (combat)* — filtered by data, not a hardcoded list: a room qualifies if any of its
+    `actionBuffs` has a type `combatUnit.js` actually reads (`*_level`, `attack_speed`,
+    `cast_speed`, `hp_regen`, `mp_regen`). That resolves to 7 rooms today and picks up a new one
+    automatically. Skilling rooms pass into the sim but contribute nothing to combat.
+  - *Guild Shrines* — all four listed including zeros, so an unbuilt shrine is visibly missing. The
+    row is suppressed entirely when the DTO has no shrine data (a preset-built player).
+  - *Achievements* — the tiers whose buff is `/buff_types/damage`, which today is **Elite +2%**
+    alone. Green ON when every achievement in the tier is complete, grey OFF (n) otherwise; tiers
+    are all-or-nothing, so a member two achievements short gets nothing.
+
+`renderDetailedStatus` takes an optional `extraBuffs`; this page passes `groupBattleExtraBuffs(dto)`.
+Skill Lab calls it without, and its DTOs carry no shrines, so its numbers are unchanged.
 
 ---
 
 ## 5. Choosing enemies
 
 Enemy groups come from `monsterGroups.json`. Currently: Trial Badger (×2), Trial Chameleon,
-Trial Jellyfish, Trial Hedgehog, and Trial Swarm (beetle + dragonfly + wasp + firefly).
-Members whose hrid is missing from `combatMonsterDetailMap` are silently dropped (`:1233-1238`).
+Trial Jellyfish, Trial Hedgehog, and Trial Swarm (beetle + dragonfly + wasp + firefly). Each also
+carries a `trialHrid` for the guild-trial mapping (§4.2). Members whose hrid is missing from
+`combatMonsterDetailMap` are silently dropped.
 
-There is **no manual add/remove step**: `setEnemyGroupFromSelection` (`:1330-1334`) mirrors the
+There is **no manual add/remove step**: `setEnemyGroupFromSelection` (`:1565`) mirrors the
 dropdown into `enemyGroup` whenever the group or level changes. `resolveSelectedEnemySpecs`
-flattens the group to one spec per enemy (count copies each).
+flattens the group to one spec per enemy (count copies each). It also re-renders the roster,
+because the sanity check's AoE rule depends on the enemy count.
 
-A spec is deliberately thin (`trialSpecAtLevel`, `:1288-1291`):
+A spec is deliberately thin (`trialSpecAtLevel`, `:1522`):
 
 ```js
 { trial: true, scaling: true, hrid, level, name }
@@ -178,10 +381,10 @@ A spec is deliberately thin (`trialSpecAtLevel`, `:1288-1291`):
 Full stats are never transcribed — the sim rebuilds a real monster from `hrid + level`.
 
 The level dropdown offers **L100 … L300 in steps of 10**, labelled `L<level> (T<tier>)` where
-`tier = (level-100)/10 + 1`, so T1..T21 (`initEnemyLevelSelect`, `:1256-1265`). In Trial Mode the
+`tier = (level-100)/10 + 1`, so T1..T21 (`initEnemyLevelSelect`). In Trial Mode the
 dropdown is frozen to L100 and disabled — the ladder always starts at T1.
 
-`monsterDerived(hrid, level, hpMult)` (`:1297-1301`) constructs a real `GroupBattleMonster`, calls
+`monsterDerived(hrid, level, scaling)` (`:1532`) constructs a real `GroupBattleMonster`, calls
 `updateCombatDetails()`, and returns its derived stats. The preview panel and the enemy table's HP
 column both use it, so **there is no second stat formula anywhere in the UI**.
 
@@ -191,7 +394,8 @@ column both use it, so **there is no second stat formula anywhere in the UI**.
 
 ### 6.1 Where the scaling happens
 
-`GroupBattleMonster(dataHrid, roomLevel, {hpMultiplier, uniqueHrid, displayName})` calls
+`GroupBattleMonster(dataHrid, roomLevel, options)` — options being a `groupBattleScaling()` bag
+plus `uniqueHrid` / `displayName` — calls
 `super(dataHrid, /* difficultyTier */ 0, roomLevel)`. Group-battle monsters therefore reuse the
 **labyrinth room-level scaling** path in `Monster` with `difficultyTier` pinned to 0, which is what
 reproduces the trial stat table exactly.
@@ -294,8 +498,8 @@ Consequences:
   `AbilityCastEndEvent` outright (`combatSimulator.js:1554`), cancelling the cast.
 
 **Display caveats in this page:** the ability-detail table shows the *raw, unmodified*
-`ability.castDuration` (`groupBattle.js:750`), and the enemy preview's Cast Speed tile is only
-rendered when the value is non-zero (`groupBattle.js:1371`).
+`ability.castDuration` (`groupBattle.js`), and the enemy preview's Cast Speed tile is only
+rendered when the value is non-zero (`groupBattle.js`).
 
 ### 6.4 Party-size scaling
 
@@ -341,7 +545,7 @@ cannot drift from the sim. Preview tiles the roster scales are suffixed `(xN pla
 ### 6.5 Unique-hrid trick
 
 `SimResult` aggregates damage/deaths/healing by `unit.hrid`, so two copies of Trial Badger would
-merge into one row. `buildWorkerEnemies` (`groupBattle.js:1345-1353`) therefore assigns
+merge into one row. `buildWorkerEnemies` (`groupBattle.js`) therefore assigns
 `uniqueHrid = "<hrid>#<i+1>"`. But `Monster.updateCombatDetails()` re-reads
 `combatMonsterDetailMap[this.hrid]` on every call, so the hrid cannot simply be renamed. The class
 keeps the real key in `dataHrid` and **swaps it in for the duration of the base derivation**, then
@@ -400,10 +604,11 @@ group battles produce no XP.
 ```
 groupBattle.js  runBattle() / runTrialMode()
    → runBattleOnWorker({players, enemies, timeCapSeconds})   // FIFO of pending resolvers
-   → worker.postMessage({type:"start_battle", ...})
+   → worker.postMessage({type:"start_battle", ..., guildBuildingLevels})
 worker.js  case "start_battle"
+   → guildBuffs = guildBuildingBuffs(event.data.guildBuildingLevels)
    → Player.createFromDTO for each; zoneBuffs from /actions/combat/fly;
-     extraBuffs = GROUP_BATTLE_REGEN_BUFFS
+     extraBuffs = GROUP_BATTLE_REGEN_BUFFS + guildBuffs + Shrine.buffsFromLevels(player.shrines)
    → partyScaling = groupBattleScaling(players.length)
    → enemies.map(e => new GroupBattleMonster(e.hrid, e.level, {...partyScaling, uniqueHrid, displayName}))
    → new CombatSimulator(players, battleZone, null, {logEvents:true, fixedEnemies})
@@ -414,8 +619,11 @@ worker.js  case "start_battle"
 The zone `/actions/combat/fly` is a harmless stand-in used only to supply zone buffs; nothing about
 the zone's monsters is used, because `battleMode` replaces the spawn logic with `fixedEnemies`
 (`combatSimulator.js:443-444`). Only **one** worker exists and it handles one battle at a time;
-requests are serialized through `pendingBattleResolvers` (`groupBattle.js:1602-1628`), which is what
-lets Trial Mode `await` tiers sequentially.
+requests are serialized through `pendingBattleResolvers`, which is what lets Trial Mode `await`
+tiers sequentially.
+
+Both modes go through this one path, so guild buildings and shrines apply to every tier of a ladder.
+`groupBattleExtraBuffs()` in the page builds the identical stack for previews.
 
 ### `simulateBattle` semantics (`combatSimulator.js:267-321`)
 
@@ -428,7 +636,7 @@ lets Trial Mode `await` tiers sequentially.
   (hp/mp current+max), `enemyFinalState[]` (hp current+max), plus the usual `deaths`,
   `playerOomCastCount`, `abilityCastCounts`, and `battleLog`.
 
-### Trial Mode (`groupBattle.js:1649-1764`)
+### Trial Mode (`runTrialMode`, `groupBattle.js:1910`)
 
 - Tiers T1..T21 (`tierLevel(tier) = 100 + 10*(tier-1)`).
 - Every enemy is **re-leveled** to the tier's level each round — the per-enemy level from the
@@ -443,13 +651,17 @@ lets Trial Mode `await` tiers sequentially.
   fraction), OOM total, and the full `simResult`. Per-player OOM accumulates across tiers into
   `rosterOom`, refreshing the roster badges live.
 - Clicking a tier row opens `#trialResultModalOverlay`, which calls the same `renderResult` with
-  `IDS_MODAL` instead of `IDS_MAIN` — one renderer, two targets (`:1893-1904`).
+  `IDS_MODAL` instead of `IDS_MAIN` — one renderer, two targets.
+- On a wipe, the panel also reports how much of the shared budget went **unspent**
+  (`trialWipedTimeLeft`) — "reached T8" alone doesn't say whether the run died or ran out of clock.
+- `lastTrialRun` keeps `{tiers, stopReason, remainingSeconds}` so a language switch re-renders the
+  whole panel.
 
 ---
 
 ## 8. Results & combat log
 
-`renderResult(result, scrollTo, ids)` (`:1906-1966`) writes:
+`renderResult(result, scrollTo, ids)` (`:2344`) writes:
 
 - **Summary** — outcome chip, duration, enemy final states (listed first), player final states with
   HP/MP/deaths/OOM.
@@ -460,11 +672,59 @@ lets Trial Mode `await` tiers sequentially.
 - **Healing Done** — `aggregateHeals` + `mergeHealCastCounts`.
 - Each table row is expandable into a per-ability breakdown with hit/miss and accuracy %.
 
-The log renderer (`renderLog`, `:2310+`) filters by kind (attack / heal / manaGain / buffCast /
+The log renderer (`renderLog`, `:3054`) filters by kind (attack / heal / manaGain / buffCast /
 enrage / death / consumable), by player, by free-text search, and can hide aura chatter.
 
 Names are resolved through `nameFor(hrid, isPlayer)` against `window.__playerNames` /
 `window.__enemyNames`, both repopulated at the start of every run.
+
+### 8.1 Pre-mitigation damage
+
+`addAttack` takes an optional 5th argument and logs `premitigatedHit` — the damage **before**
+armour and resistances reduced it, and before the overkill clip on a killing blow
+(`simResult.js:210`). `processAttack` returns `premitigatedDamageDone`,
+`premitigatedThornDamageDone` and `premitigatedRetaliationDamageDone` alongside the real values
+(`combatUtilities.js:190+`); nothing in the sim reads them, they exist for reporting.
+
+The argument is optional on purpose: damage-over-time has no mitigation figure to give, and older
+logs have none at all, so `aggregateAttacks` falls back to the real hit rather than under-reporting.
+
+Note what the figure does and doesn't isolate: multipliers applied to the roll itself (the target's
+`damageTaken`, the attacker's task / ability / auto-attack damage) are already baked in — they are
+part of the incoming hit. What it exposes is armour/resistance mitigation plus overkill.
+
+### 8.2 Trial Mode — "Analysis — whole run"
+
+A `<details>` under the tier table (`renderTrialAnalysisTable`, `:2751`), filled by
+`aggregateTrialRun` (`:2075`), which folds every tier together. Keys are stable across tiers —
+player hrids, and the `uniqueHrid` each enemy copy gets — so a unit accumulates into one row.
+
+One row per player, **roster only** (`playersOnly()` drops the trial monsters; their rows just
+restate the raid's numbers from the other side):
+
+| Column | Colour |
+| --- | --- |
+| Total Dmg | orange `#f0894c` |
+| Total Healed | green `#6fd08a` |
+| Taken (pre-mit) | red `#ff6b6b` |
+
+Each carries its **share of the party total for that metric** — its own denominator, since a share
+of party healing measured against party damage would be meaningless. Two decimals below 1%, one
+above: with 50+ players a single decimal rounds every small contributor to the same `0.0%`.
+
+Other details:
+
+- **Healing excludes the passive per-10s HP regen** (`aggregateHeals(log, {excludeRegen:true})`).
+  With the group-battle +3pp regen buff it otherwise dominates the column and every durable
+  front-liner reads as a healer. The single-battle and per-tier tables still include it.
+- Expanding a row stacks three per-ability breakdowns — damage, healing, damage taken (the last
+  with its own pre-mitigation column) — so a player's output and what it cost them read as one line.
+- **ⓘ** next to a name opens that player's detail dialog. Resolved from the row's player hrid, so a
+  player removed after the run simply gets no icon.
+- **⧉ Copy summary for Discord** (`trialSummaryText`, `:2924`) puts the tier ladder and the
+  per-player table on the clipboard inside a fenced code block, column widths computed from the content so
+  the monospace block stays aligned. If it would exceed Discord's 2000-character limit it trims the
+  smallest contributors and appends a truncation note rather than producing a message that won't send.
 
 ---
 
@@ -489,6 +749,35 @@ Names are resolved through `nameFor(hrid, isPlayer)` against `window.__playerNam
   it and `castSpeed` is its entire damage clock — don't reason about monster DPS from
   `attackInterval` alone.
 - Adding a roster preset = drop a JSON file in `data/testPlayers/`. Adding an enemy group = add an
-  entry to `monsterGroups.json`. Neither needs code changes.
+  entry to `monsterGroups.json` (give it a `trialHrid` too). Neither needs code changes.
+- **`renderPlayerList` is shared by everything.** The roster table, the sanity check and the aura
+  chips all come out of it, and it is re-run on roster changes, guild-building edits and enemy-group
+  changes. Anything it reads must be cheap or cached.
+- **Guild buildings are buffs, not a new concept.** Add a building by extending `GUILD_BUILDINGS`
+  with buff types `CombatUnit` already reads; give each buff a `uniqueHrid` keyed by building *and*
+  stat, or two buildings granting the same stat will collide.
+- **`premitigatedHit` is optional.** Callers with nothing to report omit it and consumers fall back
+  to the real hit. Don't make it required without giving the damage-over-time path a value.
+- **An aura's strength depends on the caster's skill**, not just the aura's level (§4.5). Any
+  ranking of carriers has to use both terms, and the numbers come from `abilityDetailMap` — don't
+  hardcode them.
+- **The guild trial export has ability levels only for equipped abilities.** Anything that wants to
+  reason about an ability a member isn't carrying is guessing, and should say so in the UI.
+- The sanity check's AoE rule reads `enemyGroup.length`, so it is only correct while that mirrors
+  what will actually be fought. Trial Mode re-levels but does not re-count, so this holds.
 - Per project convention, this page is **English-only for new features**; existing strings still go
-  through `t()` / `data-i18n`.
+  through `t()` / `data-i18n`. In practice every string added through v1.0 has both en and zh.
+
+---
+
+## 10. Version history
+
+`#buildVersion` in `group-battle.html` and the matching block in
+`data/changelogGroupBattle.json` must be bumped together — the renderer tags the entry whose key
+equals the badge as "current", and a missing entry renders an empty changelog.
+
+**v1.0** added: the guild trial import, the guild buildings banner, shrines actually applying in
+group battles (they were silently dropped before — a roster with real shrine levels now fights
+differently), house/shrine/achievement display in the detail dialog, the roster row layout, the
+sanity check, the whole-run Analysis section with Discord export, pre-mitigation damage taken,
+healing excluding passive regen, and the aura display/ranking rework.

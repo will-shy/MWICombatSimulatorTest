@@ -278,7 +278,11 @@ it.
 | `seed` | the seed the run used (page results only; in Node you passed it) |
 
 Attack log entries carry `premitigatedHit` (damage before armour/resistance). It is absent for
-damage-over-time, so always fall back to `hit`.
+damage-over-time, so always fall back to `hit`. A miss logs `hit: "miss"`, a string (see §6).
+
+Players are `player1`, `player2`, … in the roster file's order, so the member at index `i` of the
+export is `job.players[i]` and has hrid `player${i + 1}`. That is how to find one member's entries
+in `battleLog` from a script, where `__playerNames` isn't available.
 
 The HP/MP time series (`timeSeriesData`) is not produced by the wasm kernel. Reconstruct HP over
 time from the `attack` and `heal` entries in `battleLog`, which carry `targetHpAfter`, and MP from
@@ -392,6 +396,9 @@ ability-driven rotation.
 order and the first that triggers but fails `canUseAbility` sets `skipNextAbility`, so *nothing*
 below it casts that action. A 200-mana Revive in slot 1 with no mana guard stops a healer healing
 entirely. This also means **slot order is a real variable** — test it.
+
+**A miss is logged as `hit: "miss"`, not 0.** Summing `hit` over attack entries turns into string
+concatenation at the first miss and ends as `NaN`. Filter on `typeof e.hit === "number"`.
 
 **A JS edit to the combat code tests nothing.** See §1: the kernel is compiled. A "fix" made in
 `src/combatsimulator/` and then swept will show no effect at all, which reads exactly like a fix
