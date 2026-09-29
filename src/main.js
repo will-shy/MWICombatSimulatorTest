@@ -2337,6 +2337,13 @@ function initHpMpVisualization() {
     const toggle = document.getElementById('hpMpVisualizationToggle');
     const container = document.getElementById('combatChartsContainer');
 
+    // The wasm combat kernel (worker.js) does not produce the HP/MP time series, so the charts stay
+    // off regardless of a previously saved preference; the toggle itself is hidden in index.html.
+    if (toggle) {
+        toggle.checked = false;
+        return;
+    }
+
     const enableHpMpVisualization = localStorage.getItem('enableHpMpVisualization');
     if (enableHpMpVisualization === 'true') {
         toggle.checked = true;

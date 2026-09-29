@@ -7,7 +7,7 @@
 
 const en = {
     pageTitle: "MWI Group Battle Simulator (WIP)",
-    buildInfo: "last modified 2026-08-13 UTC",
+    buildInfo: "last modified 2026-09-29 UTC",
     disclaimer: "For IC guild Arsenal internal use only.",
     backToStandard: "← Back to standard simulator",
     tabBattle: "Battle",
@@ -323,7 +323,7 @@ const en = {
 
 const zh = {
     pageTitle: "MWI 团队战斗模拟器 (WIP)",
-    buildInfo: "最后修改 2026-08-13 UTC",
+    buildInfo: "最后修改 2026-09-29 UTC",
     disclaimer: "仅供 IC 公会 Arsenal 内部使用。",
     backToStandard: "← 返回标准模拟器",
     tabBattle: "战斗",

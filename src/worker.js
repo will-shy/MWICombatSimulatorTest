@@ -1,293 +1,130 @@
-import CombatSimulator from "./combatsimulator/combatSimulator";
-import Player from "./combatsimulator/player";
-import Zone from "./combatsimulator/zone";
-import Labyrinth from "./combatsimulator/labyrinth";
-import LabyrinthUpgrade from "./combatsimulator/labyrinthUpgrade";
-import Shrine from "./combatsimulator/shrine";
-import Monster from "./combatsimulator/monster";
-import GroupBattleMonster from "./combatsimulator/groupBattleMonster";
-import GROUP_BATTLE_REGEN_BUFFS from "./combatsimulator/data/groupBattleBuffs";
-import { guildBuildingBuffs } from "./combatsimulator/data/guildBuildings";
-import groupBattleScaling from "./combatsimulator/data/groupBattleScaling";
+// Simulation worker, backed by the wasm combat kernel (src/wasm/, see its README).
+//
+// Every page that simulates goes through this worker: the standard simulator (main.js and
+// multiWorker.js), the group battle page (groupBattle.js) and the optimizer (optimizationWorker.js).
+// The message protocol is unchanged:
+//   start_simulation           → simulation_progress, simulation_result      (planets, dungeons, labyrinths)
+//   start_simulation_all_zones → simulation_progress, simulation_result_allZones
+//   start_battle               → battle_result                               (group battle)
+//   any failure                → simulation_error
+//
+// The kernel reproduces src/combatsimulator/ exactly, with two by-design differences:
+//   - Each job is seeded. Pass `seed` on the message to reproduce a run; otherwise a random seed is
+//     drawn and returned on the result as `simResult.seed`.
+//   - Progress is reported once, at the end: a job runs to completion inside the kernel (and is fast).
+// The HP/MP time series (`extra.enableHpMpVisualization`, `simResult.timeSeriesData`) is not produced.
 
+import init, { CombatKernel } from "./wasm/mwi_wasm.js";
 
-class SimulationManager {
-    constructor() {
-        this.simulations = [];
-        this.simResults;
-    }
+import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
+import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
+import enhancementLevelTotalBonusMultiplierTable from "./combatsimulator/data/enhancementLevelTotalBonusMultiplierTable.json";
+import combatMonsterDetailMap from "./combatsimulator/data/combatMonsterDetailMap.json";
+import actionDetailMap from "./combatsimulator/data/actionDetailMap.json";
+import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
+import achievementDetailMap from "./combatsimulator/data/achievementDetailMap.json";
+import achievementTierDetailMap from "./combatsimulator/data/achievementTierDetailMap.json";
+import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json";
+import labyrinthUpgradeDetailMap from "./combatsimulator/data/labyrinthUpgradeDetailMap.json";
+import labyrinthCrateDetailMap from "./combatsimulator/data/labyrinthCrateDetailMap.json";
+import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTriggerDependencyDetailMap.json";
+import combatStyleDetailMap from "./combatsimulator/data/combatStyleDetailMap.json";
 
-    addSimulation(sim) {
-        this.simulations.push(sim);
-    }
+const kernelReady = init().then(
+    () =>
+        new CombatKernel(
+            JSON.stringify({
+                abilityDetailMap,
+                itemDetailMap,
+                enhancementLevelTotalBonusMultiplierTable,
+                combatMonsterDetailMap,
+                actionDetailMap,
+                houseRoomDetailMap,
+                achievementDetailMap,
+                achievementTierDetailMap,
+                shrineDetailMap,
+                labyrinthUpgradeDetailMap,
+                labyrinthCrateDetailMap,
+                combatTriggerDependencyDetailMap,
+                combatStyleDetailMap,
+            }),
+        ),
+);
 
-    async startSimulations(simulationTimeLimit) {
-        const simulationPromises = this.simulations.map(simulation => simulation.simulate(simulationTimeLimit));
-        const results = await Promise.all(simulationPromises);
-        return results;
-    }
+function randomSeed() {
+    return crypto.getRandomValues(new Uint32Array(1))[0] || 1;
+}
+
+function simulate(kernel, job) {
+    const seed = job.seed ?? randomSeed();
+    const simResult = JSON.parse(kernel.simulate(JSON.stringify({ ...job, seed })));
+    simResult.seed = seed;
+    return simResult;
+}
+
+function errorMessage(e) {
+    return String(e?.message ?? e);
 }
 
 onmessage = async function (event) {
-    switch (event.data.type) {
-        case "start_simulation":
-            let extraBuffs = [];
-            if (event.data.extra.mooPass) {
-                const mooPassBuff = {
-                    "uniqueHrid": "/buff_uniques/experience_moo_pass_buff",
-                    "typeHrid": "/buff_types/wisdom",
-                    "ratioBoost": 0,
-                    "ratioBoostLevelBonus": 0,
-                    "flatBoost": 0.05,
-                    "flatBoostLevelBonus": 0,
-                    "startTime": "0001-01-01T00:00:00Z",
-                    "duration": 0
-                };
-                extraBuffs.push(mooPassBuff);
-            }
-            if (event.data.extra.comExp > 0) {
-                const comExpBuff = {
-                    "uniqueHrid": "/buff_uniques/experience_community_buff",
-                    "typeHrid": "/buff_types/wisdom",
-                    "ratioBoost": 0,
-                    "ratioBoostLevelBonus": 0,
-                    "flatBoost": 0.005 * (event.data.extra.comExp - 1) + 0.2,
-                    "flatBoostLevelBonus": 0,
-                    "startTime": "0001-01-01T00:00:00Z",
-                    "duration": 0
-                };
-                extraBuffs.push(comExpBuff);
-            }
-            if (event.data.extra.comDrop > 0) {
-                const comDropBuff = {
-                    "uniqueHrid": "/buff_uniques/combat_community_buff",
-                    "typeHrid": "/buff_types/combat_drop_quantity",
-                    "ratioBoost": 0,
-                    "ratioBoostLevelBonus": 0,
-                    "flatBoost": 0.005 * (event.data.extra.comDrop - 1) + 0.2,
-                    "flatBoostLevelBonus": 0,
-                    "startTime": "0001-01-01T00:00:00Z",
-                    "duration": 0
-                };
-                extraBuffs.push(comDropBuff);
-            }
-            if (event.data.extra.personalBuffs) {
-                const personalBuffs = {
-                    "/items/seal_of_attack_speed": {
-                        "uniqueHrid": "/buff_uniques/personal_attack_speed",
-                        "typeHrid": "/buff_types/attack_speed",
-                        "ratioBoost": 0.15,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_cast_speed": {
-                        "uniqueHrid": "/buff_uniques/personal_cast_speed",
-                        "typeHrid": "/buff_types/cast_speed",
-                        "ratioBoost": 0,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0.15,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_combat_drop": {
-                        "uniqueHrid": "/buff_uniques/personal_combat_drop",
-                        "typeHrid": "/buff_types/combat_drop_quantity",
-                        "ratioBoost": 0,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0.15,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_critical_rate": {
-                        "uniqueHrid": "/buff_uniques/personal_critical_rate",
-                        "typeHrid": "/buff_types/critical_rate",
-                        "ratioBoost": 0,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0.1,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_damage": {
-                        "uniqueHrid": "/buff_uniques/personal_damage",
-                        "typeHrid": "/buff_types/damage",
-                        "ratioBoost": 0.08,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_rare_find": {
-                        "uniqueHrid": "/buff_uniques/personal_rare_find",
-                        "typeHrid": "/buff_types/rare_find",
-                        "ratioBoost": 0,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0.6,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    },
-                    "/items/seal_of_wisdom": {
-                        "uniqueHrid": "/buff_uniques/personal_wisdom",
-                        "typeHrid": "/buff_types/wisdom",
-                        "ratioBoost": 0,
-                        "ratioBoostLevelBonus": 0,
-                        "flatBoost": 0.2,
-                        "flatBoostLevelBonus": 0,
-                        "startTime": "0001-01-01T00:00:00Z",
-                        "duration": 0
-                    }
-                };
-                for (let buff of event.data.extra.personalBuffs) {
-                    if (personalBuffs[buff]) {
-                        extraBuffs.push(personalBuffs[buff]);
-                    }
-                }
-            }
+    const data = event.data;
+    let kernel;
+    try {
+        kernel = await kernelReady;
+    } catch (e) {
+        this.postMessage({ type: "simulation_error", error: "Could not start the combat kernel: " + errorMessage(e) });
+        return;
+    }
 
-            let playersData = event.data.players;
-            let players = [];
-            let zone = null;
-            if (event.data.zone) {
-                zone = new Zone(event.data.zone.zoneHrid, event.data.zone.difficultyTier);
-            }
-            let labyrinth = null;
-            if (event.data.labyrinth) {
-                labyrinth = new Labyrinth(event.data.labyrinth.labyrinthHrid, event.data.labyrinth.roomLevel, event.data.labyrinth.crates);
-            }
-            for (let i = 0; i < playersData.length; i++) {
-                let currentPlayer = Player.createFromDTO(structuredClone(playersData[i]));
-                currentPlayer.zoneBuffs = zone?.buffs || labyrinth?.buffs || [];
-                // Shrines and labyrinth upgrades are per-player; labyrinth upgrades only take
-                // effect inside a labyrinth, shrines apply to all combat.
-                let playerBuffs = extraBuffs.concat(Shrine.buffsFromLevels(currentPlayer.shrines));
-                if (labyrinth) {
-                    playerBuffs = playerBuffs.concat(
-                        LabyrinthUpgrade.buffsFromLevels(currentPlayer.labyrinthUpgrades)
-                    );
-                }
-                currentPlayer.extraBuffs = playerBuffs;
-                players.push(currentPlayer);
-            }
-            let simulationTimeLimit = event.data.simulationTimeLimit;
-            let enableHpMpVisualization = event.data.extra.enableHpMpVisualization || false;
-            let combatSimulator = new CombatSimulator(players, zone, labyrinth, { enableHpMpVisualization });
-            combatSimulator.addEventListener("progress", (event) => {
-                this.postMessage({ 
-                    type: "simulation_progress", 
-                    progress: event.detail.progress, 
-                    zone: event.detail.zone, 
-                    difficultyTier: event.detail.difficultyTier,
-                    labyrinth: event.detail.labyrinth,
-                    roomLevel: event.detail.roomLevel,
-                    timeSeriesData: event.detail.timeSeriesData
+    try {
+        switch (data.type) {
+            case "start_simulation": {
+                const simResult = simulate(kernel, data);
+                this.postMessage({
+                    type: "simulation_progress",
+                    progress: 1,
+                    zone: data.zone?.zoneHrid,
+                    difficultyTier: data.zone?.difficultyTier,
+                    labyrinth: data.labyrinth?.labyrinthHrid,
+                    roomLevel: data.labyrinth?.roomLevel,
+                    timeSeriesData: null,
                 });
-            });
-
-            try {
-                let simResult = await combatSimulator.simulate(simulationTimeLimit);
-                this.postMessage({ type: "simulation_result", simResult: simResult });
-            } catch (e) {
-                console.log(e);
-                this.postMessage({ type: "simulation_error", error: e });
+                this.postMessage({ type: "simulation_result", simResult });
+                break;
             }
-            break;
-        case "start_battle": {
-            // Single fixed encounter fought to completion, with a detailed combat log.
-            // A real zone is still needed for zone buffs; default to a harmless combat zone.
-            const battleZoneHrid = event.data.zoneHrid || "/actions/combat/fly";
-            let battleZone = new Zone(battleZoneHrid);
-
-            let battlePlayers = [];
-            let battlePlayersData = event.data.players;
-            // Guild buildings are a guild-wide bonus on top of each player's own house rooms, so
-            // they apply to every member of the group for every tier of a trial. Levels are set in
-            // the page and travel with the request; an unset guild sends none and nothing changes.
-            const guildBuffs = guildBuildingBuffs(event.data.guildBuildingLevels);
-            for (let i = 0; i < battlePlayersData.length; i++) {
-                let currentPlayer = Player.createFromDTO(structuredClone(battlePlayersData[i]));
-                currentPlayer.zoneBuffs = battleZone.buffs;
-                // Shrines are permanent per-character combat bonuses, so they apply here exactly
-                // as they do in a solo simulation. A roster built from presets carries none and is
-                // unaffected; one imported from a guild trial export carries the guild's real levels.
-                currentPlayer.extraBuffs = GROUP_BATTLE_REGEN_BUFFS
-                    .concat(guildBuffs)
-                    .concat(Shrine.buffsFromLevels(currentPlayer.shrines));
-                battlePlayers.push(currentPlayer);
-            }
-
-            // Monsters scale with the group size: +1% max HP, +2% attack speed,
-            // +2% cast speed and +2 ability haste per player (see the group-battle.html
-            // rules banner). Shared with the UI preview via groupBattleScaling().
-            const partyScaling = groupBattleScaling(battlePlayers.length);
-
-            let fixedEnemies = event.data.enemies.map((enemy) => {
-                if (enemy.trial) {
-                    // Trial enemy: real game monster, scaled by roomLevel = its trial
-                    // level (100..300). uniqueHrid keeps duplicates (e.g. 2x Trial
-                    // Badger) as separate rows in the per-enemy result breakdown.
-                    return new GroupBattleMonster(enemy.hrid, enemy.level || 100, {
-                        ...partyScaling,
-                        uniqueHrid: enemy.uniqueHrid,
-                        displayName: enemy.name,
-                    });
+            case "start_simulation_all_zones": {
+                // One ordinary start_simulation per zone, in order (the same jobs multiWorker.js
+                // fans out). Zones may be { zoneHrid, difficultyTier } objects or bare hrids.
+                const zones = data.zones || [];
+                const simResults = [];
+                for (let i = 0; i < zones.length; i++) {
+                    const zone = typeof zones[i] === "string" ? { zoneHrid: zones[i], difficultyTier: 0 } : zones[i];
+                    simResults.push(
+                        simulate(kernel, {
+                            players: data.players,
+                            zone,
+                            labyrinth: null,
+                            simulationTimeLimit: data.simulationTimeLimit,
+                            extra: data.extra,
+                            seed: data.seed == null ? undefined : (data.seed + i) >>> 0,
+                        }),
+                    );
+                    this.postMessage({ type: "simulation_progress", progress: (i + 1) / zones.length });
                 }
-                return new Monster(enemy.hrid, enemy.eliteTier || 0);
-            });
-
-            let timeCapNs = (event.data.timeCapSeconds || 3600) * 1e9;
-
-            let battleSimulator = new CombatSimulator(battlePlayers, battleZone, null, {
-                logEvents: true,
-                fixedEnemies: fixedEnemies,
-            });
-
-            try {
-                let battleResult = await battleSimulator.simulateBattle(timeCapNs);
-                this.postMessage({ type: "battle_result", simResult: battleResult });
-            } catch (e) {
-                console.log(e);
-                this.postMessage({ type: "simulation_error", error: e.toString() });
+                this.postMessage({ type: "simulation_result_allZones", simResults });
+                break;
             }
-            break;
+            case "start_battle": {
+                const seed = data.seed ?? randomSeed();
+                const simResult = JSON.parse(kernel.battle(JSON.stringify({ ...data, seed })));
+                simResult.seed = seed;
+                this.postMessage({ type: "battle_result", simResult });
+                break;
+            }
+            default:
+                this.postMessage({ type: "simulation_error", error: `Unsupported worker message: ${data.type}` });
         }
-        case "start_simulation_all_zones": {
-            const simManager = new SimulationManager();
-            const zoneHrids = event.data.zones;
-            for (let i = 0; i < zoneHrids.length; i++) {
-                const zoneInstance = new Zone(zoneHrids[i]);
-                if (zoneInstance.monsterSpawnInfo.randomSpawnInfo.spawns) {
-                    let players = [];
-                    let playersData = event.data.players;
-                    for (let i = 0; i < playersData.length; i++) {
-                        let currentPlayer = Player.createFromDTO(structuredClone(playersData[i]));
-                        currentPlayer.zoneBuffs = zoneInstance.buffs;
-                        currentPlayer.extraBuffs = [];
-                        players.push(currentPlayer);
-                    }
-                    let simulation = new CombatSimulator(players, zoneInstance, null);
-                    if (i == 0) {
-                        simulation.addEventListener("progress", (event) => {
-                            this.postMessage({ type: "simulation_progress", progress: event.detail });
-                        });
-                    }
-                    simManager.addSimulation(simulation);
-                }
-            }
-            try {
-                const simResults = await simManager.startSimulations(event.data.simulationTimeLimit);
-                this.postMessage({ type: "simulation_result_allZones", simResults: simResults });
-            } catch (e) {
-                console.log(e);
-                this.postMessage({ type: "simulation_error", error: e });
-            }
-            break;
-        }
+    } catch (e) {
+        this.postMessage({ type: "simulation_error", error: errorMessage(e) });
     }
 };

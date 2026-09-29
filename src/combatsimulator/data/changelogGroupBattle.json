@@ -1,5 +1,16 @@
 {
   "_comment": "Changelog for the Group Battle page, shown by clicking the version badge in the header. Newest version FIRST - render order follows key order. Each entry: date (YYYY-MM-DD) plus parallel en/zh note arrays; the renderer picks the array matching the active language and falls back to en. Add a new block here whenever #buildVersion in group-battle.html is bumped.",
+  "v1.1": {
+    "date": "2026-09-29",
+    "en": [
+      "Battles now run on a new combat engine: the same combat rules, compiled to WebAssembly. Given the same random rolls it produces exactly the same results as before, checked fight by fight against the old engine.",
+      "Battles run about 14 times faster, so a full Trial Mode ladder now finishes in seconds."
+    ],
+    "zh": [
+      "团队战斗改用新的战斗引擎运行：战斗规则不变，编译为 WebAssembly。在相同的随机结果下，与旧引擎的结果完全一致，并已逐场对照验证。",
+      "战斗速度约提升 14 倍，完整的试炼模式层数现在几秒内即可跑完。"
+    ]
+  },
   "v1.0": {
     "date": "2026-09-28",
     "en": [
