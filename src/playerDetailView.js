@@ -309,7 +309,7 @@ function translatedOr(ns, hrid, fallback) {
     return fallback;
 }
 
-function describeTrigger(trigger) {
+export function describeTrigger(trigger) {
     let depName = translatedOr("combatTriggerDependencyNames", trigger.dependencyHrid,
         combatTriggerDependencyDetailMap[trigger.dependencyHrid]?.name || trigger.dependencyHrid);
     let condName = translatedOr("combatTriggerConditionNames", trigger.conditionHrid,

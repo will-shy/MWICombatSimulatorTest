@@ -1,11 +1,13 @@
 // Simulation worker, backed by the wasm combat kernel (src/wasm/, see its README).
 //
 // Every page that simulates goes through this worker: the standard simulator (main.js and
-// multiWorker.js), the group battle page (groupBattle.js) and the optimizer (optimizationWorker.js).
+// multiWorker.js), the group battle page (groupBattle.js), the Skill Lab (skillLab.js) and the
+// optimizer (optimizationWorker.js).
 // The message protocol is unchanged:
 //   start_simulation           → simulation_progress, simulation_result      (planets, dungeons, labyrinths)
 //   start_simulation_all_zones → simulation_progress, simulation_result_allZones
 //   start_battle               → battle_result                               (group battle)
+//   start_skill_lab            → skill_lab_result                            (Skill Lab, see skillLabJob.js)
 //   any failure                → simulation_error
 //
 // The kernel reproduces src/combatsimulator/ exactly, with two by-design differences:
@@ -15,6 +17,7 @@
 // The HP/MP time series (`extra.enableHpMpVisualization`, `simResult.timeSeriesData`) is not produced.
 
 import init, { CombatKernel } from "./wasm/mwi_wasm.js";
+import { runSkillLabJob } from "./skillLabJob.js";
 
 import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
@@ -119,6 +122,11 @@ onmessage = async function (event) {
                 const simResult = JSON.parse(kernel.battle(JSON.stringify({ ...data, seed })));
                 simResult.seed = seed;
                 this.postMessage({ type: "battle_result", simResult });
+                break;
+            }
+            case "start_skill_lab": {
+                // `id` lets a page running several of these workers match each result to its job.
+                this.postMessage({ type: "skill_lab_result", id: data.id, run: runSkillLabJob(kernel, data.job) });
                 break;
             }
             default:

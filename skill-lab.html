@@ -133,9 +133,67 @@
         .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .grow { flex: 1 1 auto; }
 
-        /* ------------------------------------------------------------ squads */
+        /* ------------------------------------------------------ party import */
 
-        .squad {
+        .drop-zone {
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            background: var(--panel2);
+            padding: 16px 14px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.12s ease, background 0.12s ease;
+        }
+
+        .drop-zone:hover, .drop-zone.dragging { border-color: var(--accent); background: rgba(91, 155, 213, 0.10); }
+        .drop-zone .drop-title { font-weight: 600; color: var(--accent); }
+        .drop-zone .drop-sub { color: var(--dim); font-size: 12px; margin-top: 4px; }
+
+        #partyStatus { margin-top: 10px; font-size: 13px; line-height: 1.6; }
+
+        .warn-box {
+            background: rgba(255, 179, 71, 0.12);
+            border: 1px solid rgba(255, 179, 71, 0.5);
+            border-radius: 4px;
+            padding: 6px 9px;
+            margin-top: 6px;
+            font-size: 12px;
+        }
+
+        .buildings { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px 12px; }
+        .buildings label { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--dim); }
+        .buildings label span { flex: 1; }
+        .buildings input { width: 56px; }
+
+        details.roster summary { cursor: pointer; font-size: 12px; color: var(--accent); margin-top: 10px; }
+        details.roster table { margin-top: 6px; font-size: 12px; }
+        details.roster td, details.roster th { padding: 4px 6px; }
+        details.roster tr.member-row { cursor: pointer; }
+        details.roster tr.member-row:hover { background: var(--panel2); }
+        details.roster tr.is-focus td { background: rgba(91, 155, 213, 0.14); }
+        td.kit-cell { text-align: left; white-space: normal; color: var(--dim); }
+
+        /* ------------------------------------------------------------- modes */
+
+        .subtabbar { display: flex; gap: 4px; margin: 4px 0 12px; border-bottom: 1px solid var(--border); }
+
+        .subtab {
+            background: transparent;
+            color: var(--dim);
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+        }
+
+        .subtab.active { color: var(--text); border-bottom-color: var(--accent); }
+        .subtab:hover { color: var(--text); }
+
+        /* ---------------------------------------------------------- variants */
+
+        .variant {
             background: var(--panel2);
             border: 1px solid var(--border);
             border-left: 3px solid var(--dim);
@@ -144,9 +202,9 @@
             margin-bottom: 10px;
         }
 
-        .squad-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .variant-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 
-        .squad-label {
+        .variant-label {
             background: transparent;
             border: 1px solid transparent;
             border-radius: 4px;
@@ -154,10 +212,10 @@
             font-size: 14px;
             font-weight: 600;
             padding: 3px 6px;
-            width: 150px;
+            width: 170px;
         }
 
-        .squad-label:hover, .squad-label:focus { border-color: var(--border); background: var(--panel); }
+        .variant-label:hover, .variant-label:focus { border-color: var(--border); background: var(--panel); }
 
         .tag {
             font-size: 11px;
@@ -169,26 +227,17 @@
             letter-spacing: 0.05em;
         }
 
-        .tag.variant { background: #3b3524; color: var(--aura); }
-        .tag.support { background: #253242; color: var(--accent); }
-
-        .squad.is-support { opacity: 0.88; }
-
-        tbody tr.support-row td { opacity: 0.75; }
+        .tag.baseline { background: #253242; color: var(--accent); }
+        .tag.best { background: #24382a; color: var(--win); }
 
         .slots { display: flex; flex-direction: column; gap: 5px; }
 
-        .slot { display: grid; grid-template-columns: 38px minmax(120px, 200px) 62px 1fr; gap: 8px; align-items: center; }
+        .slot { display: grid; grid-template-columns: 52px minmax(120px, 200px) 62px 1fr; gap: 8px; align-items: center; }
 
-        .slot-no {
-            font-size: 11px;
-            color: var(--dim);
-            text-align: right;
-            font-variant-numeric: tabular-nums;
-        }
-
+        .slot-no { font-size: 11px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
         .slot-meta { font-size: 11px; color: var(--dim); }
         .slot-warn { font-size: 11px; color: var(--draw); margin-left: 8px; cursor: help; }
+        .slot-trig { font-size: 11px; color: var(--dim); margin-left: 8px; cursor: help; border-bottom: 1px dotted var(--dim); }
 
         /* ----------------------------------------------------------- results */
 
@@ -223,8 +272,9 @@
 
         td { text-align: right; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 
-        tbody tr.squad-row { cursor: pointer; }
-        tbody tr.squad-row:hover { background: var(--panel2); }
+        tbody tr.variant-row { cursor: pointer; }
+        tbody tr.variant-row:hover { background: var(--panel2); }
+        td.range { color: var(--dim); font-size: 12px; }
 
         table.mini { font-size: 12px; }
         table.mini th { font-size: 10px; padding: 0 6px 4px; }
@@ -242,7 +292,7 @@
         .breakdown { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; padding: 6px 0 10px; }
         .bd-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); margin-bottom: 5px; }
 
-        /* --------------------------------------------- saved builds + preview */
+        /* ----------------------------------------------------------- preview */
 
         /* The shared detail renderer emits <button class="secondary">. */
         button.secondary {
@@ -258,22 +308,6 @@
 
         button.secondary:hover { border-color: var(--accent); }
 
-        .chip-btn {
-            background: var(--panel2);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 4px 11px;
-            font-size: 12px;
-            font-family: inherit;
-            cursor: pointer;
-            margin: 0 5px 5px 0;
-        }
-
-        .chip-btn:hover { border-color: var(--accent); }
-
-        #savedBuilds { display: flex; flex-wrap: wrap; }
-        #savedBuilds a { color: var(--accent); }
 
         .modal-overlay {
             position: fixed;
@@ -377,7 +411,7 @@
 <body>
     <header>
         <h1>MWI Skill Lab</h1>
-        <span class="disclaimer">Ability-kit DPS bench · For IC guild Arsenal internal use only.</span>
+        <span class="disclaimer">Ability-kit bench for one raid member · For IC guild Arsenal internal use only.</span>
         <span class="grow"></span>
         <a href="group-battle.html">← Group Battle</a>
         <a href="index.html" target="_blank" rel="noopener">Standard simulator ↗</a>
@@ -386,15 +420,13 @@
 
     <div class="wrap">
         <p class="intro">
-            Build squads of identical players, pick each squad's five ability slots, and run one trial group to
-            completion. Squads sharing the same build are compared against the first of that build, so the
-            workflow for <b>“what if 5 of our 14 crossbows swapped skills?”</b> is: press <b>＋ variant</b> on that
-            squad, change the copy's kit, and read the <b>vs baseline</b> column.
-            Squads marked <b>support</b> fight normally — their debuffs and Mana Spring's mana feed benefit the whole
-            raid — but their damage is excluded from the analysis, and the five raid auras go to support members first.
-            Mana is real by default (watch the <b>blocked casts</b> column); tick <b>infinite mana</b> to isolate a kit
-            from its mana cost. Players never take damage — this is a damage bench, not a survival test.
-            Slot 0 is the special/aura slot.
+            Load your guild's combat-trial export, pick one member, and give them several ability kits. Every kit
+            is run in the <b>whole party's</b> fight, exactly as the Group Battle page runs it, on the same wasm
+            combat kernel. Only that member's bar changes. Each kit is run <b>10 times</b> by default, on the same
+            seeds as every other kit, and the results table compares each kit's average damage with the first kit.
+            An ability the player already has equipped keeps their own level. The export has no level for any other
+            ability, so those start at <b>60</b> for the 0-cooldown spells (Entangle, Fireball, Water Strike),
+            <b>20</b> for auras and other special abilities, and <b>40</b> for everything else. You can change any level.
         </p>
 
         <div id="errorBox"></div>
@@ -402,62 +434,66 @@
         <div class="grid2">
             <div>
                 <div class="card">
-                    <h2>Enemy</h2>
-                    <p class="card-hint">Trial groups come from the same data the Group Battle page uses. Monster HP and
-                        action speed scale with the <em>whole</em> party, support placeholders included.</p>
-                    <div class="row" style="margin-bottom:12px">
-                        <label class="inline">group <select id="groupSelect"></select></label>
-                        <label class="inline">level <select id="levelSelect"></select></label>
+                    <h2>Party</h2>
+                    <p class="card-hint">The guild combat-trial export: one JSON file holding every member. It is
+                        imported the same way as on the Group Battle page. Each member's saved trial loadout wins, and
+                        a member without one falls back to what they had equipped. Food and drinks are ignored, and the
+                        enemy switches to the trial's monster. The party is remembered in this browser.</p>
+                    <input type="file" id="partyFile" accept="application/json,.json" style="display:none" />
+                    <div id="partyDrop" class="drop-zone" role="button" tabindex="0">
+                        <div class="drop-title">Choose JSON file…</div>
+                        <div class="drop-sub">or drop the guild trial export here</div>
                     </div>
-                    <div id="enemyPreview"></div>
+                    <div id="partyStatus"></div>
+                    <div id="partyRoster"></div>
                 </div>
 
                 <div class="card">
-                    <h2>Options</h2>
-                    <div class="row" style="margin-bottom:10px">
-                        <label class="inline"><input type="checkbox" id="optInfiniteMana"> infinite mana</label>
-                        <label class="inline"><input type="checkbox" id="optNoDamage"> players take no damage</label>
+                    <h2>Guild buildings</h2>
+                    <p class="card-hint">Apply to every member. Shared with the Group Battle page.</p>
+                    <div class="buildings" id="buildingList"></div>
+                </div>
+
+                <div class="card">
+                    <h2>Fight</h2>
+                    <div class="subtabbar" role="tablist">
+                        <button type="button" class="subtab" data-mode="trial" role="tab">Trial Mode</button>
+                        <button type="button" class="subtab" data-mode="single" role="tab">Single Tier</button>
                     </div>
-                    <div class="row" style="margin-bottom:10px">
-                        <label class="inline"><input type="checkbox" id="optAuras"> auras active</label>
-                        <label class="inline">aura level <input type="number" id="auraLevel" min="1" max="40"></label>
+                    <p class="card-hint" id="modeHint"></p>
+                    <div class="row" style="margin-bottom:12px">
+                        <label class="inline">group <select id="groupSelect"></select></label>
+                        <label class="inline" id="levelWrap">level <select id="levelSelect"></select></label>
+                        <label class="inline"><span id="capLabel">time cap (s)</span>
+                            <input type="number" id="timeCap" min="60" max="86400" step="60" style="width:84px"></label>
+                        <label class="inline">runs per kit <input type="number" id="runCount" min="1" max="50"></label>
                     </div>
-                    <div class="row">
-                        <label class="inline">runs (seeds) <input type="number" id="runCount" min="1" max="10"></label>
-                        <label class="inline">time cap (s) <input type="number" id="timeCap" min="60" max="14400" step="60" style="width:84px"></label>
-                    </div>
-                    <p class="card-hint" style="margin:12px 0 0">Auras go to support-squad members when any exist,
-                        otherwise to the highest-skill damage dealers, which costs those players a slot. More runs
-                        average out roll luck; three is usually enough to separate kits more than 2% apart.</p>
+                    <div id="enemyPreview"></div>
                 </div>
             </div>
 
             <div>
                 <div class="card">
-                    <h2>Builds from your saved gear</h2>
-                    <p class="card-hint">Equipment sets you saved in the standard simulator (same browser) are loaded as
-                        builds and appear under <b>Saved equipment sets</b> in every squad's build picker — for damage
-                        squads and support squads alike. Save a set over there, then press <b>Refresh</b> here. Click a
-                        set to preview its gear, levels and abilities, or to open it in the simulator.</p>
-                    <div id="savedBuilds"></div>
-                    <div class="row" style="margin-top:8px">
-                        <button type="button" class="btn small" id="refreshBuilds">↻ Refresh</button>
+                    <h2>Player</h2>
+                    <p class="card-hint">The member whose kits are compared. Their gear, levels, house rooms and
+                        shrines stay as imported. Abilities they already use keep their own triggers. A new ability
+                        uses the game's default triggers.</p>
+                    <div class="row">
+                        <label class="inline">player <select id="focusSelect" style="min-width:220px"></select></label>
+                        <button type="button" class="btn small" id="focusPreview">👁 preview</button>
                     </div>
+                    <div id="focusSummary" class="hint"></div>
                 </div>
 
                 <div class="card">
-                    <h2>Squads</h2>
-                    <p class="card-hint">Each squad is N identical players. <b>＋ variant</b> moves up to 5 players into a
-                        copy of the squad so party size stays fixed. The <b>support</b> checkbox keeps a squad fighting
-                        (debuffs and mana feeds still land) while excluding its damage from the analysis — its kit stays
-                        editable, e.g. the Water squad's Mana Spring level. A ⚠ on a slot means that ability resolves on
-                        a different combat style's accuracy and damage than the squad's weapon — usually a trap.
-                        <b>👁 preview</b> shows the gear, levels and abilities that squad will actually be simulated with.</p>
-                    <div id="squadList"></div>
+                    <h2>Kits</h2>
+                    <p class="card-hint">The first kit is the baseline: the player's own bar at their own
+                        levels. <b>＋ kit</b> copies a kit so you can change it. A ⚠ on a slot means the
+                        ability uses a different combat style's accuracy and damage than the player's weapon.</p>
+                    <div id="variantList"></div>
                     <div class="row" style="margin-top:4px">
-                        <button type="button" class="btn small" id="addSquad">＋ add squad</button>
+                        <button type="button" class="btn small" id="resetKits">Reset to the player's bar</button>
                         <span class="grow"></span>
-                        <button type="button" class="btn" id="resetBtn">Reset to defaults</button>
                         <button type="button" class="btn primary" id="runBtn">Run simulation</button>
                     </div>
                     <div id="progress"></div>
@@ -472,7 +508,7 @@
         </div>
     </div>
 
-    <!-- Build preview modal: gear, levels, abilities and full combat status. -->
+    <!-- Player preview modal: gear, levels, abilities and full combat status. -->
     <div id="previewOverlay" class="modal-overlay">
         <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
             <div class="modal-header">
