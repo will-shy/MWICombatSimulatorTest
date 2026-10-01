@@ -180,8 +180,6 @@
 
         #resultPanel { display: none; }
 
-        .log-controls { display: flex; gap: 8px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
-        .log-checkbox { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; }
         .log-details > summary {
             cursor: pointer;
             list-style: none;
@@ -196,27 +194,6 @@
             transition: transform 0.15s ease;
         }
         .log-details[open] > summary::before { transform: rotate(90deg); }
-        #combatLog {
-            max-height: 520px;
-            overflow-y: auto;
-            background: var(--panel2);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 8px;
-            font-family: monospace;
-            font-size: 12px;
-        }
-        .log-line { padding: 1px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
-        .log-time { color: var(--dim); display: inline-block; width: 72px; }
-        .l-player-atk { color: #cfe6ff; }
-        .l-enemy-atk { color: #ffd9c2; }
-        .l-miss { opacity: 0.6; }
-        .l-heal { color: #b6e6b6; }
-        .l-death { color: var(--lose); font-weight: 600; }
-        .l-consume { color: #d9c2ff; }
-        .l-mana { color: #9ec5fe; }
-        .l-buffcast { color: #ffe08a; }
-        .l-enrage { color: #ff6b6b; font-weight: bold; }
         .dim { color: var(--dim); }
         b { color: #fff; }
 
@@ -547,7 +524,7 @@
     <header>
         <div class="header-left">
             <h1 data-i18n="common:groupBattle.pageTitle">MWI Group Battle Simulator (WIP)</h1>
-            <div class="build-info"><button type="button" id="buildVersion" class="version-badge" data-i18n-title="common:groupBattle.changelogTooltip" title="View changelog">v1.1</button> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-09-29 UTC</span></div>
+            <div class="build-info"><button type="button" id="buildVersion" class="version-badge" data-i18n-title="common:groupBattle.changelogTooltip" title="View changelog">v1.2</button> · <span data-i18n="common:groupBattle.buildInfo">last modified 2026-10-01 UTC</span></div>
             <div class="disclaimer" data-i18n="common:groupBattle.disclaimer">For IC guild Arsenal internal use only.</div>
             <a href="index.html" data-i18n="common:groupBattle.backToStandard">← Back to standard simulator</a>
         </div>
@@ -709,6 +686,18 @@
 
             <h2 style="margin-top:18px;">3. <span data-i18n="common:groupBattle.battleSettingsTitle">Battle Settings</span></h2>
 
+            <!-- Shared by both modes: every result is the average of this many runs. -->
+            <div class="row">
+                <label for="runCount" data-i18n="common:groupBattle.runsLabel">Runs</label>
+                <input type="number" id="runCount" value="10" min="1" max="50" style="width:64px;" />
+                <label for="baseSeed" data-i18n="common:groupBattle.seedLabel">Seed</label>
+                <input type="text" id="baseSeed" value="666" inputmode="numeric" style="width:96px;" />
+                <label for="concurrency" data-i18n="common:groupBattle.concurrencyLabel">Workers</label>
+                <input type="number" id="concurrency" min="1" style="width:56px;" />
+                <span id="concurrencyMax" class="hint"></span>
+            </div>
+            <p class="hint" data-i18n="common:groupBattle.runsHint">Results show the average over all runs (1–50). Each run uses its own seed derived from the seed above, so the same seed, roster and settings reproduce the same results. Workers is how many battles run at once.</p>
+
             <!-- Single Tier mode (hidden by default; Trial Mode is the default) -->
             <div id="singleBossMode" class="modepanel" style="display:none;">
                 <div class="row">
@@ -744,32 +733,11 @@
         <div class="card">
             <h2 data-i18n="common:groupBattle.battleResultTitle">Battle Result</h2>
             <div id="resultSummary"></div>
+            <h4 data-i18n="common:groupBattle.playerResultsTitle">Players</h4>
+            <div id="resultAnalysis"></div>
             <div id="damageTotals"></div>
             <div id="damageTaken"></div>
             <div id="healingDone"></div>
-        </div>
-        <div class="card">
-            <details class="log-details">
-                <summary><h2 style="display:inline;"><span data-i18n="common:groupBattle.combatLogTitle">Combat Log</span> (<span id="logCount">0</span> <span data-i18n="common:groupBattle.entries">entries</span>)</h2></summary>
-                <div class="log-controls">
-                    <label for="logFilter" data-i18n="common:groupBattle.show">Show</label>
-                    <select id="logFilter">
-                        <option value="all" data-i18n="common:groupBattle.logAllEvents">All events</option>
-                        <option value="attack" data-i18n="common:groupBattle.logAttacksOnly">Attacks only</option>
-                        <option value="heal" data-i18n="common:groupBattle.logHealsOnly">Heals only</option>
-                        <option value="manaGain" data-i18n="common:groupBattle.logManaGainsOnly">Mana gains only</option>
-                        <option value="buffCast" data-i18n="common:groupBattle.logBuffCastsOnly">Buff casts only</option>
-                        <option value="enrage" data-i18n="common:groupBattle.logEnrageOnly">Enrage only</option>
-                        <option value="death" data-i18n="common:groupBattle.logDeathsOnly">Deaths only</option>
-                        <option value="consumable" data-i18n="common:groupBattle.logConsumablesOnly">Consumables only</option>
-                    </select>
-                    <label for="logPlayer" data-i18n="common:groupBattle.logPlayerLabel">Player</label>
-                    <select id="logPlayer"><option value="all" data-i18n="common:groupBattle.logAllPlayers">All players</option></select>
-                    <label class="log-checkbox"><input type="checkbox" id="logHideAura" /> <span data-i18n="common:groupBattle.logHideAura">Hide aura info</span></label>
-                    <input type="text" id="logSearch" data-i18n-placeholder="common:groupBattle.searchPlaceholder" placeholder="Search (name, ability...)" style="min-width:220px;" />
-                </div>
-                <div id="combatLog"></div>
-            </details>
         </div>
     </div>
     </div><!-- /battleTab -->
@@ -795,7 +763,7 @@
         </div>
     </div>
 
-    <!-- Trial tier combat-detail modal (mirrors the single-boss result view) -->
+    <!-- Trial tier detail modal: that tier averaged over the runs that reached it -->
     <div id="trialResultModalOverlay" class="modal-overlay" style="display:none;">
         <div class="modal-box" style="max-width:900px;" role="dialog" aria-modal="true" aria-labelledby="trialResultModalTitle">
             <div class="modal-header">
@@ -808,6 +776,10 @@
                     <div id="trialResultSummary"></div>
                 </details>
                 <details class="log-details" open>
+                    <summary><h2 style="display:inline;"><span data-i18n="common:groupBattle.playerResultsTitle">Players</span></h2></summary>
+                    <div id="trialResultAnalysis"></div>
+                </details>
+                <details class="log-details">
                     <summary><h2 style="display:inline;"><span data-i18n="common:groupBattle.damageDone">Damage Done</span></h2></summary>
                     <div id="trialDamageTotals"></div>
                 </details>
@@ -819,27 +791,7 @@
                     <summary><h2 style="display:inline;"><span data-i18n="common:groupBattle.healingDone">Healing Done</span></h2></summary>
                     <div id="trialHealingDone"></div>
                 </details>
-                <details class="log-details">
-                    <summary><h2 style="display:inline; margin-top:16px;"><span data-i18n="common:groupBattle.combatLogTitle">Combat Log</span> (<span id="trialLogCount">0</span> <span data-i18n="common:groupBattle.entries">entries</span>)</h2></summary>
-                    <div class="log-controls">
-                        <label for="trialLogFilter" data-i18n="common:groupBattle.show">Show</label>
-                        <select id="trialLogFilter">
-                            <option value="all" data-i18n="common:groupBattle.logAllEvents">All events</option>
-                            <option value="attack" data-i18n="common:groupBattle.logAttacksOnly">Attacks only</option>
-                            <option value="heal" data-i18n="common:groupBattle.logHealsOnly">Heals only</option>
-                            <option value="manaGain" data-i18n="common:groupBattle.logManaGainsOnly">Mana gains only</option>
-                            <option value="buffCast" data-i18n="common:groupBattle.logBuffCastsOnly">Buff casts only</option>
-                            <option value="enrage" data-i18n="common:groupBattle.logEnrageOnly">Enrage only</option>
-                            <option value="death" data-i18n="common:groupBattle.logDeathsOnly">Deaths only</option>
-                            <option value="consumable" data-i18n="common:groupBattle.logConsumablesOnly">Consumables only</option>
-                        </select>
-                        <label for="trialLogPlayer" data-i18n="common:groupBattle.logPlayerLabel">Player</label>
-                        <select id="trialLogPlayer"><option value="all" data-i18n="common:groupBattle.logAllPlayers">All players</option></select>
-                        <label class="log-checkbox"><input type="checkbox" id="trialLogHideAura" /> <span data-i18n="common:groupBattle.logHideAura">Hide aura info</span></label>
-                        <input type="text" id="trialLogSearch" data-i18n-placeholder="common:groupBattle.searchPlaceholder" placeholder="Search (name, ability...)" style="min-width:220px;" />
-                    </div>
-                    <div id="trialCombatLog"></div>
-                </details>
+
             </div>
         </div>
     </div>

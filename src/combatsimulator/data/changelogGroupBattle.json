@@ -1,5 +1,28 @@
 {
   "_comment": "Changelog for the Group Battle page, shown by clicking the version badge in the header. Newest version FIRST - render order follows key order. Each entry: date (YYYY-MM-DD) plus parallel en/zh note arrays; the renderer picks the array matching the active language and falls back to en. Add a new block here whenever #buildVersion in group-battle.html is bumped.",
+  "v1.2": {
+    "date": "2026-10-01",
+    "en": [
+      "Tier progress in Trial Mode now counts the whole enemy group: the share of the group's total HP taken off. Two badgers, one dead and one at 90%, is 55% progress. Before, the column showed the HP left on the lowest surviving enemy.",
+      "The roster is sorted by raid class: Wark, Cursed Bow, Mana Support (brings Mana Spring), Nature Support (nature weapon with Rejuvenate), Slash, Stab, Smash, Ranged, Fire, Water, Nature DPS. Each class has its own colour, shared with the Skill Lab.",
+      "The roster no longer shows HP, MP and OOM. Max HP and MP are in each player's detail view, and blocked casts (OOM) are in the battle results.",
+      "Both modes now run the fight several times and show the average: set Runs (default 10, up to 50), Seed (default 666) and Workers (how many battles run at once, up to your CPU core count). The same seed, roster and settings give the same results.",
+      "Trial Mode shows each tier averaged over the runs that reached it, plus a list of runs with their seeds. Clicking a tier opens its averaged details.",
+      "The per-player table gains Accuracy and OOM (avg) columns, and Single Tier shows it too.",
+      "The combat log is gone, and the roster shows every player without a scrollbar.",
+      "Results no longer show the trial monsters: no enemy table, and only players in the damage and healing tables."
+    ],
+    "zh": [
+      "试炼模式的层级进度现在按整个敌人组计算：已打掉的总生命值占比。两只獾，一只已死、一只剩 90% 生命值，进度为 55%。之前该列显示的是存活敌人中最低的剩余生命值。",
+      "名单按团队职业排序：盾卫、咒怨之弓、法力辅助（携带法力喷泉）、自然系辅助（自然系武器并携带群体治疗术）、斩击、刺击、钝击、远程、火系、水系、自然系输出。每个职业有自己的颜色，与技能实验室一致。",
+      "名单不再显示生命值、魔力和缺蓝。最大生命值和魔力可在玩家详情中查看，缺蓝次数在战斗结果中显示。",
+      "两种模式现在都会多次运行战斗并显示平均值：可设置运行次数（默认 10，最多 50）、种子（默认 666）和并行数（同时运行的战斗数，最多为 CPU 核心数）。相同的种子、名单和设置会得到相同的结果。",
+      "试炼模式按到达该层的各次运行显示每层的平均值，并列出每次运行及其种子。点击某层可查看其平均详情。",
+      "玩家数据表新增命中率和缺蓝（平均）两列，单一层级模式也会显示该表。",
+      "移除了战斗日志；名单完整显示所有玩家，不再出现滚动条。",
+      "结果中不再显示试炼怪物：没有敌人表，伤害和治疗表中只列出玩家。"
+    ]
+  },
   "v1.1": {
     "date": "2026-09-29",
     "en": [

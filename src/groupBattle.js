@@ -50,15 +50,10 @@ const LS_GUILD_BUILDINGS_KEY = "mwiGuildBuildingLevels";
 // Must match SOLO_IMPORT_HANDOFF_KEY in src/main.js.
 const SOLO_IMPORT_HANDOFF_KEY = "mwiSoloImportHandoff";
 
-let worker = new Worker(new URL("worker.js", import.meta.url));
 
 // Imported players: array of { name, dto, noLoadout? }. noLoadout is set only by the guild trial
 // import, for members who never saved a loadout for the trial.
 let importedPlayers = [];
-// OOM (out-of-mana blocked casts) totals from the most recent run, keyed by
-// player dto.hrid. Accumulated across all tiers in Trial Mode; single battle in
-// Single Tier. Shown as a badge on each roster card. Empty until a run happens.
-let rosterOom = {};
 // Enemy group: array of monster specs (spec objects) to fight.
 let enemyGroup = [];
 // { <buildingId>: level }, every building defaulting to 0 until the user sets one.
@@ -307,7 +302,6 @@ function doImport(append) {
         clearError();
         textarea.value = "";
     }
-    document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // --------------------------------------------------------- Guild buildings ---
@@ -441,7 +435,6 @@ function importGuildTrialRoster(text, sourceName) {
     }
 
     importedPlayers = [];
-    rosterOom = {}; // stale OOM from a prior run no longer applies
     let errors = [];
     for (const member of roster.members) {
         try {
@@ -461,7 +454,6 @@ function importGuildTrialRoster(text, sourceName) {
     } else {
         clearError();
     }
-    document.getElementById("playerList").scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
 // Points the enemy dropdown at the monster group that stands in for `trialHrid` and rebuilds the
@@ -758,7 +750,6 @@ function renderUserPresetList() {
 // Rebuild the entire roster from every preset's count (predefined + user).
 function buildRoster() {
     importedPlayers = [];
-    rosterOom = {}; // stale OOM from a prior run no longer applies
     let errors = [];
 
     const addCopies = (label, count, buildDto) => {
@@ -934,7 +925,7 @@ function derivePlayerSummary(dto) {
     let weapon = dto.equipment["/equipment_types/main_hand"] || dto.equipment["/equipment_types/two_hand"];
     summary.weaponName = weapon ? itemName(weapon.hrid) : null;
     summary.weaponEnh = weapon ? (Number(weapon.enhancementLevel) || 0) : 0;
-    // Raid class (Wark, Smash, ..., Nature Support, Water Support) from the weapon and the bar.
+    // Raid class (Wark, Smash, ..., Mana Support, Nature Support) from the weapon and the bar.
     summary.cls = raidClass(weapon ? weapon.hrid : "", (dto.abilities || []).filter(Boolean).map((a) => a.hrid));
 
     // Auras: every special/aura ability on the bar, in slot order. A player can carry more than
@@ -1189,10 +1180,9 @@ function renderPlayerList() {
         return;
     }
 
-    // Display in a fixed style order (Wark, Ranged, Stab, Smash, Slash, Magic
-    // by element, then others), while keeping each row's ORIGINAL import index
-    // so remove/rename/modal still target the right entry. A stable sort keeps
-    // import order within a style group.
+    // Display in raid-class order (combatClass.js), while keeping each row's ORIGINAL import index
+    // so remove/rename/modal still target the right entry. A stable sort keeps import order within
+    // a class.
     let ordered = importedPlayers
         .map((p, i) => ({ p, i, s: derivePlayerSummary(p.dto) }))
         .sort((a, b) => styleRank(a.s) - styleRank(b.s));
@@ -1216,15 +1206,14 @@ function renderPlayerList() {
     const bestCarriers = bestCarrierByAura();
     // A row per player rather than a card grid: at guild size the roster is a list you scan down
     // one column at a time (who has no loadout, who carries what), not a set of portraits.
-    html += `<div style="max-height:460px; overflow-y:auto; margin-top:4px;">
+    // No height cap: the whole roster (60 players included) is shown without a scrollbar.
+    html += `<div style="margin-top:4px;">
         <table class="tbl"><thead><tr>
             <th></th>
             <th>${escapeHtml(t("player"))}</th>
             <th>${escapeHtml(t("style"))}</th>
             <th>${escapeHtml(t("weapon"))}</th>
             <th>${escapeHtml(t("aurasColumn"))}</th>
-            <th>HP</th><th>MP</th>
-            <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th>
             <th></th>
         </tr></thead><tbody>`;
 
@@ -1234,10 +1223,6 @@ function renderPlayerList() {
         let weaponCell = s.weaponName
             ? `${escapeHtml(s.weaponName)}${s.weaponEnh ? " +" + s.weaponEnh : ""}`
             : `<span class="dim">${escapeHtml(t("noWeapon"))}</span>`;
-
-        // OOM (from the most recent run), keyed by this player's hrid.
-        let oom = rosterOom[p.dto.hrid] || 0;
-        let oomCell = oom > 0 ? `<span style="color:#ffb347;">${oom}</span>` : `<span class="dim">—</span>`;
 
         // Guild trial import only: a member with no saved loadout is fighting whatever they
         // happened to have equipped at export time, so their numbers are a guess. Flag the row.
@@ -1253,8 +1238,6 @@ function renderPlayerList() {
                 font-weight:600; color:#12151a; background:${accent};">${escapeHtml(styleLabel(s))}</span></td>
             <td>${weaponCell}</td>
             <td>${auraTagsHtml(s.auras, p.dto.hrid, bestCarriers) || `<span class="dim">—</span>`}</td>
-            <td>${fmtNum(s.maxHitpoints)}</td><td>${fmtNum(s.maxManapoints)}</td>
-            <td>${oomCell}</td>
             <td><button class="btn-x" data-remove="${i}" title="${escapeHtml(t("removePlayer"))}">✕</button></td>
         </tr>`;
     });
@@ -1767,85 +1750,178 @@ function switchModeTab(modeTabId) {
 }
 
 // ----------------------------------------------------------------- Run battle
+// Both modes run the fight several times and show the per-run average. Runs are spread over a pool
+// of workers (one battle per worker at a time), and every result is folded into running totals as
+// it arrives, so no battle log is kept past its own aggregation.
 
-function runBattle() {
-    clearError();
-    if (!importedPlayers.length) {
-        showError(t("importAtLeastOnePlayer"));
-        return;
-    }
-    if (!enemyGroup.length) {
-        showError(t("addAtLeastOneEnemy"));
-        return;
-    }
+const DEFAULT_RUNS = 10;
+const MAX_RUNS = 50;
+const DEFAULT_SEED = 666;
+// How many battles run at once, one per worker. The max is the browser's logical core count; the
+// default leaves a core for the page and stops at 6, since each worker holds its own kernel and a
+// long fight's battle log is tens of MB while it is being aggregated.
+const MAX_CONCURRENCY = Math.max(1, navigator.hardwareConcurrency || 4);
+const DEFAULT_CONCURRENCY = Math.max(1, Math.min(6, MAX_CONCURRENCY - 1));
+const LS_CONCURRENCY_KEY = "mwiGroupBattleConcurrency";
 
-    let playersToSim = importedPlayers.map((p) => structuredClone(p.dto));
-    let timeCapSeconds = Number(document.getElementById("timeCap").value) || 3600;
-
-    // Remember display names keyed by hrid for the result view.
-    window.__playerNames = {};
-    importedPlayers.forEach((p) => (window.__playerNames[p.dto.hrid] = p.name));
-
-    document.getElementById("runBattle").disabled = true;
-    document.getElementById("battleStatus").textContent = t("simulating");
-
-    // Build the worker enemy payload (real game monsters, unique hrids per copy).
-    let enemies = buildWorkerEnemies(enemyGroup);
-
-    runBattleOnWorker({ players: playersToSim, enemies, timeCapSeconds })
-        .then((simResult) => {
-            document.getElementById("runBattle").disabled = false;
-            document.getElementById("battleStatus").textContent = "";
-            // OOM badges on roster cards reflect this single battle.
-            rosterOom = { ...(simResult.playerOomCastCount || {}) };
-            renderResult(simResult);
-            renderPlayerList();
-        })
-        .catch((err) => {
-            document.getElementById("runBattle").disabled = false;
-            document.getElementById("battleStatus").textContent = "";
-            showError(t("simulationErrorPrefix") + err);
-        });
+function readConcurrency() {
+    const input = document.getElementById("concurrency");
+    const n = Math.max(1, Math.min(MAX_CONCURRENCY, Math.floor(Number(input.value)) || DEFAULT_CONCURRENCY));
+    input.value = n;
+    return n;
 }
 
-// Promise-based single-battle request. The worker runs one battle at a time, so
-// requests are serialized via a FIFO queue of pending resolvers. This lets Trial
-// Mode await tiers sequentially while single-boss keeps working unchanged.
-let pendingBattleResolvers = [];
-function runBattleOnWorker({ players, enemies, timeCapSeconds }) {
-    return new Promise((resolve, reject) => {
-        pendingBattleResolvers.push({ resolve, reject });
-        worker.postMessage({
-            type: "start_battle",
-            players,
-            enemies,
-            timeCapSeconds,
-            guildBuildingLevels,
-        });
+function initConcurrencyInput() {
+    const input = document.getElementById("concurrency");
+    let stored = null;
+    try {
+        stored = Number(localStorage.getItem(LS_CONCURRENCY_KEY)) || null;
+    } catch (e) {
+        stored = null;
+    }
+    input.max = MAX_CONCURRENCY;
+    input.value = stored && stored <= MAX_CONCURRENCY ? stored : DEFAULT_CONCURRENCY;
+    document.getElementById("concurrencyMax").textContent = t("concurrencyMax", { max: MAX_CONCURRENCY });
+    input.addEventListener("change", () => {
+        const n = readConcurrency();
+        try {
+            localStorage.setItem(LS_CONCURRENCY_KEY, String(n));
+        } catch (e) {
+            /* the setting still applies for this session */
+        }
     });
 }
 
-worker.onmessage = function (event) {
-    switch (event.data.type) {
-        case "battle_result": {
-            let pending = pendingBattleResolvers.shift();
-            if (pending) pending.resolve(event.data.simResult);
-            break;
+// Run k uses its own seed, derived from the base: φ = 0x9e3779b9 is odd, so every k gets a
+// different one, and run 0 uses the base itself. Trial Mode derives each tier's seed from its run's
+// with the same tierSeed as scripts/sim-sweep.mjs and skillLabJob.js. Same seed, roster and settings
+// therefore give the same results.
+const seedFor = (base, k) => ((base + Math.imul(k, 0x9e3779b9)) >>> 0) || 1;
+const tierSeed = (seed, tier) => (Math.imul(seed ^ (tier * 0x9e3779b9), 0x85ebca6b) >>> 0) || 1;
+
+function readRunCount() {
+    const input = document.getElementById("runCount");
+    const n = Math.max(1, Math.min(MAX_RUNS, Math.floor(Number(input.value)) || DEFAULT_RUNS));
+    input.value = n;
+    return n;
+}
+
+function readBaseSeed() {
+    const input = document.getElementById("baseSeed");
+    const text = String(input.value).trim();
+    const seed = /^\d+$/.test(text) && Number(text) <= 0xffffffff ? Number(text) : DEFAULT_SEED;
+    input.value = seed;
+    return seed;
+}
+
+let workerPool = [];
+
+function makeBattleWorker() {
+    const w = new Worker(new URL("worker.js", import.meta.url));
+    // Each worker answers its own battles in order, so a FIFO of resolvers per worker is enough.
+    w.pending = [];
+    w.onmessage = (event) => {
+        const p = w.pending.shift();
+        if (!p) return;
+        if (event.data.type === "battle_result") p.resolve(event.data.simResult);
+        else p.reject(event.data.error);
+    };
+    return w;
+}
+
+function runBattleOn(w, { players, enemies, timeCapSeconds, seed }) {
+    return new Promise((resolve, reject) => {
+        w.pending.push({ resolve, reject });
+        w.postMessage({ type: "start_battle", players, enemies, timeCapSeconds, guildBuildingLevels, seed });
+    });
+}
+
+// Runs task(worker, index) for every index in [0, count), one task per worker at a time, on as many
+// workers as the concurrency setting allows. Workers are created on first use and kept.
+async function runPool(count, task) {
+    const size = Math.min(readConcurrency(), count);
+    while (workerPool.length < size) workerPool.push(makeBattleWorker());
+    let next = 0;
+    let failed = false;
+    await Promise.all(workerPool.slice(0, size).map(async (w) => {
+        while (!failed && next < count) {
+            const i = next++;
+            try {
+                await task(w, i);
+            } catch (e) {
+                failed = true;
+                throw e;
+            }
         }
-        case "simulation_error": {
-            let pending = pendingBattleResolvers.shift();
-            if (pending) pending.reject(event.data.error);
-            break;
-        }
+    }));
+}
+
+let simRunning = false;
+
+function setRunning(on) {
+    simRunning = on;
+    document.getElementById("runBattle").disabled = on;
+    document.getElementById("runTrial").disabled = on;
+}
+
+// The roster as the worker wants it, plus the display names the result tables resolve hrids with.
+function prepareRun() {
+    clearError();
+    if (simRunning) return null;
+    if (!importedPlayers.length) {
+        showError(t("importAtLeastOnePlayer"));
+        return null;
     }
-};
+    if (!enemyGroup.length) {
+        showError(t("addAtLeastOneEnemy"));
+        return null;
+    }
+    window.__playerNames = {};
+    importedPlayers.forEach((p) => (window.__playerNames[p.dto.hrid] = p.name));
+    return {
+        players: importedPlayers.map((p) => structuredClone(p.dto)),
+        runs: readRunCount(),
+        seed: readBaseSeed(),
+    };
+}
+
+// Single Tier: the same fight `runs` times.
+let lastSingleRun = null;
+async function runBattle() {
+    const setup = prepareRun();
+    if (!setup) return;
+    const timeCapSeconds = Number(document.getElementById("timeCap").value) || 3600;
+    const enemies = buildWorkerEnemies(enemyGroup);
+    const status = document.getElementById("battleStatus");
+
+    const acc = newRunAcc();
+    let done = 0;
+    setRunning(true);
+    status.textContent = t("runProgress", { done, total: setup.runs });
+    try {
+        await runPool(setup.runs, async (w, r) => {
+            const result = await runBattleOn(w, {
+                players: setup.players, enemies, timeCapSeconds, seed: seedFor(setup.seed, r),
+            });
+            addBattle(acc, summarizeBattle(result));
+            acc.runs += 1;
+            status.textContent = t("runProgress", { done: ++done, total: setup.runs });
+        });
+        lastSingleRun = { acc, seed: setup.seed };
+        renderRunSet(acc, IDS_MAIN, { seed: setup.seed });
+    } catch (err) {
+        showError(t("simulationErrorPrefix") + err);
+    } finally {
+        setRunning(false);
+        status.textContent = "";
+    }
+}
 
 // ---------------------------------------------------------------- Trial Mode -
 
 const TRIAL_MIN_LEVEL = 100;
 const TRIAL_MAX_LEVEL = 300;      // matches the level-select bound
 const TRIAL_LEVEL_STEP = 10;
-const trialModeState = { running: false };
 
 function tierLevel(tier) {
     return TRIAL_MIN_LEVEL + TRIAL_LEVEL_STEP * (tier - 1);
@@ -1854,125 +1930,81 @@ function maxTier() {
     return (TRIAL_MAX_LEVEL - TRIAL_MIN_LEVEL) / TRIAL_LEVEL_STEP + 1;
 }
 
-// Runs the current enemy group through escalating tiers (T1=L100, T2=L110, …)
-// until the group wipes, a tier ends inconclusively, or the total time budget
-// runs out. Players recover to full between tiers automatically (each battle
-// builds fresh Players from the DTO). Ignores the per-enemy level chosen when
-// building the group: every scaling enemy is re-leveled to the tier's level.
+// Runs the enemy group up the tier ladder (T1=L100, T2=L110, …) `runs` times. Within a run, tiers
+// share one time budget, a victory advances and anything else stops; players start every tier at
+// full HP/MP because each tier is a fresh battle. Every enemy is re-leveled to the tier's level,
+// whatever level was picked for the group.
 async function runTrialMode() {
-    clearError();
-    if (trialModeState.running) return;
-
-    if (!importedPlayers.length) {
-        showError(t("importAtLeastOnePlayer"));
-        return;
-    }
-    if (!enemyGroup.length) {
-        showError(t("addAtLeastOneEnemy"));
-        return;
-    }
-    let scalingCount = enemyGroup.filter((e) => e.scaling).length;
-    if (!scalingCount) {
+    const setup = prepareRun();
+    if (!setup) return;
+    if (!enemyGroup.some((e) => e.scaling)) {
         showError(t("trialNeedsScalingEnemy"));
         return;
     }
-    if (scalingCount < enemyGroup.length) {
+    if (enemyGroup.some((e) => !e.scaling)) {
         // Non-scaling custom enemies won't escalate; warn but continue.
         showError(t("trialHasStaticEnemies"));
     }
+    const budget = Number(document.getElementById("trialTimeCap").value) || 3600;
+    const status = document.getElementById("trialStatus");
 
-    let playersToSim = importedPlayers.map((p) => structuredClone(p.dto));
-    let totalBudgetSeconds = Number(document.getElementById("trialTimeCap").value) || 3600;
+    // whole: every tier of every run, for the whole-run analysis. byTier: one accumulator per tier,
+    // over the runs that reached it, for the tier table and the tier detail dialog.
+    const whole = newRunAcc();
+    const byTier = {};
+    const runRecords = [];
+    let done = 0;
 
-    // Names for the result view (same maps the single-boss result uses).
-    window.__playerNames = {};
-    importedPlayers.forEach((p) => (window.__playerNames[p.dto.hrid] = p.name));
-
-    trialModeState.running = true;
-    let runBtn = document.getElementById("runTrial");
-    runBtn.disabled = true;
-
-    let remainingSeconds = totalBudgetSeconds;
-    let tiers = [];       // per-tier records
-    let stopReason = "completed"; // completed | defeat | timeout | ended
-    rosterOom = {};       // reset per-player OOM totals for this run
-
+    setRunning(true);
+    status.textContent = t("runProgress", { done, total: setup.runs });
     try {
-        for (let tier = 1; tier <= maxTier(); tier++) {
-            if (remainingSeconds <= 0) { stopReason = "timeout"; break; }
-
-            let level = tierLevel(tier);
-            document.getElementById("trialStatus").textContent =
-                t("trialRunningTier", { tier, level });
-
-            // Re-level every enemy to this tier's level; unique hrids per copy.
-            let enemies = buildWorkerEnemies(enemyGroup, level);
-
-            let simResult = await runBattleOnWorker({
-                players: playersToSim,
-                enemies,
-                timeCapSeconds: remainingSeconds,
+        await runPool(setup.runs, async (w, r) => {
+            const seed = seedFor(setup.seed, r);
+            let remaining = budget;
+            let stopReason = "completed";
+            let cleared = 0;
+            let last = null;
+            for (let tier = 1; tier <= maxTier(); tier++) {
+                if (remaining <= 0) { stopReason = "timeout"; break; }
+                const level = tierLevel(tier);
+                const result = await runBattleOn(w, {
+                    players: setup.players,
+                    enemies: buildWorkerEnemies(enemyGroup, level),
+                    timeCapSeconds: remaining,
+                    seed: tierSeed(seed, tier),
+                });
+                const battle = summarizeBattle(result);
+                remaining -= battle.durationSeconds;
+                addBattle(whole, battle);
+                const tierAcc = (byTier[tier] = byTier[tier] || { ...newRunAcc(), tier, level });
+                addBattle(tierAcc, battle);
+                tierAcc.runs += 1;
+                last = { tier, level, outcome: battle.outcome, progress: battle.progress };
+                if (battle.outcome !== "victory") { stopReason = battle.outcome; break; }
+                cleared += 1;
+            }
+            whole.runs += 1;
+            runRecords.push({
+                run: r + 1, seed, stopReason, cleared,
+                lastTier: last ? last.tier : 0,
+                // Progress into the last tier fought: 100% if it was cleared.
+                lastProgress: last ? (last.outcome === "victory" ? 1 : last.progress) : 0,
+                // Tiers cleared plus progress into the tier it stopped on, as in sim-sweep --ladder. A run
+                // whose budget ran out between tiers stopped on a cleared tier, which adds nothing.
+                score: cleared + (last && last.outcome !== "victory" ? last.progress : 0),
+                remainingSeconds: Math.max(0, remaining),
             });
-
-            let durationNs = simResult.battleDurationNs ?? simResult.simulatedTime ?? 0;
-            let durationSeconds = durationNs / 1e9;
-            remainingSeconds -= durationSeconds;
-
-            let wiped = (simResult.playerFinalState || [])
-                .filter((p) => p.currentHitpoints <= 0).length;
-
-            // Enemy HP left: the whole group's remaining HP over its full HP, so a tier's progress
-            // (shown as 1 − this) counts every enemy rather than only the healthiest or the weakest
-            // one. Two badgers, one dead and one at 90%: 45% left, 55% progress.
-            let enemyStates = simResult.enemyFinalState || [];
-            let bossHpFrac = null;
-            let enemyMaxHp = enemyStates.reduce((s, e) => s + (e.maxHitpoints || 0), 0);
-            if (enemyMaxHp > 0) {
-                bossHpFrac = enemyStates.reduce((s, e) => s + Math.max(0, e.currentHitpoints || 0), 0) / enemyMaxHp;
-            }
-
-            // Total OOM (ability casts blocked by lack of mana) across all players.
-            let oomMap = simResult.playerOomCastCount || {};
-            let oomTotal = Object.values(oomMap).reduce((a, n) => a + (Number(n) || 0), 0);
-            // Accumulate per-player OOM across tiers for the roster-card badges.
-            for (const [hrid, n] of Object.entries(oomMap)) {
-                rosterOom[hrid] = (rosterOom[hrid] || 0) + (Number(n) || 0);
-            }
-            renderPlayerList(); // refresh card badges live as tiers complete
-
-            tiers.push({
-                tier, level,
-                outcome: simResult.battleOutcome,
-                durationSeconds,
-                wiped,
-                totalPlayers: (simResult.playerFinalState || []).length,
-                bossHpFrac,
-                oomTotal,
-                // Full battle result kept so clicking the tier row can show the
-                // same combat detail view the single-boss mode renders.
-                result: simResult,
-            });
-
-            renderTrialModeResult(tiers, null, remainingSeconds); // live progress
-
-            if (simResult.battleOutcome === "victory") {
-                continue; // advance to next tier
-            }
-            // defeat / timeout / ended -> stop the run
-            stopReason = simResult.battleOutcome;
-            break;
-        }
-        // Falling out of the loop with every tier won means the whole ladder
-        // was cleared; stopReason stays "completed".
+            status.textContent = t("runProgress", { done: ++done, total: setup.runs });
+        });
+        runRecords.sort((a, b) => a.run - b.run);
+        lastTrialRun = { whole, byTier, runRecords, seed: setup.seed };
+        renderTrialModeResult();
     } catch (err) {
         showError(t("simulationErrorPrefix") + err);
     } finally {
-        trialModeState.running = false;
-        runBtn.disabled = false;
-        document.getElementById("trialStatus").textContent = "";
+        setRunning(false);
+        status.textContent = "";
     }
-
-    renderTrialModeResult(tiers, stopReason, remainingSeconds);
 }
 
 function trialOutcomeLabel(outcome) {
@@ -2020,40 +2052,6 @@ function playersOnly(groups) {
     return Object.fromEntries(Object.entries(groups).filter(([, g]) => g.isPlayer));
 }
 
-// Damage done, damage taken and healing done by every PLAYER across the WHOLE trial run. A tier's
-// own modal answers "what happened at T4"; this answers "who carried the run". Rates are over the
-// summed combat time of every tier, so the between-tier recovery doesn't dilute them.
-function aggregateTrialRun(tiers) {
-    let done = {}, taken = {}, healed = {};
-    let durationSeconds = 0;
-
-    for (const tier of tiers) {
-        if (!tier.result) continue;
-        const result = tier.result;
-        durationSeconds += tier.durationSeconds || 0;
-
-        let tierDone = aggregateAttacks(result.battleLog, "source");
-        mergeAbilityCastCounts(tierDone, result);
-        tagAuraCasters(tierDone, result);
-        mergeDamageGroups(done, tierDone);
-
-        let tierTaken = aggregateAttacks(result.battleLog, "target");
-        mergeSelfInflictedDamage(tierTaken, result);
-        mergeDamageGroups(taken, tierTaken);
-
-        let tierHealed = aggregateHeals(result.battleLog, { excludeRegen: true });
-        mergeHealCastCounts(tierHealed, result);
-        mergeHealGroups(healed, tierHealed);
-    }
-
-    return {
-        done: playersOnly(done),
-        taken: playersOnly(taken),
-        healed: playersOnly(healed),
-        durationSeconds,
-    };
-}
-
 // Healing counterpart to mergeDamageGroups: "count" is heals landed, "casts" is spells cast.
 function mergeHealGroups(into, from) {
     for (const [key, g] of Object.entries(from)) {
@@ -2077,71 +2075,169 @@ function mergeHealGroups(into, from) {
     }
 }
 
-// Renders the trial-mode summary + per-tier table. `stopReason` is null while
-// the run is still in progress.
-let lastTrialRun = null;
-function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
-    const container = document.getElementById("trialModeResult");
-    if (!tiers.length) { container.innerHTML = ""; return; }
-    lastTrialRun = { tiers, stopReason, remainingSeconds };
+// ----------------------------------------------------------- Run aggregation
+// A set of battles (every run of one tier, or every tier of every run) folded into running sums.
+// summarizeBattle reduces one battle result to the groups the tables need, so its battle log can be
+// dropped right away; addBattle adds that summary into an accumulator. `runs` counts the runs the
+// set covers and is what every average divides by.
 
-    let reached = tiers[tiers.length - 1];
-    let clearedThrough = tiers.filter((x) => x.outcome === "victory").length;
+function newRunAcc() {
+    return {
+        runs: 0, battles: 0, durationSeconds: 0, progress: 0, wiped: 0, totalPlayers: 0,
+        outcomes: {}, done: {}, taken: {}, healed: {}, healedAll: {},
+        oom: {}, deaths: {}, survived: {},
+    };
+}
 
-    let headline;
-    if (stopReason === null) {
-        headline = t("trialInProgress", { tier: reached.tier, level: reached.level });
-    } else {
-        headline = t("trialReachedTier", {
-            tier: reached.tier, level: reached.level, cleared: clearedThrough,
-        });
+function summarizeBattle(result) {
+    let done = aggregateAttacks(result.battleLog, "source");
+    mergeAbilityCastCounts(done, result);
+    tagAuraCasters(done, result);
+    let taken = aggregateAttacks(result.battleLog, "target");
+    mergeSelfInflictedDamage(taken, result);
+    // Two healing views: the run analysis leaves passive regen out, the Healing Done table keeps it.
+    let healed = aggregateHeals(result.battleLog, { excludeRegen: true });
+    mergeHealCastCounts(healed, result);
+    let healedAll = aggregateHeals(result.battleLog);
+    mergeHealCastCounts(healedAll, result);
+
+    const enemies = result.enemyFinalState || [];
+    const maxHp = enemies.reduce((s, e) => s + (e.maxHitpoints || 0), 0);
+    const hpLeft = enemies.reduce((s, e) => s + Math.max(0, e.currentHitpoints || 0), 0);
+    const players = result.playerFinalState || [];
+    return {
+        outcome: result.battleOutcome,
+        durationSeconds: (result.battleDurationNs || 0) / ONE_SECOND,
+        // Tier progress: the share of the enemy group's total HP taken off (100% on a victory).
+        progress: result.battleOutcome === "victory" ? 1 : maxHp > 0 ? 1 - hpLeft / maxHp : 0,
+        done, taken, healed, healedAll,
+        oom: result.playerOomCastCount || {},
+        deaths: result.deaths || {},
+        players: players.map((p) => ({ hrid: p.hrid, alive: p.currentHitpoints > 0 })),
+    };
+}
+
+function addBattle(acc, b) {
+    acc.battles += 1;
+    acc.durationSeconds += b.durationSeconds;
+    acc.progress += b.progress;
+    acc.outcomes[b.outcome] = (acc.outcomes[b.outcome] || 0) + 1;
+    mergeDamageGroups(acc.done, b.done);
+    mergeDamageGroups(acc.taken, b.taken);
+    mergeHealGroups(acc.healed, b.healed);
+    mergeHealGroups(acc.healedAll, b.healedAll);
+    for (const p of b.players) {
+        acc.oom[p.hrid] = (acc.oom[p.hrid] || 0) + (Number(b.oom[p.hrid]) || 0);
+        acc.deaths[p.hrid] = (acc.deaths[p.hrid] || 0) + (Number(b.deaths[p.hrid]) || 0);
+        acc.survived[p.hrid] = (acc.survived[p.hrid] || 0) + (p.alive ? 1 : 0);
+        if (!p.alive) acc.wiped += 1;
     }
+    acc.totalPlayers = b.players.length;
+}
 
-    let rows = tiers.map((x, i) => {
-        // Tier progress: the share of the enemy group's total HP taken off (1 − bossHpFrac).
-        let bossHp = x.bossHpFrac == null ? "—"
-            : (x.outcome === "victory" ? "100%" : ((1 - x.bossHpFrac) * 100).toFixed(1) + "%");
-        let wipeCls = x.wiped > 0 ? ' style="color:#ff6b6b;"' : "";
-        // Rows with a stored result are clickable to open the combat-detail modal.
-        let clickable = x.result ? ' class="trial-tier-row" data-tier-index="' + i + '" title="' + escapeHtml(t("clickForCombatDetails")) + '"' : "";
-        let oom = x.oomTotal || 0;
-        return `<tr${clickable}>
+// A copy of a group map with every count and amount multiplied by f (1/runs for the per-run average).
+const SCALED_FIELDS = ["dmg", "raw", "hits", "misses", "casts", "healed", "count"];
+function scaleGroups(groups, f) {
+    const scale = (o) => {
+        const c = { ...o };
+        for (const k of SCALED_FIELDS) if (typeof o[k] === "number") c[k] = o[k] * f;
+        return c;
+    };
+    return Object.fromEntries(Object.entries(groups).map(([key, g]) => [key, {
+        ...scale(g),
+        byAbility: Object.fromEntries(Object.entries(g.byAbility || {}).map(([k, a]) => [k, scale(a)])),
+    }]));
+}
+
+// The per-run average of an accumulator, in the shape the result tables read.
+function averageOf(acc) {
+    const f = 1 / (acc.runs || 1);
+    return {
+        runs: acc.runs,
+        durationSeconds: acc.durationSeconds * f,
+        done: scaleGroups(acc.done, f),
+        taken: scaleGroups(acc.taken, f),
+        healed: scaleGroups(acc.healed, f),
+        healedAll: scaleGroups(acc.healedAll, f),
+        oom: Object.fromEntries(Object.entries(acc.oom).map(([k, v]) => [k, v * f])),
+    };
+}
+
+// An averaged view with the trial monsters dropped from every group map. Results are about the
+// roster only, so everything that renders or exports per-unit rows goes through this.
+function playersView(avg) {
+    return {
+        ...avg,
+        done: playersOnly(avg.done),
+        taken: playersOnly(avg.taken),
+        healed: playersOnly(avg.healed),
+        healedAll: playersOnly(avg.healedAll),
+    };
+}
+
+// A count that may be an average: whole numbers as is, anything else to one decimal.
+function fmtCount(v) {
+    const n = Number(v) || 0;
+    return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1);
+}
+
+// Renders the Trial Mode result: the headline, one row per tier over the runs that reached it, the
+// list of runs, and the whole-run analysis. Everything is a per-run average.
+let lastTrialRun = null;
+function renderTrialModeResult() {
+    const container = document.getElementById("trialModeResult");
+    if (!lastTrialRun) { container.innerHTML = ""; return; }
+    const { whole, byTier, runRecords, seed } = lastTrialRun;
+    const n = runRecords.length || 1;
+    const avg = (xs) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
+
+    const tierRows = Object.values(byTier).sort((a, b) => a.tier - b.tier);
+    // Where a run stopped, e.g. "T9 (35.0%)". Best and worst are by score, so two runs that both
+    // stopped at T9 are told apart by how far into it they got.
+    const stopAt = (r) => `T${r.lastTier} (${(r.lastProgress * 100).toFixed(1)}%)`;
+    const byScore = runRecords.slice().sort((a, b) => b.score - a.score);
+    const headline = t("trialAvgHeadline", {
+        runs: runRecords.length, seed,
+        cleared: avg(runRecords.map((r) => r.cleared)).toFixed(1),
+        score: avg(runRecords.map((r) => r.score)).toFixed(2),
+        best: stopAt(byScore[0]), worst: stopAt(byScore[byScore.length - 1]),
+    });
+
+    const pct = (v) => (v * 100).toFixed(1) + "%";
+    const rows = tierRows.map((x, i) => {
+        const r = x.runs || 1;
+        const cleared = x.outcomes.victory || 0;
+        const wiped = x.wiped / r;
+        const oom = Object.values(x.oom).reduce((a, b) => a + b, 0) / r;
+        return `<tr class="trial-tier-row" data-tier-index="${i}" title="${escapeHtml(t("clickForCombatDetails"))}">
             <td>T${x.tier}</td>
             <td>L${x.level}</td>
-            <td>${escapeHtml(trialOutcomeLabel(x.outcome))}</td>
-            <td>${fmtTime(x.durationSeconds * 1e9)}</td>
-            <td${wipeCls}>${x.wiped} / ${x.totalPlayers}</td>
-            <td>${bossHp}</td>
-            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${oom}</td>
+            <td>${x.runs}/${n}</td>
+            <td>${cleared}/${x.runs}</td>
+            <td>${fmtTime((x.durationSeconds / r) * ONE_SECOND)}</td>
+            <td${wiped > 0 ? ' style="color:#ff6b6b;"' : ""}>${fmtCount(wiped)} / ${x.totalPlayers}</td>
+            <td>${pct(x.progress / r)}</td>
+            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${fmtCount(oom)}</td>
         </tr>`;
     }).join("");
 
-    let wipeNote = "";
-    if (stopReason === "defeat") {
-        wipeNote = `<p class="hint">${escapeHtml(t("trialWipedTimeLeft", {
-            tier: reached.tier, level: reached.level,
-            time: fmtTime(Math.max(0, remainingSeconds) * ONE_SECOND),
-        }))}</p>`;
-    }
-
-    let lastBossNote = "";
-    if (stopReason && stopReason !== "completed" && reached.bossHpFrac != null &&
-        reached.outcome !== "victory") {
-        lastBossNote = `<p class="hint">${escapeHtml(t("trialLastBossHp", {
-            tier: reached.tier,
-            pct: ((1 - reached.bossHpFrac) * 100).toFixed(1),
-        }))}</p>`;
-    }
+    const runRows = runRecords.map((r) => `<tr>
+            <td>${r.run}</td>
+            <td class="dim">${r.seed}</td>
+            <td>${escapeHtml(r.stopReason === "completed" ? t("trialAllTiersCleared") : trialOutcomeLabel(r.stopReason))}</td>
+            <td>${stopAt(r)}</td>
+            <td>${r.score.toFixed(2)}</td>
+            <td>${fmtTime(r.remainingSeconds * ONE_SECOND)}</td>
+        </tr>`).join("");
 
     container.innerHTML = `
         <h4 style="margin:6px 0;">${escapeHtml(headline)}</h4>
-        ${wipeNote}
-        ${lastBossNote}
         <table class="tbl">
             <thead><tr>
                 <th>${escapeHtml(t("trialColTier"))}</th>
                 <th>${escapeHtml(t("trialColLevel"))}</th>
-                <th>${escapeHtml(t("trialColOutcome"))}</th>
+                <th>${escapeHtml(t("trialColReached"))}</th>
+                <th>${escapeHtml(t("trialColCleared"))}</th>
                 <th>${escapeHtml(t("trialColTime"))}</th>
                 <th>${escapeHtml(t("trialColWiped"))}</th>
                 <th>${escapeHtml(t("trialColBossHp"))}</th>
@@ -2149,6 +2245,18 @@ function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
             </tr></thead>
             <tbody>${rows}</tbody>
         </table>
+        <p class="hint">${escapeHtml(t("trialTierTableHint"))}</p>
+        <details class="log-details" style="margin-top:10px;">
+            <summary><h4 style="display:inline; margin:0;">${escapeHtml(t("runsListTitle"))}</h4></summary>
+            <table class="tbl">
+                <thead><tr>
+                    <th>${escapeHtml(t("colRun"))}</th><th>${escapeHtml(t("colSeed"))}</th>
+                    <th>${escapeHtml(t("colResult"))}</th><th>${escapeHtml(t("colLastTier"))}</th>
+                    <th>${escapeHtml(t("colScore"))}</th><th>${escapeHtml(t("colTimeLeft"))}</th>
+                </tr></thead>
+                <tbody>${runRows}</tbody>
+            </table>
+        </details>
         <details class="log-details" open style="margin-top:10px;">
             <summary><h4 style="display:inline; margin:0;">${escapeHtml(t("trialAnalysisTitle"))}</h4></summary>
             <p class="hint">${escapeHtml(t("trialAnalysisHint"))}</p>
@@ -2160,39 +2268,28 @@ function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
         </details>`;
     container.style.display = "block";
 
-    const run = aggregateTrialRun(tiers);
+    const run = playersView(averageOf(whole));
     renderTrialAnalysisTable("trialRunAnalysis", run);
 
     document.getElementById("trialExportDiscord").addEventListener("click", (ev) => {
         ev.preventDefault();
-        copyTrialSummary(tiers, run);
+        copyTrialSummary(headline, tierRows, n, run);
     });
 
-    // Wire tier-row clicks to open the combat-detail modal for that tier.
+    // A tier row opens that tier's averaged detail: summary and damage/healing tables.
     container.querySelectorAll(".trial-tier-row").forEach((row) => {
         row.addEventListener("click", () => {
-            let x = tiers[Number(row.dataset.tierIndex)];
-            if (x && x.result) openTrialResultModal(x);
+            const x = tierRows[Number(row.dataset.tierIndex)];
+            if (x) openTrialResultModal(x);
         });
     });
 }
 
-// Combat-detail modal for one trial tier: renders the same content as the
-// single-boss result (summary + damage done/taken + combat log) into the
-// modal's own element IDs, so it's decoupled from the main result panel.
-let trialModalLog = [];
-function openTrialResultModal(tierRecord) {
+function openTrialResultModal(tierAcc) {
     let overlay = document.getElementById("trialResultModalOverlay");
     let titleEl = document.getElementById("trialResultModalTitle");
-    titleEl.textContent = t("trialTierResultTitle", { tier: tierRecord.tier, level: tierRecord.level });
-
-    trialModalLog = tierRecord.result.battleLog || [];
-    // Reset the modal's log filter/search so each open starts clean.
-    document.getElementById("trialLogFilter").value = "all";
-    document.getElementById("trialLogSearch").value = "";
-
-    renderResult(tierRecord.result, false, IDS_MODAL);
-
+    titleEl.textContent = t("trialTierResultTitle", { tier: tierAcc.tier, level: tierAcc.level });
+    renderRunSet(tierAcc, IDS_MODAL);
     overlay.style.display = "flex";
     document.getElementById("trialResultModalClose").focus();
 }
@@ -2277,82 +2374,66 @@ function fmtTime(ns) {
     return m > 0 ? `${m}m ${rem}s` : `${rem}s`;
 }
 
-// Element IDs for the two result render targets: the main single-boss panel
-// (default) and the trial-tier modal. Passing IDS_MODAL lets renderResult and
-// its helpers draw the same content into the modal without duplicating logic.
+// Element IDs for the two result render targets: the main Single Tier panel (default) and the
+// trial-tier dialog. Passing IDS_MODAL draws the same content into the dialog.
 const IDS_MAIN = {
-    summary: "resultSummary", damageTotals: "damageTotals", damageTaken: "damageTaken",
-    healingDone: "healingDone",
-    combatLog: "combatLog", logCount: "logCount", logFilter: "logFilter", logSearch: "logSearch",
-    logHideAura: "logHideAura", logPlayer: "logPlayer",
+    summary: "resultSummary", analysis: "resultAnalysis", damageTotals: "damageTotals",
+    damageTaken: "damageTaken", healingDone: "healingDone",
 };
 const IDS_MODAL = {
-    summary: "trialResultSummary", damageTotals: "trialDamageTotals", damageTaken: "trialDamageTaken",
-    healingDone: "trialHealingDone",
-    combatLog: "trialCombatLog", logCount: "trialLogCount", logFilter: "trialLogFilter", logSearch: "trialLogSearch",
-    logHideAura: "trialLogHideAura", logPlayer: "trialLogPlayer",
+    summary: "trialResultSummary", analysis: "trialResultAnalysis", damageTotals: "trialDamageTotals",
+    damageTaken: "trialDamageTaken", healingDone: "trialHealingDone",
 };
 
-function renderResult(result, scrollTo = true, ids = IDS_MAIN) {
+const OUTCOME_CLASSES = { victory: "win", defeat: "lose", timeout: "draw", ended: "draw" };
+const OUTCOME_KEYS = { victory: "outcomeVictory", defeat: "outcomeDefeat", timeout: "outcomeTimeout", ended: "outcomeEnded" };
+
+// One set of runs, averaged: every run of a Single Tier fight, or every run that reached one trial
+// tier. `seed` is the base seed, shown on the main panel.
+function renderRunSet(acc, ids = IDS_MAIN, { seed = null, scrollTo = true } = {}) {
     if (ids === IDS_MAIN) {
         const panel = document.getElementById("resultPanel");
         panel.style.display = "block";
-        if (scrollTo) {
-            panel.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        if (scrollTo) panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
-    const outcomeLabels = {
-        victory: `<span class="outcome win">${escapeHtml(t("outcomeVictory"))}</span>`,
-        defeat: `<span class="outcome lose">${escapeHtml(t("outcomeDefeat"))}</span>`,
-        timeout: `<span class="outcome draw">${escapeHtml(t("outcomeTimeout"))}</span>`,
-        ended: `<span class="outcome draw">${escapeHtml(t("outcomeEnded"))}</span>`,
-    };
+    const n = acc.runs || 1;
+    const avg = averageOf(acc);
+    const dur = avg.durationSeconds || 1;
 
-    let summary = `<div class="summary-row">${outcomeLabels[result.battleOutcome] || result.battleOutcome}</div>`;
-    summary += `<div class="summary-row"><b>${escapeHtml(t("battleDuration"))}</b> ${fmtTime(result.battleDurationNs)}</div>`;
+    let summary = `<div class="summary-row">${escapeHtml(seed == null
+        ? t("avgOfRunsNoSeed", { runs: acc.runs })
+        : t("avgOfRuns", { runs: acc.runs, seed }))}</div>`;
+    summary += `<div class="summary-row">` + Object.entries(acc.outcomes)
+        .map(([o, c]) => `<span class="outcome ${OUTCOME_CLASSES[o] || "draw"}">${escapeHtml(t(OUTCOME_KEYS[o] || "outcomeEnded"))} ×${c}</span>`)
+        .join(" ") + `</div>`;
+    summary += `<div class="summary-row"><b>${escapeHtml(t("battleDuration"))}</b> ${fmtTime(dur * ONE_SECOND)}` +
+        ` · <b>${escapeHtml(t("trialColBossHp"))}</b> ${((acc.progress / n) * 100).toFixed(1)}%</div>`;
 
-    // Enemy final states shown first (monsters always lead the results),
-    // then player final states (incl. OOM = ability casts blocked by mana).
-    let oomMap = result.playerOomCastCount || {};
-    summary += `<div class="final-states"><h4>${escapeHtml(t("enemies"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th></tr></thead><tbody>`;
-    for (const es of result.enemyFinalState || []) {
-        let dead = es.currentHitpoints <= 0;
-        summary += `<tr class="src-enemy ${dead ? "dead" : ""}">
-            <td>${escapeHtml(nameFor(es.hrid, false))}</td>
-            <td>${Math.round(es.currentHitpoints)}/${es.maxHitpoints}</td></tr>`;
-    }
-    summary += "</tbody></table></div>";
-
-    summary += `<div class="final-states"><h4>${escapeHtml(t("players"))}</h4><table class="tbl"><thead><tr><th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("hp"))}</th><th>${escapeHtml(t("mp"))}</th><th>${escapeHtml(t("deaths"))}</th><th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th></tr></thead><tbody>`;
-    for (const ps of result.playerFinalState || []) {
-        let deaths = (result.deaths && result.deaths[ps.hrid]) || 0;
-        let oom = oomMap[ps.hrid] || 0;
-        let dead = ps.currentHitpoints <= 0;
-        summary += `<tr class="${dead ? "dead" : ""}">
-            <td>${escapeHtml(nameFor(ps.hrid, true))}</td>
-            <td>${Math.round(ps.currentHitpoints)}/${ps.maxHitpoints}</td>
-            <td>${Math.round(ps.currentManapoints)}/${ps.maxManapoints}</td>
-            <td>${deaths}</td>
-            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${oom}</td></tr>`;
+    // Results are about the roster only: the trial monsters get no rows anywhere. Tier progress
+    // above is the raid's figure, not a monster's.
+    summary += `<div class="final-states"><h4>${escapeHtml(t("players"))}</h4><table class="tbl"><thead><tr>
+        <th>${escapeHtml(t("name"))}</th><th>${escapeHtml(t("colSurvived"))}</th><th>${escapeHtml(t("deaths"))}</th>
+        <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomColumn"))}</th></tr></thead><tbody>`;
+    for (const [hrid, survived] of Object.entries(acc.survived)) {
+        const oom = (acc.oom[hrid] || 0) / n;
+        summary += `<tr class="${survived < n ? "dead" : ""}">
+            <td>${escapeHtml(nameFor(hrid, true))}</td>
+            <td>${survived}/${n}</td>
+            <td>${fmtCount((acc.deaths[hrid] || 0) / n)}</td>
+            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${fmtCount(oom)}</td></tr>`;
     }
     summary += "</tbody></table></div>";
-
     document.getElementById(ids.summary).innerHTML = summary;
 
-    // Damage totals (per source), damage taken (per target/player), and
-    // healing done (per healer/player).
-    renderDamageTotals(result, ids);
-    renderDamageTaken(result, ids);
-    renderHealingDone(result, ids);
-
-    // Combat log
-    if (ids === IDS_MAIN) {
-        window.__battleLog = result.battleLog || [];
-        window.__lastBattleResult = result;
-    }
-    populateLogPlayerSelect(ids, result.battleLog || []);
-    renderLog(ids, result.battleLog || []);
+    // The per-player result table (damage, healing, damage taken, accuracy, OOM), then the damage
+    // done / taken / healing tables, players only.
+    renderTrialAnalysisTable(ids.analysis, playersView(avg));
+    // rowIdPrefix must be unique per container so the tables (and the dialog's) can be open at once.
+    // The dialog wraps each section in its own <details> summary, so it skips the h4.
+    renderExpandableDamageTable(ids.damageTotals, "damageDone", playersOnly(avg.done), dur, ids.damageTotals + "_dd", ids === IDS_MAIN);
+    renderExpandableDamageTable(ids.damageTaken, "damageTaken", playersOnly(avg.taken), dur, ids.damageTaken + "_dt", ids === IDS_MAIN);
+    renderExpandableHealingTable(ids.healingDone, playersOnly(avg.healedAll), dur, ids.healingDone + "_hd", ids === IDS_MAIN);
 }
 
 // Shared aggregator: groups attack log entries by a top-level key (source for
@@ -2429,7 +2510,7 @@ function accuracyPct(hits, misses) {
 // showTitle=false omits the <h4> heading (used when the section already has a
 // collapsible <summary> providing the title, as in the trial modal).
 function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPrefix, showTitle = true) {
-    // Monsters always lead the table, then sorted by damage within each group.
+    // Results pass players only, so this is a sort by damage (monsters would lead if any were passed).
     let rows = Object.values(groups).sort((a, b) => {
         if (a.isPlayer !== b.isPlayer) return a.isPlayer ? 1 : -1;
         return b.dmg - a.dmg;
@@ -2446,7 +2527,7 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
         let auraCls = r.auras?.length ? " has-aura" : "";
         html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}${auraCls}" data-detail-toggle="${rowId}">
             <td>${escapeHtml(displayName)}</td><td>${Math.round(r.dmg).toLocaleString()}</td>
-            <td>${r.casts}</td><td>${r.hits}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
+            <td>${fmtCount(r.casts)}</td><td>${fmtCount(r.hits)}</td><td>${acc}%</td><td>${(r.dmg / dur).toFixed(1)}</td></tr>`;
 
         let abilityRows = Object.values(r.byAbility).sort((a, b) => b.dmg - a.dmg || b.casts - a.casts);
         html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="6"><div class="detail-inner">
@@ -2457,7 +2538,7 @@ function renderExpandableDamageTable(containerId, titleKey, groups, dur, rowIdPr
         for (const a of abilityRows) {
             let aAcc = accuracyPct(a.hits, a.misses);
             html += `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.dmg).toLocaleString()}</td>
-                <td>${a.casts}</td><td>${a.hits}</td><td>${aAcc}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`;
+                <td>${fmtCount(a.casts)}</td><td>${fmtCount(a.hits)}</td><td>${aAcc}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`;
         }
         html += "</tbody></table></div></td></tr>";
     });
@@ -2515,24 +2596,6 @@ function tagAuraCasters(groups, result) {
         }
         if (auras.length) group.auras = auras;
     }
-}
-
-function renderDamageTotals(result, ids = IDS_MAIN) {
-    let dur = result.battleDurationNs / ONE_SECOND || 1;
-    let doneGroups = aggregateAttacks(result.battleLog, "source");
-    mergeAbilityCastCounts(doneGroups, result);
-    tagAuraCasters(doneGroups, result);
-    // rowIdPrefix must be unique per container so both tables (and the modal's
-    // own tables) can be open simultaneously without colliding detail-row IDs.
-    // The modal wraps each section in its own <details> summary, so skip the h4.
-    renderExpandableDamageTable(ids.damageTotals, "damageDone", doneGroups, dur, ids.damageTotals + "_dd", ids === IDS_MAIN);
-}
-
-function renderDamageTaken(result, ids = IDS_MAIN) {
-    let dur = result.battleDurationNs / ONE_SECOND || 1;
-    let takenGroups = aggregateAttacks(result.battleLog, "target");
-    mergeSelfInflictedDamage(takenGroups, result);
-    renderExpandableDamageTable(ids.damageTaken, "damageTaken", takenGroups, dur, ids.damageTaken + "_dt", ids === IDS_MAIN);
 }
 
 // Folds in self-inflicted HP costs (e.g. Insanity's 30% current-HP spend) as
@@ -2632,13 +2695,6 @@ function mergeHealCastCounts(groups, result) {
 // Renders an expandable healing table (parallel to renderExpandableDamageTable):
 // one row per healer with total healed / heal count / HPS, expandable to a per-
 // ability breakdown.
-function renderHealingDone(result, ids = IDS_MAIN) {
-    let dur = result.battleDurationNs / ONE_SECOND || 1;
-    let groups = aggregateHeals(result.battleLog);
-    mergeHealCastCounts(groups, result);
-    renderExpandableHealingTable(ids.healingDone, groups, dur, ids.healingDone + "_hd", ids === IDS_MAIN);
-}
-
 // One row per healer with total healed / casts / HPS, expandable to a per-ability breakdown.
 // Parallel to renderExpandableDamageTable, and shared by the single battle and the trial run total.
 function renderExpandableHealingTable(containerId, groups, dur, rowIdPrefix, showTitle = true) {
@@ -2660,7 +2716,7 @@ function renderExpandableHealingTable(containerId, groups, dur, rowIdPrefix, sho
         let rowId = rowIdPrefix + i;
         html += `<tr class="expandable ${r.isPlayer ? "src-player" : "src-enemy"}" data-detail-toggle="${rowId}">
             <td>${escapeHtml(r.name)}</td><td>${Math.round(r.healed).toLocaleString()}</td>
-            <td>${r.casts}</td><td>${r.count}</td><td>${(r.healed / dur).toFixed(1)}</td></tr>`;
+            <td>${fmtCount(r.casts)}</td><td>${fmtCount(r.count)}</td><td>${(r.healed / dur).toFixed(1)}</td></tr>`;
 
         let abilityRows = Object.values(r.byAbility).sort((a, b) => b.healed - a.healed);
         html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="5"><div class="detail-inner">
@@ -2670,7 +2726,7 @@ function renderExpandableHealingTable(containerId, groups, dur, rowIdPrefix, sho
             </tr></thead><tbody>`;
         for (const a of abilityRows) {
             html += `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.healed).toLocaleString()}</td>
-                <td>${a.casts}</td><td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`;
+                <td>${fmtCount(a.casts)}</td><td>${fmtCount(a.count)}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`;
         }
         html += "</tbody></table></div></td></tr>";
     });
@@ -2711,7 +2767,9 @@ function renderTrialAnalysisTable(containerId, run) {
     importedPlayers.forEach((p, i) => (rosterIndexByHrid[p.dto.hrid] = i));
     const bestCarriers = bestCarrierByAura();
     // The roster, keyed the same way every group map is, so the three views line up per player.
-    let keys = [...new Set([...Object.keys(run.done), ...Object.keys(run.healed), ...Object.keys(run.taken)])];
+    // Players only, whatever the caller passed: the trial monsters never get a row.
+    let keys = [...new Set([...Object.keys(run.done), ...Object.keys(run.healed), ...Object.keys(run.taken)])]
+        .filter((key) => (run.done[key] ?? run.healed[key] ?? run.taken[key]).isPlayer);
     if (!keys.length) {
         container.innerHTML = `<div class="empty">${escapeHtml(t("noPlayersImported"))}</div>`;
         return;
@@ -2753,6 +2811,8 @@ function renderTrialAnalysisTable(containerId, run) {
         <th${tint(ANALYSIS_COLORS.damage)}>${escapeHtml(t("totalDmg"))}</th>
         <th${tint(ANALYSIS_COLORS.healing)}>${escapeHtml(t("totalHealed"))}</th>
         <th${tint(ANALYSIS_COLORS.taken)} title="${escapeHtml(t("preMitigationTooltip"))}">${escapeHtml(t("preMitigation"))}</th>
+        <th>${escapeHtml(t("accuracy"))}</th>
+        <th title="${escapeHtml(t("oomTooltip"))}">${escapeHtml(t("oomAvgColumn"))}</th>
     </tr></thead><tbody>`;
 
     rows.forEach((r, i) => {
@@ -2768,6 +2828,8 @@ function renderTrialAnalysisTable(containerId, run) {
             ? `<span style="color:#ffb347;" title="${escapeHtml(t("guildTrialNoLoadoutTooltip"))}">⚠ </span>`
             : "";
         let nameStyle = noLoadout ? ' style="color:#ffb347;"' : "";
+        // Blocked casts per run, keyed by the player's hrid.
+        let oom = run.oom?.[r.key.split("|")[0]] || 0;
 
         // No has-aura class here: it golds the entire cell, which would flatten the per-aura colours.
         html += `<tr class="expandable src-player" data-detail-toggle="${rowId}">
@@ -2775,9 +2837,11 @@ function renderTrialAnalysisTable(containerId, run) {
             <td${tint(ANALYSIS_COLORS.damage)}>${num(r.done?.dmg)}${pctSpan(r.done?.dmg, partyTotals.damage)}</td>
             <td${tint(ANALYSIS_COLORS.healing)}>${num(r.healed?.healed)}${pctSpan(r.healed?.healed, partyTotals.healing)}</td>
             <td${tint(ANALYSIS_COLORS.taken)}>${num(r.taken?.raw)}${pctSpan(r.taken?.raw, partyTotals.taken)}</td>
+            <td>${r.done && r.done.hits + r.done.misses > 0 ? accuracyPct(r.done.hits, r.done.misses) + "%" : "—"}</td>
+            <td${oom > 0 ? ' style="color:#ffb347;"' : ""}>${fmtCount(oom)}</td>
         </tr>`;
 
-        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="4"><div class="detail-inner">
+        html += `<tr class="detail-row" id="detailrow-${rowId}" style="display:none;"><td colspan="6"><div class="detail-inner">
             ${damageBreakdownHtml(t("damageDone"), r.done, dur, false, ANALYSIS_COLORS.damage)}
             ${healBreakdownHtml(t("healingDone"), r.healed, dur, ANALYSIS_COLORS.healing)}
             ${damageBreakdownHtml(t("damageTaken"), r.taken, dur, true, ANALYSIS_COLORS.taken)}
@@ -2816,7 +2880,7 @@ function damageBreakdownHtml(title, group, dur, showRaw = false, color = "") {
     let body = abilities.map((a) =>
         `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.dmg).toLocaleString()}</td>` +
         (showRaw ? `<td>${Math.round(a.raw || 0).toLocaleString()}</td>` : "") +
-        `<td>${a.casts}</td><td>${a.hits}</td><td>${accuracyPct(a.hits, a.misses)}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`
+        `<td>${fmtCount(a.casts)}</td><td>${fmtCount(a.hits)}</td><td>${accuracyPct(a.hits, a.misses)}%</td><td>${(a.dmg / dur).toFixed(1)}</td></tr>`
     ).join("");
 
     return breakdownHeading(title, color) +
@@ -2834,7 +2898,7 @@ function healBreakdownHtml(title, group, dur, color = "") {
 
     let body = abilities.map((a) =>
         `<tr><td>${escapeHtml(a.name)}</td><td>${Math.round(a.healed).toLocaleString()}</td>
-             <td>${a.casts}</td><td>${a.count}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`
+             <td>${fmtCount(a.casts)}</td><td>${fmtCount(a.count)}</td><td>${(a.healed / dur).toFixed(1)}</td></tr>`
     ).join("");
 
     return breakdownHeading(title, color) +
@@ -2873,19 +2937,17 @@ function auraTagsHtml(auras, playerHrid, bestCarriers = {}) {
 // roster, with a note if it had to be truncated.
 const DISCORD_MESSAGE_LIMIT = 2000;
 
-function trialSummaryText(tiers, run) {
-    let cleared = tiers.filter((x) => x.outcome === "victory").length;
-    let reached = tiers[tiers.length - 1];
-
+// `tiers` are the per-tier accumulators and `run` the whole-run average, as the panel shows them.
+function trialSummaryText(headline, tiers, runs, run) {
     let lines = [];
-    lines.push(`**${t("trialAnalysisTitle")}** — ${t("trialReachedTier", {
-        tier: reached.tier, level: reached.level, cleared,
-    })}`);
+    lines.push(`**${t("trialAnalysisTitle")}** — ${headline}`);
     lines.push("```");
 
     for (const x of tiers) {
-        lines.push(`T${x.tier} (L${x.level})  ${trialOutcomeLabel(x.outcome)}  ${fmtTime(x.durationSeconds * 1e9)}` +
-            `  ${t("trialColWiped")} ${x.wiped}/${x.totalPlayers}`);
+        const r = x.runs || 1;
+        lines.push(`T${x.tier} (L${x.level})  ${t("trialColReached")} ${x.runs}/${runs}` +
+            `  ${t("trialColCleared")} ${x.outcomes.victory || 0}/${x.runs}  ${fmtTime((x.durationSeconds / r) * 1e9)}` +
+            `  ${t("trialColWiped")} ${fmtCount(x.wiped / r)}/${x.totalPlayers}  ${((x.progress / r) * 100).toFixed(1)}%`);
     }
     lines.push("");
 
@@ -2893,11 +2955,15 @@ function trialSummaryText(tiers, run) {
     let rows = Object.keys(run.done)
         .concat(Object.keys(run.healed), Object.keys(run.taken))
         .filter((key, i, all) => all.indexOf(key) === i)
+        .filter((key) => (run.done[key] ?? run.healed[key] ?? run.taken[key]).isPlayer)
         .map((key) => ({
             name: (run.done[key] ?? run.healed[key] ?? run.taken[key]).name,
             dmg: Math.round(run.done[key]?.dmg || 0),
             heal: Math.round(run.healed[key]?.healed || 0),
             taken: Math.round(run.taken[key]?.raw || 0),
+            acc: run.done[key] && run.done[key].hits + run.done[key].misses > 0
+                ? accuracyPct(run.done[key].hits, run.done[key].misses) + "%" : "—",
+            oom: fmtCount(run.oom?.[key.split("|")[0]] || 0),
         }))
         .sort((a, b) => b.dmg - a.dmg);
 
@@ -2914,19 +2980,17 @@ function trialSummaryText(tiers, run) {
         return `${num(value)} (${pct < 1 ? pct.toFixed(2) : pct.toFixed(1)}%)`;
     };
     const cells = (r) => [
-        withShare(r.dmg, totals.dmg), withShare(r.heal, totals.heal), withShare(r.taken, totals.taken),
+        withShare(r.dmg, totals.dmg), withShare(r.heal, totals.heal), withShare(r.taken, totals.taken), r.acc, r.oom,
     ];
 
     const nameWidth = Math.max(6, ...rows.map((r) => r.name.length));
-    const headers = [t("totalDmg"), t("totalHealed"), t("preMitigation")];
+    const headers = [t("totalDmg"), t("totalHealed"), t("preMitigation"), t("accuracy"), t("oomAvgColumn")];
     const widths = headers.map((header, i) =>
         Math.max(header.length, ...rows.map((r) => cells(r)[i].length)));
 
-    lines.push(`${"".padEnd(nameWidth)}  ${headers[0].padStart(widths[0])}  ${headers[1].padStart(widths[1])}  ${headers[2].padStart(widths[2])}`);
+    lines.push(`${"".padEnd(nameWidth)}  ` + headers.map((h, i) => h.padStart(widths[i])).join("  "));
     for (const r of rows) {
-        const [dmg, heal, taken] = cells(r);
-        lines.push(`${r.name.padEnd(nameWidth)}  ${dmg.padStart(widths[0])}` +
-            `  ${heal.padStart(widths[1])}  ${taken.padStart(widths[2])}`);
+        lines.push(`${r.name.padEnd(nameWidth)}  ` + cells(r).map((c, i) => c.padStart(widths[i])).join("  "));
     }
     lines.push("```");
 
@@ -2942,9 +3006,9 @@ function trialSummaryText(tiers, run) {
     return text;
 }
 
-async function copyTrialSummary(tiers, run) {
+async function copyTrialSummary(headline, tiers, runs, run) {
     const status = document.getElementById("trialExportStatus");
-    const text = trialSummaryText(tiers, run);
+    const text = trialSummaryText(headline, tiers, runs, run);
     try {
         await navigator.clipboard.writeText(text);
         status.textContent = t("copiedToClipboard");
@@ -2961,89 +3025,6 @@ async function copyTrialSummary(tiers, run) {
     }
 }
 
-// The ability/source hrids carried by a log entry, used to detect aura info.
-function logEntryAbilityHrids(e) {
-    return [e.ability, e.healSource, e.manaSource, e.consumable].filter(Boolean);
-}
-
-// Does this entry involve an aura ability (cast, heal, mana, etc.)?
-function logEntryIsAura(e) {
-    return logEntryAbilityHrids(e).some((h) => AURA_ABILITY_HRIDS.has(h));
-}
-
-// The acting unit for an entry (attacker/caster), as "hrid|isPlayer", or null
-// if the entry has no single actor. Used for the "filter by player" dropdown.
-function logEntryActor(e) {
-    if (e.kind === "attack") return e.sourceIsPlayer ? e.source + "|1" : null;
-    if (e.unit != null && e.isPlayer) return e.unit + "|1";
-    return null;
-}
-
-// Rebuild the "filter by player" dropdown from the players that appear as
-// actors in the current log. Preserves the current selection if still valid.
-function populateLogPlayerSelect(ids, log) {
-    let sel = document.getElementById(ids.logPlayer);
-    if (!sel) return;
-    let prev = sel.value;
-
-    let seen = new Map(); // hrid -> name
-    for (const e of log) {
-        let actor = logEntryActor(e);
-        if (!actor) continue;
-        let hrid = actor.slice(0, -2); // strip "|1"
-        if (!seen.has(hrid)) seen.set(hrid, nameFor(hrid, true));
-    }
-
-    let opts = `<option value="all">${escapeHtml(t("logAllPlayers"))}</option>`;
-    for (const [hrid, name] of seen) {
-        opts += `<option value="${escapeHtml(hrid)}">${escapeHtml(name)}</option>`;
-    }
-    sel.innerHTML = opts;
-    // Restore prior selection if that player is still present.
-    if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
-}
-
-function renderLog(ids = IDS_MAIN, logOverride = null) {
-    const filter = document.getElementById(ids.logFilter).value;
-    const search = document.getElementById(ids.logSearch).value.trim().toLowerCase();
-    const hideAura = document.getElementById(ids.logHideAura)?.checked;
-    const playerSel = document.getElementById(ids.logPlayer);
-    const playerFilter = playerSel ? playerSel.value : "all";
-    const container = document.getElementById(ids.combatLog);
-    let log = logOverride !== null ? logOverride : (window.__battleLog || []);
-
-    let lines = [];
-    for (const e of log) {
-        if (filter !== "all" && e.kind !== filter) continue;
-        if (hideAura && logEntryIsAura(e)) continue;
-        if (playerFilter !== "all") {
-            let actor = logEntryActor(e);
-            if (!actor || actor.slice(0, -2) !== playerFilter) continue;
-        }
-        let line = formatLogEntry(e);
-        if (search && !line.text.toLowerCase().includes(search)) continue;
-        lines.push(line);
-    }
-
-    if (!lines.length) {
-        container.innerHTML = `<div class="empty">${escapeHtml(t("noLogEntriesMatch"))}</div>`;
-        document.getElementById(ids.logCount).textContent = 0;
-        return;
-    }
-
-    // Cap rendering for very large logs.
-    const CAP = 5000;
-    let shown = lines.slice(0, CAP);
-    let html = shown.map((l) =>
-        `<div class="log-line ${l.cls}"><span class="log-time">${fmtTime(l.time)}</span>${l.text}</div>`
-    ).join("");
-    if (lines.length > CAP) {
-        html += `<div class="empty">${escapeHtml(t("moreEntriesHidden", { count: lines.length - CAP }))}</div>`;
-    }
-    container.innerHTML = html;
-    document.getElementById(ids.logCount).textContent = lines.length;
-}
-
 // Translates an ability/consumable hrid to a display name via i18next
 // (abilityNames/itemNames), falling back to the raw hrid tail.
 function abilityOrItemName(hrid) {
@@ -3053,56 +3034,6 @@ function abilityOrItemName(hrid) {
         if (i18next.exists("itemNames." + hrid)) return i18next.t("itemNames." + hrid);
     }
     return tail;
-}
-
-function formatLogEntry(e) {
-    let time = e.time;
-    if (e.kind === "attack") {
-        let src = nameFor(e.source, e.sourceIsPlayer);
-        let tgt = nameFor(e.target, e.targetIsPlayer);
-        let cls = e.sourceIsPlayer ? "l-player-atk" : "l-enemy-atk";
-        if (e.hit === "miss") {
-            return { time, cls: cls + " l-miss", text: `${esc(src)} <i>${esc(t("misses"))}</i> ${esc(tgt)} <span class="dim">(${esc(abilityOrItemName(e.ability))})</span>` };
-        }
-        let hpPct = e.targetMaxHp ? Math.max(0, Math.round(100 * e.targetHpAfter / e.targetMaxHp)) : 0;
-        return {
-            time, cls,
-            text: t("hitsForDamage", {
-                src: esc(src), tgt: esc(tgt),
-                dmg: `<b>${Math.round(e.hit).toLocaleString()}</b>`,
-                ability: `<span class="dim">(${esc(abilityOrItemName(e.ability))})</span>`,
-            }) + ` → ${esc(tgt)} ${hpPct}% HP`,
-        };
-    }
-    if (e.kind === "heal") {
-        return { time, cls: "l-heal", text: `${esc(nameFor(e.unit, e.isPlayer))} ${esc(t("heals"))} <b>${Math.round(e.amount).toLocaleString()}</b> <span class="dim">(${esc(abilityOrItemName(e.healSource))})</span>` };
-    }
-    if (e.kind === "manaGain") {
-        return { time, cls: "l-mana", text: `${esc(nameFor(e.unit, e.isPlayer))} ${esc(t("gainsMana"))} <b>${Math.round(e.amount).toLocaleString()}</b> MP <span class="dim">(${esc(abilityOrItemName(e.manaSource))})</span>` };
-    }
-    if (e.kind === "death") {
-        return { time, cls: "l-death", text: `☠ ${esc(nameFor(e.unit, e.isPlayer))} <b>${esc(t("died"))}</b>` };
-    }
-    if (e.kind === "consumable") {
-        return { time, cls: "l-consume", text: `${esc(nameFor(e.unit, e.isPlayer))} ${esc(t("consumes"))} ${esc(abilityOrItemName(e.consumable))}` };
-    }
-    if (e.kind === "buffCast") {
-        let selfCast = e.unit === e.target;
-        let text = selfCast
-            ? `${esc(nameFor(e.unit, e.isPlayer))} ${esc(t("casts"))} <b>${esc(abilityOrItemName(e.ability))}</b>`
-            : t("castsOn", {
-                src: esc(nameFor(e.unit, e.isPlayer)),
-                ability: `<b>${esc(abilityOrItemName(e.ability))}</b>`,
-                tgt: esc(nameFor(e.target, e.targetIsPlayer)),
-            });
-        return { time, cls: "l-buffcast", text };
-    }
-    if (e.kind === "enrage") {
-        let pct = e.stack * 10;
-        let text = "⚡ " + t("enragesText", { src: esc(nameFor(e.unit, e.isPlayer)), stack: e.stack, pct });
-        return { time, cls: "l-enrage", text };
-    }
-    return { time, cls: "", text: JSON.stringify(e) };
 }
 
 // --------------------------------------------------------------------- Utils
@@ -3143,11 +3074,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (document.getElementById("changelogModalOverlay")?.style.display !== "none") {
             renderChangelog();
         }
-        if (window.__lastBattleResult) {
-            renderResult(window.__lastBattleResult, false);
+        if (lastSingleRun) {
+            renderRunSet(lastSingleRun.acc, IDS_MAIN, { seed: lastSingleRun.seed, scrollTo: false });
         }
         if (lastTrialRun) {
-            renderTrialModeResult(lastTrialRun.tiers, lastTrialRun.stopReason, lastTrialRun.remainingSeconds);
+            renderTrialModeResult();
         }
     });
 
@@ -3189,7 +3120,6 @@ window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("importAppend").addEventListener("click", () => doImport(true));
     const clearRoster = () => {
         importedPlayers = [];
-        rosterOom = {};
         lastGuildTrialImport = null;
         renderPlayerList();
         renderGuildTrialStatus();
@@ -3257,16 +3187,8 @@ window.addEventListener("DOMContentLoaded", () => {
     // Battle
     document.getElementById("runBattle").addEventListener("click", runBattle);
     document.getElementById("runTrial").addEventListener("click", runTrialMode);
-    document.getElementById("logFilter").addEventListener("change", () => renderLog());
-    document.getElementById("logSearch").addEventListener("input", () => renderLog());
-    document.getElementById("logHideAura").addEventListener("change", () => renderLog());
-    document.getElementById("logPlayer").addEventListener("change", () => renderLog());
+    initConcurrencyInput();
 
-    // Trial-tier result modal: log filter/search operate on the modal's own log.
-    document.getElementById("trialLogFilter").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
-    document.getElementById("trialLogSearch").addEventListener("input", () => renderLog(IDS_MODAL, trialModalLog));
-    document.getElementById("trialLogHideAura").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
-    document.getElementById("trialLogPlayer").addEventListener("change", () => renderLog(IDS_MODAL, trialModalLog));
     document.getElementById("trialResultModalClose").addEventListener("click", closeTrialResultModal);
     document.getElementById("trialResultModalOverlay").addEventListener("click", (ev) => {
         if (ev.target.id === "trialResultModalOverlay") closeTrialResultModal();

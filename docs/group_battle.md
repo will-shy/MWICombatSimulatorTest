@@ -14,9 +14,10 @@ re-verified rather than trusted.
 A second entry point next to the standard simulator (`index.html`). Instead of "one player
 grinds a zone for N hours", it answers **"can this raid roster kill this monster group?"**:
 
-- N players (10–60) fight a **fixed** enemy group, **once**, to completion.
-- No respawns, no drops, no XP-rate output. The outputs are: win/lose, duration,
-  who died, damage/healing breakdowns, a whole-run analysis, and a full combat log.
+- N players (10–60) fight a **fixed** enemy group to completion, repeated over several seeded runs
+  (default 10) and averaged.
+- No respawns, no drops, no XP-rate output. The outputs are: win/lose counts, duration,
+  who died, damage/healing breakdowns and a per-player table with accuracy and OOM.
 - Two modes: **Single Tier** (one fight at a chosen level) and **Trial Mode** (default —
   a ladder of escalating tiers on one shared time budget).
 - The primary input is a **guild combat-trial export**: one JSON file holding the whole guild,
@@ -47,7 +48,7 @@ documents this; don't "fix" it. `guildBuildings.js` follows the same rule for it
 | File | Role |
 | --- | --- |
 | `group-battle.html` | Markup + all CSS (self-contained, dark theme). No logic beyond relocating the i18n language switcher into the header. |
-| `src/groupBattle.js` (~3.3k lines) | All page logic: imports/roster, presets, guild buildings, sanity check, aura planning, enemy selection/preview, running battles, rendering results, the run analysis and the combat log. |
+| `src/groupBattle.js` (~3.3k lines) | All page logic: imports/roster, presets, guild buildings, sanity check, aura planning, enemy selection/preview, running battles over a worker pool, aggregating and rendering the averaged results. |
 | `src/guildTrialImport.js` | Guild combat-trial export → import set → player DTO (§4.1). |
 | `src/combatsimulator/data/guildBuildings.js` | Guild building definitions and `guildBuildingBuffs()` (§4.6). |
 | `src/playerDetailView.js` | Shared detail dialog: equipment, abilities **with their triggers**, character bonuses, detailed combat status. Also used by `skill-lab.html`. |
@@ -87,19 +88,19 @@ header (title, build version v1.0, disclaimer, back-link, language switcher)
         #buildRoster / #clearPlayers
       #playerList               aura chips + sanity check + roster TABLE (one row per player)
     card 2 — "Select Enemy Group" + "Battle Settings"
+      #runCount #baseSeed #concurrency (+ #concurrencyMax)   shared by both modes
       mode subtabs: #trialMode (default) | #singleBossMode
       #enemySelect  #enemyLevelSelect  #previewEnemyBtn
       #enemyPreviewPanel        per-member stat block
       #enemyGroup               flat table of the resolved enemies
       #singleBossMode: #timeCap, #runBattle
       #trialMode:     #trialTimeCap, #runTrial, #trialModeResult
-                      └─ tier table + <details> "Analysis — whole run"
+                      └─ headline + tier table + <details> runs list + <details> "Analysis — whole run"
                            #trialExportDiscord, #trialRunAnalysis
-  #resultPanel (hidden until a run)
-    #resultSummary #damageTotals #damageTaken #healingDone
-    <details> combat log + filters
+  #resultPanel (Single Tier, hidden until a run)
+    #resultSummary #resultAnalysis #damageTotals #damageTaken #healingDone
 #playerModalOverlay          player/preset detail modal
-#trialResultModalOverlay     per-tier combat detail modal (mirrors #resultPanel)
+#trialResultModalOverlay     per-tier detail: that tier averaged over the runs that reached it
 ```
 
 Wiring lives in the `DOMContentLoaded` handler at the end of `src/groupBattle.js` (`:3173+`).
@@ -320,10 +321,9 @@ the `.roster-card` / `.rc-*` CSS is gone.)
 | Style | the raid class chip (see **Classes** below), coloured per class |
 | Weapon | name + enhancement |
 | Auras | **every** aura the player carries, with level, each in its own colour (`AURA_COLORS`); ★ marks the strongest carrier of a single-carrier aura; Insanity is deliberately uncoloured |
-| HP / MP | derived max values |
-| OOM | ability casts blocked by lack of mana in the most recent run (`rosterOom`) |
 | ✕ | remove |
 
+The table has no height cap, so a full 60-player roster shows without a scrollbar.
 Rows are ordered by class, keeping each player's **original import index** within a class, so
 remove/rename/modal target the right entry. The class order is the one listed below.
 
@@ -334,16 +334,17 @@ one name, colour and position, read off the weapon and, for the two support clas
 | --- | --- |
 | Wark | a bulwark (a weapon with `defensiveDamage`), whatever its style |
 | Cursed Bow | `/items/cursed_bow` or `_refined`, played as support |
-| Water Support | water weapon **with Mana Spring** |
-| Nature Support | nature weapon **with Rejuvenate**, with or without Mana Spring |
+| Mana Support | any non-bulwark weapon **with Mana Spring**, with or without Rejuvenate |
+| Nature Support | nature weapon **with Rejuvenate** and no Mana Spring |
 | Slash / Stab / Smash | the weapon's combat style |
 | Ranged | any ranged weapon except the Cursed Bow |
 | Fire / Water | magic weapon by element |
 | Nature DPS | nature weapon without Rejuvenate |
 | Magic / Unarmed | fallbacks: no known element / no weapon |
 
-Support is tied to the element: Mana Spring on a nature weapon alone, or Rejuvenate on a water one,
-stays a DPS class. Change a class, its colour or its order in `combatClass.js` only, and add the
+Mana Spring decides first: anyone but a Wark who brings it is a Mana Support, including a player
+bringing both Mana Spring and Rejuvenate, and a Cursed Bow or a water weapon with it. Rejuvenate
+only makes a support on a nature weapon; on any other weapon it stays a DPS class. Change a class, its colour or its order in `combatClass.js` only, and add the
 label to `groupBattleI18nSetup.js` (en + zh) too. Skill Lab uses the English `label`.
 
 Derived stats are cached in a `WeakMap` keyed by DTO reference because building a `Player` is
@@ -352,7 +353,9 @@ whole cache.
 
 `derivePlayerSummary` (`:922`) builds the preview `Player` with the **same** buff stack the worker
 uses, via the shared `groupBattleExtraBuffs()` — regen compensation + guild buildings + that
-player's shrines — so the roster's HP/MP cannot drift from the sim.
+player's shrines — so the effective skill levels it reads (aura ranking, §4.5) cannot drift from the
+sim. The roster no longer shows HP, MP or OOM (removed in v1.2). Max HP/MP are in the detail dialog's
+combat status, and OOM is in the run results (per player in the summary, per tier in Trial Mode).
 
 ### 4.9 Detail dialog
 
@@ -622,8 +625,9 @@ group battles produce no XP.
 
 ```
 groupBattle.js  runBattle() / runTrialMode()
-   → runBattleOnWorker({players, enemies, timeCapSeconds})   // FIFO of pending resolvers
-   → worker.postMessage({type:"start_battle", ..., guildBuildingLevels})
+   → runPool(runs, task)                       // one task per run, spread over the worker pool
+   → runBattleOn(w, {players, enemies, timeCapSeconds, seed})   // per-worker FIFO of resolvers
+   → w.postMessage({type:"start_battle", ..., guildBuildingLevels, seed})
 worker.js  case "start_battle"
    → guildBuffs = guildBuildingBuffs(event.data.guildBuildingLevels)
    → Player.createFromDTO for each; zoneBuffs from /actions/combat/fly;
@@ -637,9 +641,30 @@ worker.js  case "start_battle"
 
 The zone `/actions/combat/fly` is a harmless stand-in used only to supply zone buffs; nothing about
 the zone's monsters is used, because `battleMode` replaces the spawn logic with `fixedEnemies`
-(`combatSimulator.js:443-444`). Only **one** worker exists and it handles one battle at a time;
-requests are serialized through `pendingBattleResolvers`, which is what lets Trial Mode `await`
-tiers sequentially.
+(`combatSimulator.js:443-444`). (The worker runs on the wasm kernel now; the JS flow above is what
+it reproduces.)
+
+### Runs, seeds and workers (v1.2)
+
+Battle Settings has three fields shared by both modes:
+
+| Field | Default | Rule |
+| --- | --- | --- |
+| Runs (`#runCount`) | 10 | 1–50. Every result is the **per-run average** over all runs. |
+| Seed (`#baseSeed`) | 666 | uint32. Run `k` uses `seedFor(seed, k) = (seed + k·0x9e3779b9) >>> 0`, distinct per run, and run 0 uses the seed itself. Trial Mode tier `t` of a run uses `tierSeed(runSeed, t)`, the same derivation as `sim-sweep` and `skillLabJob.js`. Same seed, roster, buildings and settings give the same results. |
+| Workers (`#concurrency`) | `min(6, cores − 1)` | 1 to `navigator.hardwareConcurrency`, which is shown next to the field. This many battles run at once, one per worker. Persisted in `localStorage["mwiGroupBattleConcurrency"]`. |
+
+`runPool` creates workers on first use and keeps them. Each worker runs one battle at a time and
+answers in order, so a FIFO of resolvers per worker (`w.pending`) matches results to requests. In
+Trial Mode a run is one task: its tiers run in sequence on the same worker, and different runs'
+ladders run in parallel. Each worker holds its own kernel, and a long fight's result is tens of MB
+of JSON while it is being aggregated, which is why the default stops at 6.
+
+**No battle log is kept.** Each result is reduced by `summarizeBattle` (the damage done/taken and
+healing groups, OOM, deaths, survivors, enemy HP, progress) and added into an accumulator
+(`newRunAcc` / `addBattle`), then dropped. The combat log, its filters and `window.__battleLog` /
+`window.__lastBattleResult` are gone. A harness that needs one battle's full result should run the
+kernel on the captured job (`docs/harness.md` §4).
 
 Both modes go through this one path, so guild buildings and shrines apply to every tier of a ladder.
 `groupBattleExtraBuffs()` in the page builds the identical stack for previews.
@@ -655,7 +680,7 @@ Both modes go through this one path, so guild buildings and shrines apply to eve
   (hp/mp current+max), `enemyFinalState[]` (hp current+max), plus the usual `deaths`,
   `playerOomCastCount`, `abilityCastCounts`, and `battleLog`.
 
-### Trial Mode (`runTrialMode`, `groupBattle.js:1910`)
+### Trial Mode (`runTrialMode`)
 
 - Tiers T1..T21 (`tierLevel(tier) = 100 + 10*(tier-1)`).
 - Every enemy is **re-leveled** to the tier's level each round — the per-enemy level from the
@@ -666,37 +691,49 @@ Both modes go through this one path, so guild buildings and shrines apply to eve
   the same DTOs.
 - Loop continues only on `victory`; `defeat` / `timeout` / `ended` stops the run and becomes the
   `stopReason`.
-- Per tier it records outcome, duration, wiped count, `bossHpFrac`, OOM total, and the full
-  `simResult`. `bossHpFrac` is **Σ remaining HP / Σ max HP over every enemy in the group**, not the
+- Each tier's battle is added to two accumulators: the whole-run one (`whole`), and that tier's own
+  (`byTier[tier]`, over the runs that reached it). Each run also leaves a record: seed, stop reason,
+  tiers cleared, last tier, score (`cleared + progress into the tier it stopped on`, as in
+  `sim-sweep --ladder`), and time left.
+- Tier progress is `1 − Σ remaining HP / Σ max HP over every enemy in the group`, not the
   lowest or highest single enemy, so multi-enemy tiers (Badger ×2, Swarm ×4) count every enemy.
-  The page shows it as **tier progress, `1 − bossHpFrac`** (the "Tier progress" column, 100% on a
-  victory). Two badgers, one dead and one at 90%, is 55%. Skill Lab shows progress the same way, and
-  `sim-sweep` uses the same formula (its single-tier score is still reported as HP left). Per-player OOM accumulates across tiers into
-  `rosterOom`, refreshing the roster badges live.
-- Clicking a tier row opens `#trialResultModalOverlay`, which calls the same `renderResult` with
-  `IDS_MODAL` instead of `IDS_MAIN` — one renderer, two targets.
-- On a wipe, the panel also reports how much of the shared budget went **unspent**
-  (`trialWipedTimeLeft`) — "reached T8" alone doesn't say whether the run died or ran out of clock.
-- `lastTrialRun` keeps `{tiers, stopReason, remainingSeconds}` so a language switch re-renders the
-  whole panel.
+  It is 100% on a victory. Two badgers, one dead and one at 90%, is 55%. Skill Lab shows progress the
+  same way, and `sim-sweep` uses the same formula (its single-tier score is still reported as HP left).
+- The panel shows a headline (average tiers cleared and score, and where the best and worst runs by
+  score stopped, as tier + progress into it, e.g. "T9 (35.0%)", 100% for a cleared tier), one row per tier
+  (reached x/N, cleared, average time, wiped, progress and OOM over the runs that reached it), a
+  collapsible list of runs with their seeds, and the whole-run analysis (§8.2).
+- Clicking a tier row opens `#trialResultModalOverlay` with that tier's accumulator, drawn by the
+  same `renderRunSet` with `IDS_MODAL` instead of `IDS_MAIN`: one renderer, two targets.
+- `lastTrialRun` keeps `{whole, byTier, runRecords, seed}`, and `lastSingleRun` keeps
+  `{acc, seed}`, so a language switch re-renders the results.
 
 ---
 
-## 8. Results & combat log
+## 8. Results
 
-`renderResult(result, scrollTo, ids)` (`:2344`) writes:
+`renderRunSet(acc, ids, {seed})` draws one accumulator, averaged per run (`averageOf` scales every
+count and amount by `1/runs`; `fmtCount` shows a non-integer average to one decimal). It is used for
+the Single Tier panel and for the trial-tier dialog, and writes:
 
-- **Summary** — outcome chip, duration, enemy final states (listed first), player final states with
-  HP/MP/deaths/OOM.
-- **Damage Done** — `aggregateAttacks(log, "source")`, then `mergeAbilityCastCounts` folds in
-  abilities that never appear in the attack log (pure buffs/heals/revives) so every cast ability is
-  listed. Aura casters are tagged via `NAME_TAG_AURA_HRIDS`.
-- **Damage Taken** — `aggregateAttacks(log, "target")`, plus `mergeSelfInflictedDamage`.
-- **Healing Done** — `aggregateHeals` + `mergeHealCastCounts`.
+- **Summary**: "Average of N runs · seed S", outcome counts, average duration and tier progress,
+  and players (survived x/N, average deaths, average OOM).
+- **Players**: the per-player result table of §8.2, with Accuracy and OOM (avg) columns.
+- **Damage Done**: `aggregateAttacks(log, "source")` per battle, then `mergeAbilityCastCounts` folds
+  in abilities that never appear in the attack log (pure buffs/heals/revives), so every cast ability
+  is listed. Aura casters are tagged via `NAME_TAG_AURA_HRIDS`.
+- **Damage Taken**: `aggregateAttacks(log, "target")`, plus `mergeSelfInflictedDamage`.
+- **Healing Done**: `aggregateHeals` + `mergeHealCastCounts`, **including** passive regen.
 - Each table row is expandable into a per-ability breakdown with hit/miss and accuracy %.
 
-The log renderer (`renderLog`, `:3054`) filters by kind (attack / heal / manaGain / buffCast /
-enrage / death / consumable), by player, by free-text search, and can hide aura chatter.
+**No trial-monster data in any result.** Every averaged view goes through `playersView()` (which
+applies `playersOnly()` to every group map), and `renderTrialAnalysisTable` and `trialSummaryText`
+also skip any non-player key themselves. There is no enemy table. (v1.2 briefly leaked "Trial
+Badger" rows into Trial Mode's whole-run analysis, because `averageOf(whole)` was passed unfiltered.) A player's own Damage Taken breakdown still lists the monster abilities that hit them,
+since that is the player's data. Tier progress is the raid's figure. The enemy stat preview (§5) is
+an input, not a result, and stays.
+
+There is no combat log (removed in v1.2).
 
 Names are resolved through `nameFor(hrid, isPlayer)` against `window.__playerNames` /
 `window.__enemyNames`, both repopulated at the start of every run.
@@ -716,11 +753,12 @@ Note what the figure does and doesn't isolate: multipliers applied to the roll i
 `damageTaken`, the attacker's task / ability / auto-attack damage) are already baked in — they are
 part of the incoming hit. What it exposes is armour/resistance mitigation plus overkill.
 
-### 8.2 Trial Mode — "Analysis — whole run"
+### 8.2 The per-player table ("Analysis — whole run" / "Players")
 
-A `<details>` under the tier table (`renderTrialAnalysisTable`, `:2751`), filled by
-`aggregateTrialRun` (`:2075`), which folds every tier together. Keys are stable across tiers —
-player hrids, and the `uniqueHrid` each enemy copy gets — so a unit accumulates into one row.
+`renderTrialAnalysisTable`. In Trial Mode it sits under the tier table and covers every tier of
+every run, averaged per run. In Single Tier and the tier dialog it is the "Players" section. Keys
+are stable across tiers and runs (player hrids, and the `uniqueHrid` each enemy copy gets), so a
+unit accumulates into one row.
 
 One row per player, **roster only** (`playersOnly()` drops the trial monsters; their rows just
 restate the raid's numbers from the other side):
@@ -730,6 +768,8 @@ restate the raid's numbers from the other side):
 | Total Dmg | orange `#f0894c` |
 | Total Healed | green `#6fd08a` |
 | Taken (pre-mit) | red `#ff6b6b` |
+| Accuracy | none: hits / (hits + misses) over the player's attacks |
+| OOM (avg) | none: ability casts blocked by lack of mana, per run |
 
 Each carries its **share of the party total for that metric** — its own denominator, since a share
 of party healing measured against party damage would be meaningless. Two decimals below 1%, one
@@ -739,13 +779,13 @@ Other details:
 
 - **Healing excludes the passive per-10s HP regen** (`aggregateHeals(log, {excludeRegen:true})`).
   With the group-battle +3pp regen buff it otherwise dominates the column and every durable
-  front-liner reads as a healer. The single-battle and per-tier tables still include it.
+  front-liner reads as a healer. The Healing Done table still includes it.
 - Expanding a row stacks three per-ability breakdowns — damage, healing, damage taken (the last
   with its own pre-mitigation column) — so a player's output and what it cost them read as one line.
 - **ⓘ** next to a name opens that player's detail dialog. Resolved from the row's player hrid, so a
   player removed after the run simply gets no icon.
-- **⧉ Copy summary for Discord** (`trialSummaryText`, `:2924`) puts the tier ladder and the
-  per-player table on the clipboard inside a fenced code block, column widths computed from the content so
+- **⧉ Copy summary for Discord** (`trialSummaryText`) puts the headline, the averaged tier ladder
+  and the per-player table (with accuracy and OOM) on the clipboard inside a fenced code block, column widths computed from the content so
   the monospace block stays aligned. If it would exceed Discord's 2000-character limit it trims the
   smallest contributors and appends a truncation note rather than producing a message that won't send.
 
@@ -798,6 +838,12 @@ Other details:
 `#buildVersion` in `group-battle.html` and the matching block in
 `data/changelogGroupBattle.json` must be bumped together — the renderer tags the entry whose key
 equals the badge as "current", and a missing entry renders an empty changelog.
+
+**v1.2** (2026-10-01): tier progress over the whole enemy group (§7, Trial Mode), and the roster
+sorted by raid class from `src/combatClass.js` (§4.8), including Mana Support. The roster's HP, MP and
+OOM columns were removed, and the roster has no height cap. Runs / seed / workers settings with
+averaged results, a worker pool, Accuracy and OOM (avg) in the per-player table, and the combat log
+removed (§7, §8).
 
 **v1.0** added: the guild trial import, the guild buildings banner, shrines actually applying in
 group battles (they were silently dropped before — a roster with real shrine levels now fights

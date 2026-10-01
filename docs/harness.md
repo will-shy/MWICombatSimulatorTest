@@ -164,8 +164,9 @@ await page.click("#runBattle");
 await page.waitForSelector("#resultPanel:not([style*='display: none'])", { timeout: 60000 });
 ```
 
-On the wasm kernel this takes about a second. Level ↔ tier is `level = 100 + 10*(tier-1)`, so
-T8 = L170.
+The page now runs `#runCount` runs (default 10) seeded from `#baseSeed` (default 666) across
+`#concurrency` workers, and shows the average, so expect a few seconds. Set `#runCount` to 1 for a
+single fight. Level ↔ tier is `level = 100 + 10*(tier-1)`, so T8 = L170.
 
 **A single-tier run at tier N reproduces that tier of a ladder**, because Trial Mode restores every
 player to full HP/MP between tiers. That makes isolating one tier both valid and cheaper than
@@ -189,12 +190,15 @@ Conclusions drawn from a 900s single-tier run can overstate what the ladder will
 `sim-sweep --ladder` does not click through the page tier by tier. It captures the tier-1 message
 and runs the ladder itself, the way `runTrialMode` in `groupBattle.js` does: every enemy is
 re-leveled to the tier, the time budget is shared, a victory advances and anything else stops. On
-the same per-tier seeds it reproduces the page's Trial Mode table tier for tier.
+the same per-tier seeds it reproduces the page's Trial Mode table tier for tier. The page derives
+those seeds as `tierSeed(seedFor(baseSeed, run), tier)`, the same `tierSeed` the sweep uses.
 
 ### Capturing the job, and seeding the page
 
-The page creates its worker at load, so patch `Worker.prototype.postMessage` before any page
-script runs. This is how `sim-sweep` captures jobs:
+Patch `Worker.prototype.postMessage` before any page script runs. The page creates its workers on
+the first run (a pool, one battle per worker), and every run of every tier posts its own
+`start_battle`, each already carrying its `seed`. `window.__jobs[0]` is run 1, tier 1. This is how
+`sim-sweep` captures jobs:
 
 ```js
 await page.addInitScript(() => {
@@ -210,9 +214,10 @@ await page.addInitScript(() => {
 });
 ```
 
-The worker accepts `seed` on the message, and `__lastBattleResult.seed` reports the seed a run used,
-whether it was pinned or drawn at random. A result from the page and a result from Node (§4) on the
-same job and seed are byte-identical.
+The worker accepts `seed` on the message and returns it as `simResult.seed`. A result from the page
+and a result from Node (§4) on the same job and seed are byte-identical. A capture that drops the
+message (as `sim-sweep` does) leaves the page waiting for that run; that is harmless, since the sweep
+reloads the page for the next arm.
 
 ---
 
@@ -220,17 +225,11 @@ same job and seed are byte-identical.
 
 ### From the page
 
-`renderResult` stashes the raw result on the page. This is the richest source by far — prefer it
-over scraping rendered tables:
-
-```js
-const out = await page.evaluate(() => {
-  const res = window.__lastBattleResult;          // full SimResult
-  const names = window.__playerNames;             // hrid -> display name
-  const enemies = window.__enemyNames;            // uniqueHrid -> display name
-  // ...aggregate here, return plain JSON
-});
-```
+The page keeps **no raw result** any more (v1.2): each battle is folded into averages and its log
+dropped, so `window.__lastBattleResult` and `window.__battleLog` are gone. For one battle's full
+`SimResult`, capture its `start_battle` message (§3) and run it through the kernel in Node (below).
+`window.__playerNames` (hrid → display name) and `window.__enemyNames` (uniqueHrid → display name)
+are still set on every run.
 
 ### From the kernel directly
 

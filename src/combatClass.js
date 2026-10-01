@@ -2,26 +2,27 @@
 // the abilities they bring. Shared by the Group Battle and Skill Lab pages so a class has the same
 // name, colour and place in the list on both.
 //
-//   Wark            a bulwark (a weapon with defensiveDamage), whatever its style
+//   Wark            a bulwark (a weapon with defensiveDamage), whatever its style or bar
 //   Cursed Bow      the Cursed Bow (refined or not), played as support
-//   Water Support   a water weapon that brings Mana Spring
-//   Nature Support  a nature weapon that brings Rejuvenate
+//   Mana Support    any other weapon that brings Mana Spring
+//   Nature Support  a nature weapon that brings Rejuvenate (and not Mana Spring)
 //   Slash / Stab / Smash
 //   Ranged          any ranged weapon except the Cursed Bow
 //   Fire / Water    magic DPS by element
 //   Nature DPS
 //
-// A nature player bringing both Rejuvenate and Mana Spring is a Nature Support. Mana Spring on a
-// nature weapon alone, or Rejuvenate on a water one, does not make a support class.
+// Mana Spring wins over Rejuvenate: a player bringing both is a Mana Support. It also wins over the
+// weapon, so a Cursed Bow or a water staff with Mana Spring is a Mana Support too. Rejuvenate only
+// makes a support on a nature weapon.
 import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
 
-// In display order: Wark, then the supports (Cursed Bow, Water, Nature), then physical DPS, magic
+// In display order: Wark, then the supports (Cursed Bow, Mana, Nature), then physical DPS, magic
 // DPS, and the fallbacks. `label` is the English name (Skill Lab is English-only); `labelKey` is the
 // Group Battle page's i18n key for it.
 export const CLASSES = [
     { key: "wark", label: "Wark", labelKey: "styleWark", color: "#4bb3c4" },
     { key: "cursedBow", label: "Cursed Bow", labelKey: "classCursedBow", color: "#c77dff" },
-    { key: "waterSupport", label: "Water Support", labelKey: "classWaterSupport", color: "#a9cff7" },
+    { key: "manaSupport", label: "Mana Support", labelKey: "classManaSupport", color: "#a9cff7" },
     { key: "natureSupport", label: "Nature Support", labelKey: "classNatureSupport", color: "#d4f0b0" },
     { key: "slash", label: "Slash", labelKey: "classSlash", color: "#e05a5a" },
     { key: "stab", label: "Stab", labelKey: "classStab", color: "#e8d24c" },
@@ -58,6 +59,7 @@ export function raidClass(weaponHrid, abilityHrids = []) {
     if (isBulwark(weaponHrid)) return BY_KEY.wark;
 
     const abilities = new Set(abilityHrids);
+    if (abilities.has(MANA_SPRING)) return BY_KEY.manaSupport;
     switch (cs.combatStyleHrids?.[0]) {
         case "/combat_styles/smash": return BY_KEY.smash;
         case "/combat_styles/slash": return BY_KEY.slash;
@@ -66,7 +68,7 @@ export function raidClass(weaponHrid, abilityHrids = []) {
         case "/combat_styles/magic":
             switch (cs.damageType) {
                 case "/damage_types/fire": return BY_KEY.fire;
-                case "/damage_types/water": return abilities.has(MANA_SPRING) ? BY_KEY.waterSupport : BY_KEY.water;
+                case "/damage_types/water": return BY_KEY.water;
                 case "/damage_types/nature": return abilities.has(REJUVENATE) ? BY_KEY.natureSupport : BY_KEY.natureDps;
                 default: return BY_KEY.magic;
             }

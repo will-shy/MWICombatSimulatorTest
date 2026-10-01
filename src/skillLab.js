@@ -222,7 +222,7 @@ function memberStyle(member) {
     return styles && styles.length ? styles[0] : "";
 }
 
-// The member's raid class (Wark, Smash, ..., Nature Support, Water Support) from their weapon and
+// The member's raid class (Wark, Smash, ..., Mana Support, Nature Support) from their weapon and
 // their own bar as imported, with the same name, colour and order as the Group Battle roster.
 function memberClass(member) {
     const weapon = member && memberWeapon(member);

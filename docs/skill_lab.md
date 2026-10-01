@@ -136,11 +136,12 @@ and bare-hrid weapon procs such as `bloom`, which are shown with "(proc)".
 
 ### Party list
 
-The party table and the player dropdown are in **class order**: Wark → Cursed Bow → Water Support →
+The party table and the player dropdown are in **class order**: Wark → Cursed Bow → Mana Support →
 Nature Support → Slash → Stab → Smash → Ranged → Fire → Water → Nature DPS → unknown (magic with no
 element, unarmed), with import order kept within a class. The class comes from `raidClass` in `src/combatClass.js`, read off the weapon
-and, for the support classes, the member's bar as imported (nature + Rejuvenate, water + Mana
-Spring). The Group Battle roster uses the same module, so a class has the same name, colour and
+and, for the support classes, the member's bar as imported (Mana Spring on any non-bulwark weapon
+makes a Mana Support, including when they also bring Rejuvenate; nature + Rejuvenate makes a
+Nature Support). The Group Battle roster uses the same module, so a class has the same name, colour and
 order on both pages. The rules are in `docs/group_battle.md` §4.8. Sorting is display
 only: a member keeps their import index, which their `player${i+1}` hrid and the focus selection
 are keyed on. The dropdown groups members under one heading per class.
