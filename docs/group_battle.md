@@ -647,8 +647,12 @@ Both modes go through this one path, so guild buildings and shrines apply to eve
   the same DTOs.
 - Loop continues only on `victory`; `defeat` / `timeout` / `ended` stops the run and becomes the
   `stopReason`.
-- Per tier it records outcome, duration, wiped count, `bossHpFrac` (the *lowest* surviving enemy HP
-  fraction), OOM total, and the full `simResult`. Per-player OOM accumulates across tiers into
+- Per tier it records outcome, duration, wiped count, `bossHpFrac`, OOM total, and the full
+  `simResult`. `bossHpFrac` is **Σ remaining HP / Σ max HP over every enemy in the group**, not the
+  lowest or highest single enemy, so multi-enemy tiers (Badger ×2, Swarm ×4) count every enemy.
+  The page shows it as **tier progress, `1 − bossHpFrac`** (the "Tier progress" column, 100% on a
+  victory). Two badgers, one dead and one at 90%, is 55%. Skill Lab shows progress the same way, and
+  `sim-sweep` uses the same formula (its single-tier score is still reported as HP left). Per-player OOM accumulates across tiers into
   `rosterOom`, refreshing the roster badges live.
 - Clicking a tier row opens `#trialResultModalOverlay`, which calls the same `renderResult` with
   `IDS_MODAL` instead of `IDS_MAIN` — one renderer, two targets.

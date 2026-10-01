@@ -1969,15 +1969,14 @@ async function runTrialMode() {
             let wiped = (simResult.playerFinalState || [])
                 .filter((p) => p.currentHitpoints <= 0).length;
 
-            // Lowest surviving enemy HP fraction (the "last boss" health).
+            // Enemy HP left: the whole group's remaining HP over its full HP, so a tier's progress
+            // (shown as 1 − this) counts every enemy rather than only the healthiest or the weakest
+            // one. Two badgers, one dead and one at 90%: 45% left, 55% progress.
             let enemyStates = simResult.enemyFinalState || [];
             let bossHpFrac = null;
-            if (enemyStates.length) {
-                let alive = enemyStates.filter((e) => e.currentHitpoints > 0);
-                let ref = (alive.length ? alive : enemyStates)
-                    .reduce((a, b) => (a.maxHitpoints ? a.currentHitpoints / a.maxHitpoints : 0)
-                        <= (b.maxHitpoints ? b.currentHitpoints / b.maxHitpoints : 0) ? a : b);
-                bossHpFrac = ref.maxHitpoints ? ref.currentHitpoints / ref.maxHitpoints : 0;
+            let enemyMaxHp = enemyStates.reduce((s, e) => s + (e.maxHitpoints || 0), 0);
+            if (enemyMaxHp > 0) {
+                bossHpFrac = enemyStates.reduce((s, e) => s + Math.max(0, e.currentHitpoints || 0), 0) / enemyMaxHp;
             }
 
             // Total OOM (ability casts blocked by lack of mana) across all players.
@@ -2147,8 +2146,9 @@ function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
     }
 
     let rows = tiers.map((x, i) => {
+        // Tier progress: the share of the enemy group's total HP taken off (1 − bossHpFrac).
         let bossHp = x.bossHpFrac == null ? "—"
-            : (x.outcome === "victory" ? "0%" : (x.bossHpFrac * 100).toFixed(1) + "%");
+            : (x.outcome === "victory" ? "100%" : ((1 - x.bossHpFrac) * 100).toFixed(1) + "%");
         let wipeCls = x.wiped > 0 ? ' style="color:#ff6b6b;"' : "";
         // Rows with a stored result are clickable to open the combat-detail modal.
         let clickable = x.result ? ' class="trial-tier-row" data-tier-index="' + i + '" title="' + escapeHtml(t("clickForCombatDetails")) + '"' : "";
@@ -2177,7 +2177,7 @@ function renderTrialModeResult(tiers, stopReason, remainingSeconds = 0) {
         reached.outcome !== "victory") {
         lastBossNote = `<p class="hint">${escapeHtml(t("trialLastBossHp", {
             tier: reached.tier,
-            pct: (reached.bossHpFrac * 100).toFixed(1),
+            pct: ((1 - reached.bossHpFrac) * 100).toFixed(1),
         }))}</p>`;
     }
 

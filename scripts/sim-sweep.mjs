@@ -44,13 +44,12 @@ async function loadKernel() {
 
 const battle = (kernel, job) => JSON.parse(kernel.battle(JSON.stringify(job)));
 
-// Health of the lowest surviving enemy, as a fraction - the page's "boss HP left".
+// Enemy HP left, as a fraction: the whole group's remaining HP over its full HP. The same figure as
+// the page's "enemy HP left".
 function bossHpFrac(res) {
     const enemies = res.enemyFinalState || [];
-    if (!enemies.length) return 0;
-    const frac = (e) => (e.maxHitpoints ? e.currentHitpoints / e.maxHitpoints : 0);
-    const alive = enemies.filter((e) => e.currentHitpoints > 0);
-    return Math.min(...(alive.length ? alive : enemies).map(frac));
+    const max = enemies.reduce((s, e) => s + (e.maxHitpoints || 0), 0);
+    return max > 0 ? enemies.reduce((s, e) => s + Math.max(0, e.currentHitpoints || 0), 0) / max : 0;
 }
 
 function summarize(res) {

@@ -270,7 +270,7 @@ it.
 | `battleOutcome` | `victory` / `defeat` / `timeout` / `ended` |
 | `battleDurationNs` | fight length |
 | `playerFinalState[]` | `hrid`, current/max HP and MP — also the only easy source of **max HP per player** |
-| `enemyFinalState[]` | current/max HP, for "boss HP left" |
+| `enemyFinalState[]` | current/max HP, for "boss HP left" = Σ current / Σ max over every enemy |
 | `battleLog[]` | every event; `kind` is `attack` / `heal` / `death` / `manaGain` / `buffCast` / `consumable` / `enrage` |
 | `abilityCastCounts[hrid][abilityHrid]` | true cast counts including non-damaging abilities |
 | `playerOomCastCount[hrid]` | casts blocked by insufficient mana |
