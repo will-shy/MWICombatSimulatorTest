@@ -317,15 +317,34 @@ the `.roster-card` / `.rc-*` CSS is gone.)
 | --- | --- |
 | # | display position |
 | Player | ⚠ + amber name when `noLoadout`; double-click to rename |
-| Style | chip coloured by `STYLE_COLORS`; magic split by element; a weapon with `defensiveDamage` is the synthetic **wark** (bulwark/tank) style |
+| Style | the raid class chip (see **Classes** below), coloured per class |
 | Weapon | name + enhancement |
 | Auras | **every** aura the player carries, with level, each in its own colour (`AURA_COLORS`); ★ marks the strongest carrier of a single-carrier aura; Insanity is deliberately uncoloured |
 | HP / MP | derived max values |
 | OOM | ability casts blocked by lack of mana in the most recent run (`rosterOom`) |
 | ✕ | remove |
 
-Rows are ordered by `styleRank` (Wark → Ranged → Stab → Smash → Slash → Magic by element → other)
-while keeping each player's **original import index**, so remove/rename/modal target the right entry.
+Rows are ordered by class, keeping each player's **original import index** within a class, so
+remove/rename/modal target the right entry. The class order is the one listed below.
+
+**Classes** (`src/combatClass.js` `raidClass`, shared with the Skill Lab's party list). Each class has
+one name, colour and position, read off the weapon and, for the two support classes, the bar:
+
+| Class (in roster order) | Rule |
+| --- | --- |
+| Wark | a bulwark (a weapon with `defensiveDamage`), whatever its style |
+| Cursed Bow | `/items/cursed_bow` or `_refined`, played as support |
+| Water Support | water weapon **with Mana Spring** |
+| Nature Support | nature weapon **with Rejuvenate**, with or without Mana Spring |
+| Slash / Stab / Smash | the weapon's combat style |
+| Ranged | any ranged weapon except the Cursed Bow |
+| Fire / Water | magic weapon by element |
+| Nature DPS | nature weapon without Rejuvenate |
+| Magic / Unarmed | fallbacks: no known element / no weapon |
+
+Support is tied to the element: Mana Spring on a nature weapon alone, or Rejuvenate on a water one,
+stays a DPS class. Change a class, its colour or its order in `combatClass.js` only, and add the
+label to `groupBattleI18nSetup.js` (en + zh) too. Skill Lab uses the English `label`.
 
 Derived stats are cached in a `WeakMap` keyed by DTO reference because building a `Player` is
 expensive. `assignAuras` invalidates the entry it mutates; a guild-building change replaces the

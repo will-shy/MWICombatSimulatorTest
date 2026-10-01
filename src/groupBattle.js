@@ -17,6 +17,7 @@ import {
     playerDetailHtml, renderDetailedStatus, dtoToSoloExport,
 } from "./playerDetailView.js";
 import { parseGuildTrialRoster, guildTrialEntryToPlayerDTO } from "./guildTrialImport.js";
+import { raidClass } from "./combatClass.js";
 
 // Auto-load every predefined preset from the testPlayers folder. Each JSON file
 // is one solo-export; the preset's display name is derived from the filename
@@ -868,30 +869,8 @@ function refreshHpDependentViews() {
     }
 }
 
-// The five real combat styles map to a color; magic is further split by damage
-// element (fire/water/nature). "unarmed"/unknown falls back to a neutral color.
-// "wark" is a synthetic style for defensive/bulwark players (a bulwark uses the
-// smash style but plays a distinct tank role) - detected via the weapon's
-// defensiveDamage stat, and given its own color.
-const STYLE_COLORS = {
-    "/combat_styles/smash": "#e8963c",   // orange
-    "/combat_styles/slash": "#e05a5a",   // red
-    "/combat_styles/stab": "#e8d24c",    // yellow
-    "/combat_styles/ranged": "#5fbf6f",  // green
-    "/combat_styles/magic": "#9b7fe0",   // violet (overridden by element below)
-    wark: "#4bb3c4",                     // cyan/teal - defensive (bulwark)
-};
-
-// A weapon is a "bulwark" (defensive) if its combat stats include defensiveDamage.
-function isBulwark(hrid) {
-    let cs = itemDetailMap[hrid]?.equipmentDetail?.combatStats;
-    return !!(cs && "defensiveDamage" in cs);
-}
-const MAGIC_ELEMENT_COLORS = {
-    "/damage_types/fire": "#ff6b3d",
-    "/damage_types/water": "#4c9be8",
-    "/damage_types/nature": "#5fbf6f",
-};
+// Class colours and roster order (wark, then each combat style, magic split by element) live in
+// combatClass.js, shared with the Skill Lab so a class looks the same on both pages.
 // Aura abilities. Most end in "_aura", but Insanity, Invincible, and Revive are
 // auras too despite their hrids not following that pattern.
 const AURA_ABILITY_HRIDS = new Set([
@@ -955,8 +934,8 @@ function derivePlayerSummary(dto) {
     let weapon = dto.equipment["/equipment_types/main_hand"] || dto.equipment["/equipment_types/two_hand"];
     summary.weaponName = weapon ? itemName(weapon.hrid) : null;
     summary.weaponEnh = weapon ? (Number(weapon.enhancementLevel) || 0) : 0;
-    // Defensive ("wark") if the equipped weapon is a bulwark.
-    summary.isWark = weapon ? isBulwark(weapon.hrid) : false;
+    // Raid class (Wark, Smash, ..., Nature Support, Water Support) from the weapon and the bar.
+    summary.cls = raidClass(weapon ? weapon.hrid : "", (dto.abilities || []).filter(Boolean).map((a) => a.hrid));
 
     // Auras: every special/aura ability on the bar, in slot order. A player can carry more than
     // one - Invincible alongside Guardian Aura, say - and taking only the first hid the rest.
@@ -968,45 +947,18 @@ function derivePlayerSummary(dto) {
     return summary;
 }
 
-// Resolve the accent color for a player's card from combat style + element.
+// The roster's class chip: colour, label and sort order all come from combatClass.js, shared with
+// the Skill Lab.
 function styleColor(summary) {
-    if (summary.isWark) return STYLE_COLORS.wark;
-    if (summary.combatStyleHrid === "/combat_styles/magic") {
-        return MAGIC_ELEMENT_COLORS[summary.damageType] || STYLE_COLORS["/combat_styles/magic"];
-    }
-    return STYLE_COLORS[summary.combatStyleHrid] || "var(--dim)";
+    return summary.cls.color;
 }
 
-// Fixed display order for the roster:
-//   Wark → Ranged → Stab → Smash → Slash → Magic(Nature → Fire → Water) → other.
-// Lower rank sorts first. Within the same rank, original import order is kept.
 function styleRank(summary) {
-    if (summary.isWark) return 0;
-    switch (summary.combatStyleHrid) {
-        case "/combat_styles/ranged": return 1;
-        case "/combat_styles/stab": return 2;
-        case "/combat_styles/smash": return 3;
-        case "/combat_styles/slash": return 4;
-        case "/combat_styles/magic":
-            switch (summary.damageType) {
-                case "/damage_types/nature": return 5;
-                case "/damage_types/fire": return 6;
-                case "/damage_types/water": return 7;
-                default: return 8; // magic, unknown element
-            }
-        default: return 9; // unarmed / unknown
-    }
+    return summary.cls.rank;
 }
 
-// Short label for the style chip, e.g. "Ranged", "Magic · Fire", or "Wark".
 function styleLabel(summary) {
-    if (summary.isWark) return t("styleWark");
-    if (!summary.combatStyleHrid) return t("unarmed");
-    let base = combatStyleName(summary.combatStyleHrid);
-    if (summary.combatStyleHrid === "/combat_styles/magic" && summary.damageType) {
-        return base + " · " + damageTypeName(summary.damageType);
-    }
-    return base;
+    return t(summary.cls.labelKey);
 }
 
 // AoE abilities carried as a debuff or as support rather than for their damage. What they are

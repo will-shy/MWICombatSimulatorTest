@@ -17,6 +17,7 @@ import { parseGuildTrialRoster, guildTrialEntryToImportSet } from "./guildTrialI
 import {
     playerDetailHtml, renderDetailedStatus, dtoToSoloExport, describeTrigger, abilityName, itemName,
 } from "./playerDetailView.js";
+import { raidClass } from "./combatClass.js";
 
 const STORE_KEY = "mwiSkillLabConfigV3";
 const PARTY_KEY = "mwiSkillLabPartyV1";
@@ -47,14 +48,6 @@ const BUILDING_LABELS = {
     gym: "Gym",
     archeryRange: "Archery Range",
     mysticalStudy: "Mystical Study",
-};
-
-const STYLE_COLORS = {
-    "/combat_styles/smash": "#e8963c",
-    "/combat_styles/slash": "#e05a5a",
-    "/combat_styles/stab": "#e8d24c",
-    "/combat_styles/ranged": "#5fbf6f",
-    "/combat_styles/magic": "#9b7fe0",
 };
 
 const MONSTER_GROUPS = (monsterGroupsData.groups || []).map((g) => ({
@@ -219,6 +212,26 @@ function memberStyle(member) {
     return styles && styles.length ? styles[0] : "";
 }
 
+// The member's raid class (Wark, Smash, ..., Nature Support, Water Support) from their weapon and
+// their own bar as imported, with the same name, colour and order as the Group Battle roster.
+function memberClass(member) {
+    const weapon = member && memberWeapon(member);
+    const bar = member ? baselineAbilitySlots(member.importSet).filter(Boolean).map((s) => s.hrid) : [];
+    return raidClass(weapon ? weapon.itemHrid : "", bar);
+}
+
+function classChip(c) {
+    return `<span class="class-chip" style="background:${c.color}">${esc(c.label)}</span>`;
+}
+
+// Party members in class order, keeping import order within a class. Each entry keeps its import
+// index, which is what the member's player hrid and the focus selection are keyed on.
+function membersByClass() {
+    return party.members
+        .map((m, i) => ({ m, i, c: memberClass(m) }))
+        .sort((a, b) => a.c.rank - b.c.rank || a.i - b.i);
+}
+
 // The extra-buff stack every group battle player fights with (worker.js builds the same one), so
 // the preview's combat status matches the run.
 function extraBuffsFor(dto) {
@@ -369,16 +382,16 @@ function renderParty() {
         <details class="roster">
             <summary>Show the party (${party.members.length}). Click a member to select them.</summary>
             <table>
-                <thead><tr><th>#</th><th>Member</th><th>Weapon</th><th style="text-align:left">Abilities (as imported)</th></tr></thead>
+                <thead><tr><th>#</th><th>Member</th><th>Class</th><th>Weapon</th><th style="text-align:left">Abilities (as imported)</th></tr></thead>
                 <tbody>
-                    ${party.members.map((m, i) => {
+                    ${membersByClass().map(({ m, i, c }, pos) => {
                         const weapon = memberWeapon(m);
-                        const color = STYLE_COLORS[memberStyle(m)] || "#9aa0aa";
                         const own = baselineAbilitySlots(m.importSet).filter(Boolean)
                             .map((s) => `${shortName(s.hrid)} ${s.level}`).join(" · ");
                         return `<tr class="member-row${i === fi ? " is-focus" : ""}" data-member="${i}">
-                            <td>${i + 1}</td>
-                            <td><span class="dot" style="background:${color}"></span>${esc(m.name)}${m.noLoadout ? ' <span class="warn" title="No saved trial loadout">⚠</span>' : ""}</td>
+                            <td>${pos + 1}</td>
+                            <td>${esc(m.name)}${m.noLoadout ? ' <span class="warn" title="No saved trial loadout">⚠</span>' : ""}</td>
+                            <td style="text-align:left">${classChip(c)}</td>
                             <td class="dim">${weapon ? esc(itemName(weapon.itemHrid)) + (weapon.enhancementLevel ? " +" + weapon.enhancementLevel : "") : "—"}</td>
                             <td class="kit-cell">${esc(own || "none")}</td>
                         </tr>`;
@@ -489,8 +502,15 @@ function renderFocus() {
     }
     sel.disabled = false;
     el("focusPreview").disabled = false;
-    sel.innerHTML = party.members.map((m) =>
-        `<option value="${esc(m.name)}"${m.name === state.focusName ? " selected" : ""}>${esc(m.name)}</option>`).join("");
+    // Grouped by class, in the roster's order.
+    const groups = [];
+    for (const { m, c } of membersByClass()) {
+        const label = c.label;
+        if (!groups.length || groups[groups.length - 1].label !== label) groups.push({ label, members: [] });
+        groups[groups.length - 1].members.push(m);
+    }
+    sel.innerHTML = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.members.map((m) =>
+        `<option value="${esc(m.name)}"${m.name === state.focusName ? " selected" : ""}>${esc(m.name)}</option>`).join("")}</optgroup>`).join("");
 
     const m = focusMember();
     if (!m) { el("focusSummary").textContent = ""; return; }
@@ -548,7 +568,7 @@ function renderVariants() {
         return;
     }
     const style = memberStyle(member);
-    const color = STYLE_COLORS[style] || "#9aa0aa";
+    const color = memberClass(member).color;
     host.innerHTML = state.variants.map((v, idx) => `
         <div class="variant" data-idx="${idx}" style="border-left-color:${color}">
             <div class="variant-head">

@@ -20,6 +20,7 @@ File/line pointers are given so this doc can be re-verified rather than trusted.
 | `src/guildTrialImport.js` | The guild trial export → import set, shared with the Group Battle page (`docs/group_battle.md` §4.1). |
 | `src/combatsimulator/importSet.js` | `importSetToPlayerDTO(set, hrid, abilityOverride)` builds every DTO, including each kit. |
 | `src/playerDetailView.js` | The preview dialog (shared with Group Battle). `describeTrigger` is exported for the kit slots. |
+| `src/combatClass.js` | Class colour and order from the weapon, shared with the Group Battle roster. |
 | `src/combatsimulator/skillLab.js` | **The old JS-kernel squad bench.** The page uses only `ABILITY_LIST` and `enemyPreview` from it. It stays because `src/skillLabMatrix.js` (the Boss Matrix batch driver, `webpack.matrix.config.js`) still runs on it. |
 
 ---
@@ -121,6 +122,17 @@ focus player's numbers reach the page:
 
 Source keys are shown through `sourceName`: `autoAttack`, `damageOverTime`, full ability hrids,
 and bare-hrid weapon procs such as `bloom`, which are shown with "(proc)".
+
+### Party list
+
+The party table and the player dropdown are in **class order**: Wark → Cursed Bow → Water Support →
+Nature Support → Slash → Stab → Smash → Ranged → Fire → Water → Nature DPS → unknown (magic with no
+element, unarmed), with import order kept within a class. The class comes from `raidClass` in `src/combatClass.js`, read off the weapon
+and, for the support classes, the member's bar as imported (nature + Rejuvenate, water + Mana
+Spring). The Group Battle roster uses the same module, so a class has the same name, colour and
+order on both pages. The rules are in `docs/group_battle.md` §4.8. Sorting is display
+only: a member keeps their import index, which their `player${i+1}` hrid and the focus selection
+are keyed on. The dropdown groups members under one heading per class.
 
 ### Persistence
 
