@@ -83,9 +83,20 @@ consequence: a kit that swaps an equipped ability (own level, say 85) for an unk
 
 ### Runs and seeds
 
-- Default **10 runs per kit** (max 50). Run `i` of every kit uses seed `1000 + (i+1)·7919`, so
-  results are reproducible and kits start from the same rolls. As `docs/harness.md` §7 warns,
-  a changed bar diverges from the first differing event, so same-seed runs aren't paired samples.
+- Default **10 runs per kit** (max 50).
+- **Every run uses a different seed.** Kits don't share seeds, and neither do runs of one kit. Run
+  `k` (in job order) uses `baseSeed + k·0x9e3779b9`, which is distinct for every `k` because the
+  multiplier is odd.
+- **Base seed:** the "base seed" field (`state.baseSeed`, persisted) is empty by default, which
+  draws a random base per click, so pressing Run again gives fresh samples. Set it to a uint32 to
+  **reproduce** a result: the same base seed, party, kits (count and order), runs per kit, mode,
+  level/budget and guild buildings give the same numbers. Job order is interleaved by run and then
+  by kit, so adding, removing or reordering a kit changes which seed every later run gets. The
+  results summary shows the base seed used, and clicking it puts it in the field. Each run's own seed
+  is in the per-run list, so a single run can also be replayed through the kernel in Node
+  (`docs/harness.md` §4). Shared seeds were dropped because, as `docs/harness.md` §7 warns, a
+  changed bar diverges from the first differing event anyway, so same-seed runs were never paired
+  samples.
 - Jobs are interleaved by run index and spread over a pool of `worker.js` instances
   (`min(6, cores − 1)`). Each worker holds its own kernel. **Stop** terminates the pool, and the
   next run starts a fresh one.

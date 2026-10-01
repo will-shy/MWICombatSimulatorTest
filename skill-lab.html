@@ -432,8 +432,8 @@
         <p class="intro">
             Load your guild's combat-trial export, pick one member, and give them several ability kits. Every kit
             is run in the <b>whole party's</b> fight, exactly as the Group Battle page runs it, on the same wasm
-            combat kernel. Only that member's bar changes. Each kit is run <b>10 times</b> by default, on the same
-            seeds as every other kit, and the results table compares each kit's average damage with the first kit.
+            combat kernel. Only that member's bar changes. Each kit is run <b>10 times</b> by default, every run on
+            its own seed, and the results table compares each kit's average damage with the first kit.
             An ability the player already has equipped keeps their own level. The export has no level for any other
             ability, so those start at <b>60</b> for the 0-cooldown spells (Entangle, Fireball, Water Strike),
             <b>20</b> for auras and other special abilities, and <b>40</b> for everything else. You can change any level.
@@ -477,6 +477,8 @@
                         <label class="inline"><span id="capLabel">time cap (s)</span>
                             <input type="number" id="timeCap" min="60" max="86400" step="60" style="width:84px"></label>
                         <label class="inline">runs per kit <input type="number" id="runCount" min="1" max="50"></label>
+                        <label class="inline" title="Leave empty for a new random seed on every run. Set it to reproduce a result: the same seed, party, kits, mode and settings give the same numbers.">base seed
+                            <input type="text" id="baseSeed" inputmode="numeric" placeholder="random" style="width:110px"></label>
                     </div>
                     <div id="enemyPreview"></div>
                 </div>

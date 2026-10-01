@@ -32,9 +32,18 @@ const MAX_RUNS = 50;
 const DEFAULT_TIME_CAP = 3600;
 const ABILITY_BY_HRID = ABILITY_LIST.reduce((acc, a) => (acc[a.hrid] = a, acc), {});
 
-// Fixed seed ladder: run i of every kit uses the same seed, so the same config always gives the
-// same numbers and two kits start from identical rolls.
-const seedFor = (run) => 1000 + (run + 1) * 7919;
+// Every run gets its own seed: run k of a simulation uses baseSeed + k·φ (φ = 0x9e3779b9, odd, so
+// the seeds are all distinct). The base is drawn fresh on every click unless the page has one set,
+// in which case the same setup reproduces the same numbers. Kits are independent samples rather
+// than sharing rolls, which a changed bar would not keep anyway (docs/harness.md §7).
+const randomSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
+const seedFor = (baseSeed, k) => ((baseSeed + Math.imul(k, 0x9e3779b9)) >>> 0) || 1;
+
+// A typed base seed as a uint32, or null for "random".
+function parseSeed(text) {
+    const s = String(text ?? "").trim();
+    return /^\d+$/.test(s) && Number(s) <= 0xffffffff ? Number(s) : null;
+}
 
 // One worker per core, leaving one for the page. Each holds its own kernel, and a long fight's
 // battle log is tens of MB while it is being reduced, so the pool is capped.
@@ -91,6 +100,7 @@ function defaultState() {
         trialBudget: DEFAULT_TIME_CAP,
         singleCap: DEFAULT_TIME_CAP,
         runs: DEFAULT_RUNS,
+        baseSeed: "", // "" = random on every run
         focusName: "",
         nextId: 2,
         variants: [],
@@ -446,6 +456,7 @@ function renderFight() {
     el("capLabel").textContent = trial ? "time budget (s)" : "time cap (s)";
     el("timeCap").value = trial ? state.trialBudget : state.singleCap;
     el("runCount").value = state.runs;
+    el("baseSeed").value = state.baseSeed || "";
 
     renderEnemyPreview();
 }
@@ -782,6 +793,7 @@ async function run() {
         focusName: member.name,
         partySize: basePlayers.length,
         guildBuildingLevels: { ...guildBuildingLevels },
+        baseSeed: parseSeed(state.baseSeed) ?? randomSeed(),
     };
     const variants = state.variants.map((v) => ({ id: v.id, label: v.label, kit: v.kit.map((s) => (s ? { ...s } : null)) }));
 
@@ -803,7 +815,7 @@ async function run() {
                 mode: settings.mode,
                 level: settings.level,
                 timeCapSeconds: settings.timeCapSeconds,
-                seed: seedFor(r),
+                seed: seedFor(settings.baseSeed, jobs.length),
             });
             index.push(vi);
         });
@@ -971,7 +983,14 @@ function renderResult() {
             <div class="stat"><span>Runs per kit</span><b>${settings.runs}</b></div>
         </div>
         <p class="hint" style="margin:0 0 10px">${variants.length * settings.runs} runs in ${wallSeconds.toFixed(1)} s.
-            Run <i>i</i> of every kit uses the same seed.</p>`;
+            Every run uses its own seed, shown per run in each kit's breakdown. Base seed
+            <button type="button" class="btn small" id="reuseSeed" title="Put this base seed in the base seed field, so the next run reproduces these numbers">${settings.baseSeed}</button>
+            <span class="dim">(click to reuse; the same party, kits, mode and settings give the same numbers)</span></p>`;
+    el("reuseSeed").addEventListener("click", () => {
+        state.baseSeed = String(settings.baseSeed);
+        el("baseSeed").value = state.baseSeed;
+        saveState();
+    });
 
     el("resultTable").innerHTML = `
         <div style="overflow-x:auto">
@@ -1146,6 +1165,12 @@ document.addEventListener("DOMContentLoaded", () => {
         e.target.value = v;
         if (state.mode === "trial") state.trialBudget = v;
         else state.singleCap = v;
+        saveState();
+    });
+    el("baseSeed").addEventListener("change", (e) => {
+        const seed = parseSeed(e.target.value);
+        state.baseSeed = seed == null ? "" : String(seed);
+        e.target.value = state.baseSeed; // anything that isn't a uint32 clears back to random
         saveState();
     });
     el("runCount").addEventListener("change", (e) => {
