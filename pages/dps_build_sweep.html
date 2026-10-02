@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DPS Build Sweep</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body, h1, h2, h3, p, table, ul, li { margin: 0; padding: 0; }
+
+/* Shared token set with index.html and trial_scorecard_L160.html. */
+:root {
+    --bg: #e9ebe7; --surface: #f8f9f6; --surface-2: #f1f3ef;
+    --ink: #171b18; --ink-2: #4b544e; --ink-3: #737d76;
+    --rule: #d2d7cf; --rule-strong: #b8c0b5;
+    --melee: #b4661f; --ranged: #2f7d43; --magic: #6a4fbf;
+    --top: #2f7d43; --top-soft: #2f7d4324; --tie-soft: #2f7d4314;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --measure: 68ch; --page: 1080px;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #101311; --surface: #171b18; --surface-2: #1d2220;
+        --ink: #e9ece7; --ink-2: #a5aea7; --ink-3: #7b857e;
+        --rule: #2a302c; --rule-strong: #3b433e;
+        --melee: #f0a45a; --ranged: #74cf83; --magic: #ad93ea;
+        --top: #74cf83; --top-soft: #74cf8326; --tie-soft: #74cf8316;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #101311; --surface: #171b18; --surface-2: #1d2220;
+    --ink: #e9ece7; --ink-2: #a5aea7; --ink-3: #7b857e;
+    --rule: #2a302c; --rule-strong: #3b433e;
+    --melee: #f0a45a; --ranged: #74cf83; --magic: #ad93ea;
+    --top: #74cf83; --top-soft: #74cf8326; --tie-soft: #74cf8316;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.page { max-width: var(--page); margin: 0 auto; padding: 56px 24px 96px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3, table { font-family: var(--display); }
+h1 { font-size: clamp(2.1rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.025em; line-height: 1.04; text-wrap: balance; }
+h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+h3 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+p { max-width: var(--measure); }
+a { color: inherit; }
+strong { font-weight: 600; }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.standfirst { font-size: 1.12rem; color: var(--ink-2); }
+.note { font-size: 0.95rem; color: var(--ink-2); }
+header { display: flex; flex-direction: column; gap: 18px; }
+.rule-top { height: 3px; background: var(--ink); max-width: 96px; }
+.specs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.chip { font-family: var(--mono); font-size: 0.74rem; padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--ink-2); background: var(--surface); }
+.chip b { color: var(--ink); font-weight: 600; }
+section { display: flex; flex-direction: column; gap: 18px; }
+.section-head { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--rule-strong); padding-top: 14px; }
+.section-head .eyebrow.r { color: var(--ranged); }
+.section-head .eyebrow.n { color: var(--magic); }
+ul.points { display: flex; flex-direction: column; gap: 8px; padding-left: 1.1em; max-width: var(--measure); }
+ul.points li { color: var(--ink-2); font-size: 0.97rem; }
+ul.points li strong { color: var(--ink); }
+
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+thead th { font-family: var(--mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); text-align: center; padding: 0 8px 8px; border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+thead th:first-child { text-align: left; padding-left: 0; }
+tbody th { text-align: left; font-weight: 600; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+
+table.plan { min-width: 720px; }
+table.plan thead th { text-align: left; }
+table.plan td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); font-family: var(--body); font-size: 0.92rem; color: var(--ink-2); vertical-align: top; }
+table.plan.diag { min-width: 640px; }
+table.plan.diag td { font-family: var(--display); font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
+table.plan.diag thead th:not(:first-child) { text-align: right; }
+table.plan th .who { display: block; font-family: var(--mono); font-size: 0.7rem; font-weight: 400; color: var(--ink-3); }
+.status { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 7px; border-radius: 2px; border: 1px solid var(--rule-strong); }
+.status.fixed { color: var(--top); border-color: var(--top); }
+.status.proposed { color: var(--ink-3); border-style: dashed; }
+
+table.matrix { min-width: 760px; table-layout: fixed; }
+table.matrix thead th:first-child, table.matrix tbody th { width: 34%; white-space: normal; }
+table.matrix td { text-align: center; padding: 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+table.matrix td .main { display: block; font-weight: 600; font-size: 0.95rem; color: var(--ink-3); }
+table.matrix td .sub { display: block; font-family: var(--mono); font-size: 0.68rem; color: var(--ink-3); }
+table.matrix td.tie { background: var(--tie-soft); }
+table.matrix td.tie .main { color: var(--ink); }
+table.matrix td.top { background: var(--top-soft); }
+table.matrix td.top .main { color: var(--top); }
+table.matrix td.chosen { outline: 2px solid var(--ink); outline-offset: -3px; border-radius: 3px; }
+table.matrix td.na { color: var(--ink-3); }
+.tag { font-family: var(--mono); font-size: 0.62rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); border: 1px solid var(--rule-strong); border-radius: 2px; padding: 0 4px; vertical-align: 2px; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 22px; height: 14px; border-radius: 2px; display: inline-block; border: 1px solid var(--rule); }
+.sw.top { background: var(--top-soft); }
+.sw.tie { background: var(--tie-soft); }
+.sw.chosen { outline: 2px solid var(--ink); outline-offset: -3px; }
+
+footer { border-top: 1px solid var(--rule-strong); padding-top: 16px; font-family: var(--mono); font-size: 0.72rem; line-height: 1.7; color: var(--ink-3); }
+footer a { color: var(--ink-2); }
+
+@media (max-width: 620px) {
+    .page { padding: 40px 16px 64px; gap: 40px; }
+    body { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+    <div class="rule-top"></div>
+    <div class="eyebrow">Arsenal · simulated · 2 Oct 2026</div>
+    <h1>DPS Build Sweep</h1>
+    <p class="standfirst">Which ability bar each DPS class should run against each trial boss. Every build was run through the full Trial Mode ladder with the rest of the raid held fixed, and scored on what it does for the whole raid, not just the player running it.</p>
+    <div class="specs">
+        <span class="chip">roster <b>Hedgehog export, 28 Sep</b> · 56 players</span>
+        <span class="chip">mode <b>Trial ladder</b> · 3600 s budget</span>
+        <span class="chip"><b>10 runs</b> per build · seed 1843724591</span>
+        <span class="chip">abilities <b>Lv 40</b> · Fireball / Water Strike / Entangle Lv 60 · Insanity Lv 20</span>
+        <span class="chip">triggers <b>game default</b></span>
+        <span class="chip">buildings <b>library 2 · dojo 4 · others 1 · dining 0</b></span>
+    </div>
+</header>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Result</div>
+        <h2>The plan</h2>
+    </div>
+    <div class="scroll"><table class="plan">
+        <thead><tr><th>Class</th><th>Badger · Chameleon · Jellyfish · Hedgehog</th><th>Swarm</th><th>Status</th></tr></thead>
+        <tbody>
+<tr>
+    <th scope="row">Cursed Bow<span class="who">Toooom0529</span></th>
+    <td>Insanity · Frenzy · Berserk · Precision · Pestilent Shot</td><td>Insanity · Frenzy · Berserk · Penetrating Shot · Rain of Arrows</td><td><span class="status fixed">fixed</span></td></tr>
+<tr>
+    <th scope="row">Ranged<span class="who">17 Insanity players</span></th>
+    <td>Insanity · Frenzy · Berserk · Pestilent Shot · Steady Shot</td><td>Insanity · Frenzy · Berserk · Pestilent Shot · Rain of Arrows</td><td><span class="status fixed">fixed</span></td></tr>
+<tr>
+    <th scope="row">Fire<span class="who">Dedende (from the Badger export)</span></th>
+    <td>Badger, Hedgehog: Insanity · Elemental Affinity · Smoke Burst · Firestorm · Fireball. Chameleon, Jellyfish: Life Drain in place of Firestorm</td><td>Insanity · Elemental Affinity · Smoke Burst · Firestorm · Fireball</td><td><span class="status proposed">proposed</span></td></tr>
+<tr>
+    <th scope="row">Water<span class="who">DexterMorgan, EvilBunny</span></th>
+    <td>Insanity · Elemental Affinity · Frost Surge · Smoke Burst · Water Strike</td><td>same</td><td><span class="status proposed">proposed</span></td></tr>
+<tr>
+    <th scope="row">Nature DPS<span class="who">Skellt</span></th>
+    <td>Mystic Aura · Elemental Affinity · Frost Surge · Nature's Veil · Firestorm</td><td>same</td><td><span class="status proposed">proposed</span></td></tr>
+        </tbody>
+    </table></div>
+    <ul class="points">
+        <li><strong>Who is changed.</strong> Within a class, only players running Insanity get the build. Players carrying a raid aura keep their bar, because swapping the aura out would change the whole raid. That leaves CastorTroyRanged, AzureCamilla, WillZ, dimibay, Tinbad, Jinbad (Ranged) and OTTOWAAO (Cursed Bow) as imported. Skellt, the only Nature DPS, carries Mystic Aura, so he keeps it and takes each build in his other four slots.</li>
+        <li><strong>Supports are fixed.</strong> Anyone bringing Mana Spring is a Mana Support and keeps their bar. Anyone bringing Rejuvenate without Mana Spring is a Nature Support, whatever their weapon, and runs their slot-1 ability + Rejuvenate + Smoke Burst + Toxic Pollen + Entangle in every Fire, Water and Nature run. Six of the seven already did; maage swaps Precision for Smoke Burst (Lv 40). The Cursed Bow and Ranged runs came before this and use the supports as imported.</li>
+        <li><strong>Fire.</strong> Nobody in the Hedgehog roster uses a fire weapon, so Dedende (blazing trident, CL132, Insanity) was taken from the 28 Sep Badger export and added as a 57th player. The Fire runs use that 57-player raid. Monsters scale with party size, so the extra player raises the raid DPS baseline by 1.5–5% per boss. Compare Fire's numbers with each other, not with the other sections'.</li>
+        <li><strong>Fixed</strong> rows were chosen and held in place for the Water and Nature runs. <strong>Proposed</strong> rows are this page's recommendation and are not confirmed yet.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Reading the tables</div>
+        <h2>How each cell is scored</h2>
+    </div>
+    <div class="legend">
+        <span><i class="sw top"></i>best on this boss</span>
+        <span><i class="sw tie"></i>statistically tied with the best (one-sided Mann-Whitney p &gt; 0.05)</span>
+        <span><i class="sw chosen"></i>the build in the plan</span>
+    </div>
+    <p class="note">Hover a cell for the mean, spread and progress behind it. Progress is tiers cleared plus the fraction of the next tier's boss HP removed, so 7.35 means T7 cleared and the T8 boss 35% down. Badger, Chameleon and Swarm use up the full 3600 s budget on every run, so progress there measures damage output and the spread is tight. Jellyfish and Hedgehog end when the raid wipes, so their numbers are noisier.</p>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow r">Ranged · fixed</div>
+        <h2>Cursed Bow: precision on one target, rain on Swarm</h2>
+    </div>
+    <p class="note">Toooom0529's own DPS for each build, with Ranged left as imported. One player barely moves raid DPS (under 0.5% in a joint test with Ranged), so this one is picked on his own damage. The small figure is the gap to the best build on that boss.</p>
+    <div class="scroll"><table class="matrix"><thead><tr><th>Build</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead><tbody>
+<tr><th scope="row">Precision + Pestilent Shot</th><td class="top chosen" title="57.2 ±1.5 DPS · progress 7.11"><span class="main">57.2</span><span class="sub">best</span></td><td class="top chosen" title="83.8 ±1.9 DPS · progress 9.25"><span class="main">83.8</span><span class="sub">best</span></td><td class="top chosen" title="94.7 ±3.3 DPS · progress 7.63"><span class="main">94.7</span><span class="sub">best</span></td><td class="top chosen" title="47.3 ±1.5 DPS · progress 7.71"><span class="main">47.3</span><span class="sub">best</span></td><td class="" title="70.0 ±1.3 DPS · progress 7.33"><span class="main">70.0</span><span class="sub">−10.4%</span></td></tr>
+<tr><th scope="row">Pestilent Shot + Steady Shot</th><td class="" title="55.7 ±0.9 DPS · progress 7.08"><span class="main">55.7</span><span class="sub">−2.6%</span></td><td class="tie" title="82.8 ±1.7 DPS · progress 9.25"><span class="main">82.8</span><span class="sub">−1.2%</span></td><td class="tie" title="92.6 ±3.7 DPS · progress 7.97"><span class="main">92.6</span><span class="sub">−2.2%</span></td><td class="tie" title="46.0 ±3.5 DPS · progress 7.67"><span class="main">46.0</span><span class="sub">−2.7%</span></td><td class="" title="70.8 ±1.8 DPS · progress 7.32"><span class="main">70.8</span><span class="sub">−9.5%</span></td></tr>
+<tr><th scope="row">Penetrating Shot + Rain of Arrows</th><td class="" title="49.1 ±1.1 DPS · progress 7.09"><span class="main">49.1</span><span class="sub">−14.2%</span></td><td class="" title="72.0 ±1.5 DPS · progress 9.24"><span class="main">72.0</span><span class="sub">−14.1%</span></td><td class="" title="84.5 ±2.7 DPS · progress 7.78"><span class="main">84.5</span><span class="sub">−10.7%</span></td><td class="" title="40.4 ±2.8 DPS · progress 7.76"><span class="main">40.4</span><span class="sub">−14.6%</span></td><td class="top chosen" title="78.2 ±2.7 DPS · progress 7.33"><span class="main">78.2</span><span class="sub">best</span></td></tr>
+</tbody></table></div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow r">Ranged · fixed</div>
+        <h2>Ranged: keep Pestilent Shot on every boss</h2>
+    </div>
+    <p class="note">Raid progress for each Ranged build, with Cursed Bow on its fixed builds. The small figure is the Ranged players' own average DPS.</p>
+    <div class="scroll"><table class="matrix"><thead><tr><th>Build</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead><tbody>
+<tr><th scope="row">Pestilent Shot + Steady Shot <span class="tag">ref</span></th><td class="top chosen" title="progress 7.057 ±0.035 · raid 2961 DPS · Ranged 48.5 DPS · Pestilent uptime 61%"><span class="main">7.06</span><span class="sub">48.5 dps</span></td><td class="top chosen" title="progress 9.246 ±0.038 · raid 3486 DPS · Ranged 70.7 DPS · Pestilent uptime 92%"><span class="main">9.25</span><span class="sub">70.7 dps</span></td><td class="top chosen" title="progress 7.923 ±0.354 · raid 3283 DPS · Ranged 80.0 DPS · Pestilent uptime 92%"><span class="main">7.92</span><span class="sub">80.0 dps</span></td><td class="top chosen" title="progress 7.790 ±0.112 · raid 1984 DPS · Ranged 40.0 DPS · Pestilent uptime 91%"><span class="main">7.79</span><span class="sub">40.0 dps</span></td><td class="" title="progress 7.305 ±0.017 · raid 3587 DPS · Ranged 63.9 DPS · Pestilent uptime 28%"><span class="main">7.30</span><span class="sub">63.9 dps</span></td></tr>
+<tr><th scope="row">Pestilent Shot + Penetrating Shot</th><td class="" title="progress 6.991 ±0.029 · raid 2926 DPS · Ranged 45.7 DPS · Pestilent uptime 61%"><span class="main">6.99</span><span class="sub">45.7 dps</span></td><td class="" title="progress 9.089 ±0.022 · raid 3408 DPS · Ranged 65.7 DPS · Pestilent uptime 92%"><span class="main">9.09</span><span class="sub">65.7 dps</span></td><td class="tie" title="progress 7.723 ±0.370 · raid 3224 DPS · Ranged 75.7 DPS · Pestilent uptime 92%"><span class="main">7.72</span><span class="sub">75.7 dps</span></td><td class="" title="progress 7.685 ±0.147 · raid 1955 DPS · Ranged 37.3 DPS · Pestilent uptime 91%"><span class="main">7.68</span><span class="sub">37.3 dps</span></td><td class="" title="progress 7.323 ±0.024 · raid 3599 DPS · Ranged 65.6 DPS · Pestilent uptime 28%"><span class="main">7.32</span><span class="sub">65.6 dps</span></td></tr>
+<tr><th scope="row">Pestilent Shot + Rain of Arrows</th><td class="" title="progress 6.933 ±0.032 · raid 2896 DPS · Ranged 44.0 DPS · Pestilent uptime 61%"><span class="main">6.93</span><span class="sub">44.0 dps</span></td><td class="" title="progress 9.028 ±0.034 · raid 3378 DPS · Ranged 63.4 DPS · Pestilent uptime 93%"><span class="main">9.03</span><span class="sub">63.4 dps</span></td><td class="" title="progress 7.671 ±0.289 · raid 3184 DPS · Ranged 72.9 DPS · Pestilent uptime 92%"><span class="main">7.67</span><span class="sub">72.9 dps</span></td><td class="" title="progress 7.660 ±0.138 · raid 1942 DPS · Ranged 36.0 DPS · Pestilent uptime 92%"><span class="main">7.66</span><span class="sub">36.0 dps</span></td><td class="chosen" title="progress 7.328 ±0.022 · raid 3602 DPS · Ranged 66.0 DPS · Pestilent uptime 28%"><span class="main">7.33</span><span class="sub">66.0 dps</span></td></tr>
+<tr><th scope="row">Penetrating Shot + Rain of Arrows</th><td class="" title="progress 6.921 ±0.018 · raid 2890 DPS · Ranged 43.7 DPS · Pestilent uptime 58%"><span class="main">6.92</span><span class="sub">43.7 dps</span></td><td class="" title="progress 8.977 ±0.038 · raid 3353 DPS · Ranged 61.8 DPS · Pestilent uptime 89%"><span class="main">8.98</span><span class="sub">61.8 dps</span></td><td class="" title="progress 7.666 ±0.290 · raid 3154 DPS · Ranged 71.1 DPS · Pestilent uptime 90%"><span class="main">7.67</span><span class="sub">71.1 dps</span></td><td class="" title="progress 7.590 ±0.179 · raid 1928 DPS · Ranged 35.0 DPS · Pestilent uptime 84%"><span class="main">7.59</span><span class="sub">35.0 dps</span></td><td class="top" title="progress 7.353 ±0.017 · raid 3618 DPS · Ranged 69.9 DPS · Pestilent uptime 24%"><span class="main">7.35</span><span class="sub">69.9 dps</span></td></tr>
+</tbody></table></div>
+    <ul class="points">
+        <li><strong>One target:</strong> Pestilent + Steady Shot beats every alternative tested, by 0.1–0.27 tiers. Penetrating + Rain is last on all four single-target bosses.</li>
+        <li><strong>Swarm:</strong> Penetrating + Rain comes out on top, but by only 0.025 tiers over Pestilent + Rain. The plan uses Pestilent + Rain so the 17 Insanity Ranged keep casting the armor debuff.</li>
+        <li><strong>Pestilent coverage.</strong> Pestilent Shot lowers the target's armor and fire, water and nature resistance by about 14% for 12 s, on hit only. On Swarm its uptime is 28% with Pestilent + Rain and 24% with Penetrating + Rain. The 6 aura carriers still cast it in every case. In the first joint test, moving Ranged off Pestilent on Swarm raised their own DPS 9% but raid DPS only 0.3%: the rest of the raid lost most of the gain.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow n">Magic · proposed</div>
+        <h2>Fire: Firestorm, except Life Drain on Chameleon and Jellyfish</h2>
+    </div>
+    <p class="note">Same scoring as Water, for Dedende in the 57-player raid. Every build also carries Insanity.</p>
+    <div class="scroll"><table class="matrix"><thead><tr><th>Build</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead><tbody>
+<tr><th scope="row">Elemental Affinity + Smoke Burst + Life Drain + Fireball</th><td class="" title="raid 3051 ±13 DPS (baseline 3073) · own 109.5 ±3.0 DPS · progress 7.19"><span class="main">−0.7%</span><span class="sub">own −2%</span></td><td class="tie chosen" title="raid 3543 ±18 DPS (baseline 3541) · own 33.6 ±1.0 DPS · progress 9.32"><span class="main">+0.1%</span><span class="sub">own best</span></td><td class="tie chosen" title="raid 3372 ±86 DPS (baseline 3399) · own 56.5 ±2.3 DPS · progress 7.85"><span class="main">−0.8%</span><span class="sub">own best</span></td><td class="tie" title="raid 2065 ±58 DPS (baseline 2040) · own 54.0 ±2.0 DPS · progress 7.77"><span class="main">+1.2%</span><span class="sub">own −2%</span></td><td class="" title="raid 3657 ±11 DPS (baseline 3668) · own 70.7 ±1.6 DPS · progress 7.38"><span class="main">−0.3%</span><span class="sub">own −24%</span></td></tr>
+<tr><th scope="row">Precision + Smoke Burst + Life Drain + Fireball</th><td class="tie" title="raid 3058 ±12 DPS (baseline 3073) · own 100.5 ±1.5 DPS · progress 7.20"><span class="main">−0.5%</span><span class="sub">own −10%</span></td><td class="top" title="raid 3553 ±14 DPS (baseline 3541) · own 33.2 ±0.9 DPS · progress 9.33"><span class="main">+0.3%</span><span class="sub">own −1%</span></td><td class="top" title="raid 3429 ±131 DPS (baseline 3399) · own 54.9 ±2.0 DPS · progress 7.71"><span class="main">+0.9%</span><span class="sub">own −3%</span></td><td class="tie" title="raid 2049 ±79 DPS (baseline 2040) · own 50.9 ±4.0 DPS · progress 7.62"><span class="main">+0.5%</span><span class="sub">own −8%</span></td><td class="" title="raid 3660 ±9 DPS (baseline 3668) · own 65.7 ±1.6 DPS · progress 7.38"><span class="main">−0.2%</span><span class="sub">own −29%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Smoke Burst + Firestorm + Fireball</th><td class="top chosen" title="raid 3062 ±9 DPS (baseline 3073) · own 112.2 ±1.8 DPS · progress 7.21"><span class="main">−0.3%</span><span class="sub">own best</span></td><td class="tie" title="raid 3542 ±22 DPS (baseline 3541) · own 32.3 ±0.9 DPS · progress 9.31"><span class="main">±0%</span><span class="sub">own −4%</span></td><td class="tie" title="raid 3406 ±101 DPS (baseline 3399) · own 50.4 ±1.6 DPS · progress 7.74"><span class="main">+0.2%</span><span class="sub">own −11%</span></td><td class="top chosen" title="raid 2073 ±61 DPS (baseline 2040) · own 55.3 ±2.9 DPS · progress 7.76"><span class="main">+1.6%</span><span class="sub">own best</span></td><td class="top chosen" title="raid 3670 ±11 DPS (baseline 3668) · own 93.1 ±1.4 DPS · progress 7.39"><span class="main">+0.1%</span><span class="sub">own best</span></td></tr>
+</tbody></table></div>
+    <ul class="points">
+        <li>One player out of 57 doesn't move raid DPS: all three builds are tied on every boss except Badger, where Precision is behind. The pick is made on his own damage.</li>
+        <li><strong>Firestorm</strong> (his current bar) is his best on Badger, Hedgehog and Swarm. On Swarm it's 24% ahead, since it hits all four enemies. <strong>Life Drain</strong> is his best on Jellyfish (13% ahead) and Chameleon (4% ahead). Precision in place of Elemental Affinity never wins.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow n">Magic · proposed</div>
+        <h2>Water: Smoke Burst everywhere</h2>
+    </div>
+    <p class="note">The big figure is raid DPS against the baseline (Cursed Bow and Ranged on their fixed builds, everyone else as imported). The small figure is the two Water players' own DPS against their best build on that boss. Every build also carries Insanity.</p>
+    <div class="scroll"><table class="matrix"><thead><tr><th>Build</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead><tbody>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Ice Spear + Water Strike</th><td class="" title="raid 2936 ±16 DPS (baseline 2970) · own 74.3 ±1.7 DPS · progress 7.01"><span class="main">−1.1%</span><span class="sub">own −4%</span></td><td class="" title="raid 3465 ±16 DPS (baseline 3495) · own 20.6 ±0.6 DPS · progress 9.20"><span class="main">−0.9%</span><span class="sub">own −6%</span></td><td class="tie" title="raid 3302 ±113 DPS (baseline 3273) · own 31.3 ±1.4 DPS · progress 7.68"><span class="main">+0.9%</span><span class="sub">own −17%</span></td><td class="tie" title="raid 1995 ±46 DPS (baseline 2010) · own 25.4 ±0.9 DPS · progress 7.70"><span class="main">−0.7%</span><span class="sub">own −11%</span></td><td class="" title="raid 3579 ±13 DPS (baseline 3603) · own 62.6 ±1.4 DPS · progress 7.29"><span class="main">−0.7%</span><span class="sub">own −17%</span></td></tr>
+<tr><th scope="row">Precision + Frost Surge + Ice Spear + Water Strike</th><td class="" title="raid 2956 ±13 DPS (baseline 2970) · own 70.7 ±1.3 DPS · progress 7.05"><span class="main">−0.5%</span><span class="sub">own −9%</span></td><td class="tie" title="raid 3492 ±14 DPS (baseline 3495) · own 21.3 ±0.5 DPS · progress 9.26"><span class="main">−0.1%</span><span class="sub">own −3%</span></td><td class="tie" title="raid 3338 ±110 DPS (baseline 3273) · own 31.6 ±1.0 DPS · progress 7.49"><span class="main">+2.0%</span><span class="sub">own −16%</span></td><td class="tie" title="raid 1987 ±23 DPS (baseline 2010) · own 24.6 ±1.4 DPS · progress 7.73"><span class="main">−1.2%</span><span class="sub">own −14%</span></td><td class="top" title="raid 3600 ±10 DPS (baseline 3603) · own 61.4 ±0.9 DPS · progress 7.32"><span class="main">−0.1%</span><span class="sub">own −19%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Life Drain + Water Strike</th><td class="" title="raid 2949 ±12 DPS (baseline 2970) · own 77.5 ±2.5 DPS · progress 7.03"><span class="main">−0.7%</span><span class="sub">own best</span></td><td class="" title="raid 3466 ±20 DPS (baseline 3495) · own 22.0 ±1.1 DPS · progress 9.21"><span class="main">−0.8%</span><span class="sub">own best</span></td><td class="tie" title="raid 3303 ±97 DPS (baseline 3273) · own 37.7 ±1.9 DPS · progress 7.73"><span class="main">+0.9%</span><span class="sub">own best</span></td><td class="" title="raid 1964 ±28 DPS (baseline 2010) · own 25.8 ±0.9 DPS · progress 7.74"><span class="main">−2.3%</span><span class="sub">own −10%</span></td><td class="" title="raid 3581 ±14 DPS (baseline 3603) · own 62.5 ±1.5 DPS · progress 7.29"><span class="main">−0.6%</span><span class="sub">own −18%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Smoke Burst + Water Strike</th><td class="top chosen" title="raid 2969 ±13 DPS (baseline 2970) · own 76.3 ±1.8 DPS · progress 7.07"><span class="main">±0%</span><span class="sub">own −2%</span></td><td class="top chosen" title="raid 3501 ±11 DPS (baseline 3495) · own 21.0 ±0.7 DPS · progress 9.28"><span class="main">+0.2%</span><span class="sub">own −4%</span></td><td class="top chosen" title="raid 3355 ±115 DPS (baseline 3273) · own 32.6 ±1.1 DPS · progress 7.69"><span class="main">+2.5%</span><span class="sub">own −14%</span></td><td class="top chosen" title="raid 1999 ±38 DPS (baseline 2010) · own 28.6 ±0.7 DPS · progress 7.73"><span class="main">−0.6%</span><span class="sub">own best</span></td><td class="tie chosen" title="raid 3599 ±10 DPS (baseline 3603) · own 61.7 ±1.1 DPS · progress 7.32"><span class="main">−0.1%</span><span class="sub">own −19%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Firestorm + Water Strike</th><td class="" title="raid 2943 ±12 DPS (baseline 2970) · own 75.1 ±1.7 DPS · progress 7.02"><span class="main">−0.9%</span><span class="sub">own −3%</span></td><td class="" title="raid 3460 ±19 DPS (baseline 3495) · own 19.5 ±0.9 DPS · progress 9.19"><span class="main">−1.0%</span><span class="sub">own −11%</span></td><td class="tie" title="raid 3301 ±118 DPS (baseline 3273) · own 29.4 ±1.4 DPS · progress 7.68"><span class="main">+0.9%</span><span class="sub">own −22%</span></td><td class="tie" title="raid 1968 ±27 DPS (baseline 2010) · own 25.3 ±0.8 DPS · progress 7.73"><span class="main">−2.1%</span><span class="sub">own −11%</span></td><td class="" title="raid 3590 ±13 DPS (baseline 3603) · own 75.9 ±2.2 DPS · progress 7.31"><span class="main">−0.3%</span><span class="sub">own best</span></td></tr>
+</tbody></table></div>
+    <ul class="points">
+        <li>Elemental Affinity + Frost Surge + Smoke Burst + Water Strike is best or tied for raid DPS on all five bosses, even where Life Drain gives the player more personal damage. Smoke Burst cuts the target's accuracy and evasion by about 21%, so everyone hitting it lands more often.</li>
+        <li><strong>Why not Firestorm on Swarm?</strong> It is the best build for the two Water players' own damage, about 29 DPS more than Smoke Burst. But the other 54 players do about 38 DPS less, so raid DPS ends 0.25% lower (p = 0.02). The only two builds that keep the rest of the raid at its best both add an evasion debuff. Smoke Burst puts its own on the target. Precision makes Frost Surge land more, raising its uptime from 41% to 50%. Firestorm, Ice Spear and Life Drain add no debuff. Enemy accuracy, damage taken and deaths don't change between builds, so the gap is all offense. It is small, though: if the guild cares about the Water players' own numbers, Firestorm costs the raid very little.</li>
+    </ul>
+    <div class="scroll"><table class="plan diag">
+        <thead><tr><th>Water build, Swarm</th><th>2 Water DPS</th><th>other 54 DPS</th><th>raid DPS</th><th>raid hit rate</th><th>Smoke uptime</th><th>Surge uptime</th></tr></thead>
+        <tbody>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Smoke Burst + Water Strike</th><td>123</td><td>3476</td><td>3599</td><td>61.36%</td><td>26%</td><td>42%</td></tr>
+<tr><th scope="row">Precision + Frost Surge + Ice Spear + Water Strike</th><td>123</td><td>3477</td><td>3600</td><td>61.65%</td><td>24%</td><td>50%</td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Firestorm + Water Strike</th><td>152</td><td>3438</td><td>3590</td><td>61.11%</td><td>24%</td><td>41%</td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Life Drain + Water Strike</th><td>125</td><td>3456</td><td>3581</td><td>60.89%</td><td>24%</td><td>41%</td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Ice Spear + Water Strike</th><td>125</td><td>3454</td><td>3579</td><td>60.85%</td><td>24%</td><td>41%</td></tr>
+        </tbody>
+    </table></div>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow n">Magic · proposed</div>
+        <h2>Nature DPS: Surge + Veil + Firestorm everywhere</h2>
+    </div>
+    <p class="note">Same scoring as Water, for Skellt. He keeps Mystic Aura in slot 1.</p>
+    <div class="scroll"><table class="matrix"><thead><tr><th>Build</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead><tbody>
+<tr><th scope="row">Elemental Affinity + Smoke Burst + Life Drain + Entangle</th><td class="" title="raid 2964 ±17 DPS (baseline 2970) · own 98.3 ±3.1 DPS · progress 7.06"><span class="main">−0.2%</span><span class="sub">own −2%</span></td><td class="" title="raid 3503 ±11 DPS (baseline 3495) · own 30.2 ±0.9 DPS · progress 9.28"><span class="main">+0.2%</span><span class="sub">own −3%</span></td><td class="" title="raid 3248 ±65 DPS (baseline 3273) · own 60.1 ±2.8 DPS · progress 7.97"><span class="main">−0.8%</span><span class="sub">own −2%</span></td><td class="tie" title="raid 2019 ±62 DPS (baseline 2010) · own 39.7 ±2.1 DPS · progress 7.64"><span class="main">+0.4%</span><span class="sub">own best</span></td><td class="" title="raid 3606 ±15 DPS (baseline 3603) · own 52.7 ±1.6 DPS · progress 7.33"><span class="main">+0.1%</span><span class="sub">own −45%</span></td></tr>
+<tr><th scope="row">Precision + Smoke Burst + Life Drain + Entangle</th><td class="" title="raid 2957 ±12 DPS (baseline 2970) · own 91.6 ±1.7 DPS · progress 7.05"><span class="main">−0.4%</span><span class="sub">own −8%</span></td><td class="tie" title="raid 3510 ±16 DPS (baseline 3495) · own 31.1 ±1.0 DPS · progress 9.29"><span class="main">+0.4%</span><span class="sub">own best</span></td><td class="top" title="raid 3335 ±87 DPS (baseline 3273) · own 60.8 ±2.9 DPS · progress 7.77"><span class="main">+1.9%</span><span class="sub">own −1%</span></td><td class="tie" title="raid 2015 ±55 DPS (baseline 2010) · own 39.3 ±1.5 DPS · progress 7.67"><span class="main">+0.2%</span><span class="sub">own −1%</span></td><td class="" title="raid 3597 ±8 DPS (baseline 3603) · own 51.9 ±1.5 DPS · progress 7.32"><span class="main">−0.2%</span><span class="sub">own −46%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Nature's Veil + Life Drain + Entangle</th><td class="" title="raid 2958 ±15 DPS (baseline 2970) · own 100.0 ±1.9 DPS · progress 7.05"><span class="main">−0.4%</span><span class="sub">own best</span></td><td class="" title="raid 3470 ±14 DPS (baseline 3495) · own 28.1 ±1.3 DPS · progress 9.21"><span class="main">−0.7%</span><span class="sub">own −10%</span></td><td class="tie" title="raid 3258 ±116 DPS (baseline 3273) · own 61.5 ±3.7 DPS · progress 7.91"><span class="main">−0.5%</span><span class="sub">own best</span></td><td class="tie" title="raid 1993 ±52 DPS (baseline 2010) · own 34.3 ±1.5 DPS · progress 7.73"><span class="main">−0.9%</span><span class="sub">own −13%</span></td><td class="" title="raid 3604 ±8 DPS (baseline 3603) · own 71.8 ±2.2 DPS · progress 7.33"><span class="main">±0%</span><span class="sub">own −26%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Nature's Veil + Firestorm + Entangle</th><td class="" title="raid 2952 ±11 DPS (baseline 2970) · own 88.8 ±1.8 DPS · progress 7.04"><span class="main">−0.6%</span><span class="sub">own −11%</span></td><td class="" title="raid 3465 ±14 DPS (baseline 3495) · own 23.4 ±0.9 DPS · progress 9.20"><span class="main">−0.9%</span><span class="sub">own −25%</span></td><td class="tie" title="raid 3242 ±130 DPS (baseline 3273) · own 48.6 ±2.5 DPS · progress 7.91"><span class="main">−1.0%</span><span class="sub">own −21%</span></td><td class="tie" title="raid 1988 ±54 DPS (baseline 2010) · own 31.0 ±1.2 DPS · progress 7.72"><span class="main">−1.1%</span><span class="sub">own −22%</span></td><td class="" title="raid 3605 ±14 DPS (baseline 3603) · own 84.9 ±2.3 DPS · progress 7.33"><span class="main">+0.1%</span><span class="sub">own −12%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Precision + Nature's Veil + Firestorm</th><td class="" title="raid 2951 ±16 DPS (baseline 2970) · own 78.5 ±1.2 DPS · progress 7.04"><span class="main">−0.6%</span><span class="sub">own −21%</span></td><td class="" title="raid 3476 ±21 DPS (baseline 3495) · own 21.6 ±0.5 DPS · progress 9.23"><span class="main">−0.6%</span><span class="sub">own −30%</span></td><td class="tie" title="raid 3314 ±88 DPS (baseline 3273) · own 43.2 ±1.7 DPS · progress 7.55"><span class="main">+1.3%</span><span class="sub">own −30%</span></td><td class="tie" title="raid 1994 ±53 DPS (baseline 2010) · own 26.2 ±1.2 DPS · progress 7.61"><span class="main">−0.8%</span><span class="sub">own −34%</span></td><td class="" title="raid 3602 ±13 DPS (baseline 3603) · own 89.5 ±1.8 DPS · progress 7.33"><span class="main">±0%</span><span class="sub">own −7%</span></td></tr>
+<tr><th scope="row">Elemental Affinity + Frost Surge + Nature's Veil + Firestorm</th><td class="top chosen" title="raid 2980 ±15 DPS (baseline 2970) · own 79.4 ±1.5 DPS · progress 7.09"><span class="main">+0.4%</span><span class="sub">own −21%</span></td><td class="top chosen" title="raid 3517 ±12 DPS (baseline 3495) · own 19.7 ±0.6 DPS · progress 9.31"><span class="main">+0.6%</span><span class="sub">own −37%</span></td><td class="tie chosen" title="raid 3326 ±76 DPS (baseline 3273) · own 38.3 ±1.5 DPS · progress 7.68"><span class="main">+1.6%</span><span class="sub">own −38%</span></td><td class="top chosen" title="raid 2022 ±61 DPS (baseline 2010) · own 25.5 ±1.1 DPS · progress 7.64"><span class="main">+0.6%</span><span class="sub">own −36%</span></td><td class="top chosen" title="raid 3644 ±11 DPS (baseline 3603) · own 96.6 ±2.0 DPS · progress 7.40"><span class="main">+1.2%</span><span class="sub">own best</span></td></tr>
+</tbody></table></div>
+    <ul class="points">
+        <li>Elemental Affinity + Frost Surge + Nature's Veil + Firestorm is top or tied for raid DPS on all five bosses. On Swarm it is also clearly his best own damage, since all three of those skills hit every enemy.</li>
+        <li><strong>The cost on one target.</strong> It gives up 20–38% of his own DPS against Smoke Burst + Life Drain. The raid still comes out ahead, for the same reason as Water: Frost Surge's evasion debuff on every enemy helps everyone else more. Affinity + Smoke + Drain + Entangle, his current bar, is behind for the raid on Badger (p = 0.03) and Chameleon (p = 0.002). The margins are 0.2–0.6% of raid DPS, from one player.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Caveats</div>
+        <h2>What this doesn't settle</h2>
+    </div>
+    <ul class="points">
+        <li><strong>Small classes, small effects.</strong> Water is 2 players, and Fire and Nature DPS are 1 each, out of a 56–57-player raid. Their builds move raid DPS by 3% at most, often inside the run-to-run spread. The close calls need about 40 runs to separate.</li>
+        <li><strong>Level 40 everywhere.</strong> The real bars run skills at levels 45–68, so these builds are compared with each other, not with what players field today.</li>
+        <li><strong>One class at a time.</strong> Fire, Water and Nature were each varied with the other two left as imported. All three can bring Smoke Burst, and Water and Nature can both bring Frost Surge. Neither debuff stacks across casters, so a joint run could shift the picks.</li>
+        <li><strong>Guild buildings</strong> are the harness defaults. The export doesn't carry them.</li>
+    </ul>
+</section>
+
+<footer>
+    Arsenal internal pages · <a href="index.html">all pages</a> · runs on the wasm combat kernel through the headless harness (<a href="https://github.com/will-shy/MWICombatSimulatorTest/blob/testing/docs/harness.md">docs/harness.md</a>), the same engine as the <a href="../group-battle.html">Group Battle simulator</a>.
+</footer>
+
+</div>
+</body>
+</html>
