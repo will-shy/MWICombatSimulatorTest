@@ -1,0 +1,845 @@
+{
+ "generated": "2026-10-02",
+ "level": 160,
+ "cap": 900,
+ "runs": 40,
+ "baseSeed": 170,
+ "normalisation": {
+  "k": 1.0286133771589034,
+  "over": [
+   "smash",
+   "stab",
+   "ranged",
+   "fire",
+   "water",
+   "natureDps"
+  ]
+ },
+ "current": {
+  "smash": [
+   0.169,
+   0.312,
+   0.209,
+   0.235,
+   0.246
+  ],
+  "slash": [
+   0.174,
+   0.344,
+   0.265,
+   0.27,
+   0.16
+  ],
+  "stab": [
+   0.196,
+   0.383,
+   0.291,
+   0.304,
+   0.168
+  ],
+  "cursedBow": [
+   0.148,
+   0.29,
+   0.388,
+   0.254,
+   0.176
+  ],
+  "ranged": [
+   0.154,
+   0.301,
+   0.387,
+   0.263,
+   0.19
+  ],
+  "fire": [
+   0.292,
+   0.12,
+   0.207,
+   0.28,
+   0.209
+  ],
+  "water": [
+   0.301,
+   0.115,
+   0.182,
+   0.197,
+   0.232
+  ],
+  "natureDps": [
+   0.259,
+   0.107,
+   0.232,
+   0.207,
+   0.227
+  ]
+ },
+ "roster": [
+  {
+   "cls": "wark",
+   "preset": "wark",
+   "n": 2,
+   "main": [
+    "defense",
+    "stamina"
+   ]
+  },
+  {
+   "cls": "natureSupport",
+   "preset": "nature_healer_revive",
+   "n": 6,
+   "main": [
+    "attack",
+    "magic"
+   ]
+  },
+  {
+   "cls": "manaSupport",
+   "preset": "nature_healer_revive",
+   "n": 2,
+   "main": [
+    "attack",
+    "magic"
+   ]
+  },
+  {
+   "cls": "slash",
+   "preset": "slash_T95",
+   "n": 2,
+   "main": [
+    "attack",
+    "melee"
+   ]
+  },
+  {
+   "cls": "stab",
+   "preset": "stab_T95",
+   "n": 3,
+   "main": [
+    "attack",
+    "melee"
+   ]
+  },
+  {
+   "cls": "cursedBow",
+   "preset": "bow_T95",
+   "n": 2,
+   "main": [
+    "attack",
+    "ranged"
+   ]
+  },
+  {
+   "cls": "fire",
+   "preset": "fire_T95",
+   "n": 3,
+   "main": [
+    "attack",
+    "magic"
+   ]
+  },
+  {
+   "cls": "water",
+   "preset": "water_T95",
+   "n": 3,
+   "main": [
+    "attack",
+    "magic"
+   ]
+  },
+  {
+   "cls": "natureDps",
+   "preset": "nature_aoe_T95",
+   "n": 11,
+   "main": [
+    "attack",
+    "magic"
+   ]
+  },
+  {
+   "cls": "ranged",
+   "preset": "xbow_T95",
+   "n": 11,
+   "main": [
+    "attack",
+    "ranged"
+   ]
+  },
+  {
+   "cls": "smash",
+   "preset": "smash_T95",
+   "n": 11,
+   "main": [
+    "attack",
+    "melee"
+   ]
+  }
+ ],
+ "auras": [
+  [
+   "fierce_aura",
+   "slash",
+   0
+  ],
+  [
+   "speed_aura",
+   "slash",
+   1
+  ],
+  [
+   "critical_aura",
+   "cursedBow",
+   0
+  ],
+  [
+   "guardian_aura",
+   "wark",
+   0
+  ],
+  [
+   "mystic_aura",
+   "natureSupport",
+   0
+  ]
+ ],
+ "bosses": [
+  {
+   "boss": "Trial Badger",
+   "outcomes": {
+    "victory": 40
+   },
+   "seconds": 581.5672976503862,
+   "deaths": 0,
+   "survivors": 56,
+   "hpLeft": 0,
+   "oom": 714.4,
+   "totalHp": 1829880,
+   "perClass": {
+    "smash": {
+     "n": 11,
+     "score": 0.15879943893018927,
+     "sd": 0.0033087327546513796,
+     "winScore": 0.15879943893018927
+    },
+    "stab": {
+     "n": 3,
+     "score": 0.1802516171375236,
+     "sd": 0.005825175160973835,
+     "winScore": 0.1802516171375236
+    },
+    "ranged": {
+     "n": 11,
+     "score": 0.14463305100058657,
+     "sd": 0.0026130255996180034,
+     "winScore": 0.14463305100058657
+    },
+    "fire": {
+     "n": 3,
+     "score": 0.3014063656066493,
+     "sd": 0.012872436215924633,
+     "winScore": 0.3014063656066493
+    },
+    "water": {
+     "n": 3,
+     "score": 0.269911554755147,
+     "sd": 0.01238133799395937,
+     "winScore": 0.269911554755147
+    },
+    "natureDps": {
+     "n": 11,
+     "score": 0.24196849753498667,
+     "sd": 0.00663323821462412,
+     "winScore": 0.24196849753498667
+    },
+    "cursedBow": {
+     "n": 1,
+     "score": 0.1153763147151134,
+     "sd": 0.008250379105115327,
+     "winScore": 0.1153763147151134
+    }
+   },
+   "bars": {
+    "wark": [
+     "provoke",
+     "taunt",
+     "spike_shell",
+     "retribution"
+    ],
+    "slash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "maim"
+    ],
+    "smash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "fracturing_impact"
+    ],
+    "stab": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "puncture"
+    ],
+    "cursedBow": [
+     "frenzy",
+     "berserk",
+     "penetrating_shot",
+     "rain_of_arrows"
+    ],
+    "ranged": [
+     "frenzy",
+     "berserk",
+     "pestilent_shot",
+     "steady_shot"
+    ],
+    "fire": [
+     "elemental_affinity",
+     "smoke_burst",
+     "firestorm",
+     "fireball"
+    ],
+    "water": [
+     "precision",
+     "frost_surge",
+     "ice_spear",
+     "water_strike"
+    ],
+    "natureDps": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "entangle"
+    ],
+    "natureSupport": [
+     "rejuvenate",
+     "smoke_burst",
+     "toxic_pollen",
+     "entangle"
+    ],
+    "manaSupport": [
+     "rejuvenate",
+     "mana_spring",
+     "life_drain",
+     "entangle"
+    ]
+   }
+  },
+  {
+   "boss": "Trial Chameleon",
+   "outcomes": {
+    "victory": 40
+   },
+   "seconds": 511.26946018281905,
+   "deaths": 0.1,
+   "survivors": 56,
+   "hpLeft": 0,
+   "oom": 476.9,
+   "totalHp": 1524900,
+   "perClass": {
+    "smash": {
+     "n": 11,
+     "score": 0.3059855323993578,
+     "sd": 0.005908905407382807,
+     "winScore": 0.3059855323993578
+    },
+    "stab": {
+     "n": 3,
+     "score": 0.37075522832379126,
+     "sd": 0.011295875824072517,
+     "winScore": 0.37075522832379126
+    },
+    "ranged": {
+     "n": 11,
+     "score": 0.29933379626099665,
+     "sd": 0.005267474276828083,
+     "winScore": 0.29933379626099665
+    },
+    "fire": {
+     "n": 3,
+     "score": 0.12072934651622087,
+     "sd": 0.0074217869569213725,
+     "winScore": 0.12072934651622087
+    },
+    "water": {
+     "n": 3,
+     "score": 0.1178795020135589,
+     "sd": 0.005478701099028861,
+     "winScore": 0.1178795020135589
+    },
+    "natureDps": {
+     "n": 11,
+     "score": 0.10410782439351382,
+     "sd": 0.004297551523479277,
+     "winScore": 0.10410782439351382
+    },
+    "cursedBow": {
+     "n": 1,
+     "score": 0.27839213583676353,
+     "sd": 0.012951665182659297,
+     "winScore": 0.27839213583676353
+    }
+   },
+   "bars": {
+    "wark": [
+     "provoke",
+     "taunt",
+     "spike_shell",
+     "retribution"
+    ],
+    "slash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "maim"
+    ],
+    "smash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "fracturing_impact"
+    ],
+    "stab": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "puncture"
+    ],
+    "cursedBow": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "pestilent_shot"
+    ],
+    "ranged": [
+     "frenzy",
+     "berserk",
+     "pestilent_shot",
+     "steady_shot"
+    ],
+    "fire": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "fireball"
+    ],
+    "water": [
+     "precision",
+     "frost_surge",
+     "ice_spear",
+     "water_strike"
+    ],
+    "natureDps": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "entangle"
+    ],
+    "natureSupport": [
+     "rejuvenate",
+     "smoke_burst",
+     "toxic_pollen",
+     "entangle"
+    ],
+    "manaSupport": [
+     "rejuvenate",
+     "mana_spring",
+     "life_drain",
+     "entangle"
+    ]
+   }
+  },
+  {
+   "boss": "Trial Jellyfish",
+   "outcomes": {
+    "victory": 40
+   },
+   "seconds": 441.7590908680139,
+   "deaths": 2.75,
+   "survivors": 55.35,
+   "hpLeft": 0,
+   "oom": 257.35,
+   "totalHp": 1379040,
+   "perClass": {
+    "smash": {
+     "n": 11,
+     "score": 0.2163528233792388,
+     "sd": 0.01106989944875371,
+     "winScore": 0.2163528233792388
+    },
+    "stab": {
+     "n": 3,
+     "score": 0.28293641213791837,
+     "sd": 0.01852712311865762,
+     "winScore": 0.28293641213791837
+    },
+    "ranged": {
+     "n": 11,
+     "score": 0.3665260511554142,
+     "sd": 0.008798684399725667,
+     "winScore": 0.3665260511554142
+    },
+    "fire": {
+     "n": 3,
+     "score": 0.21185605575671024,
+     "sd": 0.012171499366744849,
+     "winScore": 0.21185605575671024
+    },
+    "water": {
+     "n": 3,
+     "score": 0.1849735784914171,
+     "sd": 0.010970790293954038,
+     "winScore": 0.1849735784914171
+    },
+    "natureDps": {
+     "n": 11,
+     "score": 0.2333869464655102,
+     "sd": 0.009650922273852105,
+     "winScore": 0.2333869464655102
+    },
+    "cursedBow": {
+     "n": 1,
+     "score": 0.3407479726380888,
+     "sd": 0.024726979580477725,
+     "winScore": 0.3407479726380888
+    }
+   },
+   "bars": {
+    "wark": [
+     "provoke",
+     "taunt",
+     "spike_shell",
+     "retribution"
+    ],
+    "slash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "maim"
+    ],
+    "smash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "fracturing_impact"
+    ],
+    "stab": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "puncture"
+    ],
+    "cursedBow": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "pestilent_shot"
+    ],
+    "ranged": [
+     "frenzy",
+     "berserk",
+     "pestilent_shot",
+     "steady_shot"
+    ],
+    "fire": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "fireball"
+    ],
+    "water": [
+     "precision",
+     "frost_surge",
+     "ice_spear",
+     "water_strike"
+    ],
+    "natureDps": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "entangle"
+    ],
+    "natureSupport": [
+     "rejuvenate",
+     "smoke_burst",
+     "toxic_pollen",
+     "entangle"
+    ],
+    "manaSupport": [
+     "rejuvenate",
+     "mana_spring",
+     "life_drain",
+     "entangle"
+    ]
+   }
+  },
+  {
+   "boss": "Trial Hedgehog",
+   "outcomes": {
+    "victory": 40
+   },
+   "seconds": 521.2431725226213,
+   "deaths": 0,
+   "survivors": 56,
+   "hpLeft": 0,
+   "oom": 384.75,
+   "totalHp": 1060800,
+   "perClass": {
+    "smash": {
+     "n": 11,
+     "score": 0.21642531521284925,
+     "sd": 0.0054023317690632695,
+     "winScore": 0.21642531521284925
+    },
+    "stab": {
+     "n": 3,
+     "score": 0.28214385697266453,
+     "sd": 0.011438694661273466,
+     "winScore": 0.28214385697266453
+    },
+    "ranged": {
+     "n": 11,
+     "score": 0.2503607097650701,
+     "sd": 0.005498812015102585,
+     "winScore": 0.2503607097650701
+    },
+    "fire": {
+     "n": 3,
+     "score": 0.278709622334536,
+     "sd": 0.015984749390798168,
+     "winScore": 0.278709622334536
+    },
+    "water": {
+     "n": 3,
+     "score": 0.2017687505915983,
+     "sd": 0.007716895773356212,
+     "winScore": 0.2017687505915983
+    },
+    "natureDps": {
+     "n": 11,
+     "score": 0.19892856805422515,
+     "sd": 0.008285963928513124,
+     "winScore": 0.19892856805422515
+    },
+    "cursedBow": {
+     "n": 1,
+     "score": 0.2369906950788105,
+     "sd": 0.017253724190362477,
+     "winScore": 0.2369906950788105
+    }
+   },
+   "bars": {
+    "wark": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "shield_bash"
+    ],
+    "slash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "maim"
+    ],
+    "smash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "fracturing_impact"
+    ],
+    "stab": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "puncture"
+    ],
+    "cursedBow": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "pestilent_shot"
+    ],
+    "ranged": [
+     "frenzy",
+     "berserk",
+     "pestilent_shot",
+     "steady_shot"
+    ],
+    "fire": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "fireball"
+    ],
+    "water": [
+     "precision",
+     "frost_surge",
+     "ice_spear",
+     "water_strike"
+    ],
+    "natureDps": [
+     "elemental_affinity",
+     "smoke_burst",
+     "life_drain",
+     "entangle"
+    ],
+    "natureSupport": [
+     "rejuvenate",
+     "quick_aid",
+     "smoke_burst",
+     "toxic_pollen"
+    ],
+    "manaSupport": [
+     "rejuvenate",
+     "quick_aid",
+     "mana_spring",
+     "toxic_pollen"
+    ]
+   }
+  },
+  {
+   "boss": "Trial Swarm",
+   "outcomes": {
+    "victory": 40
+   },
+   "seconds": 565.8032017401076,
+   "deaths": 0.575,
+   "survivors": 56,
+   "hpLeft": 0,
+   "oom": 1108.2,
+   "totalHp": 2121600,
+   "perClass": {
+    "smash": {
+     "n": 11,
+     "score": 0.23738237055677716,
+     "sd": 0.005396571501320625,
+     "winScore": 0.23738237055677716
+    },
+    "stab": {
+     "n": 3,
+     "score": 0.1676209376096131,
+     "sd": 0.008962475531377639,
+     "winScore": 0.1676209376096131
+    },
+    "ranged": {
+     "n": 11,
+     "score": 0.19081631989619355,
+     "sd": 0.005806547677786052,
+     "winScore": 0.19081631989619355
+    },
+    "fire": {
+     "n": 3,
+     "score": 0.21195151083080485,
+     "sd": 0.010701968512087864,
+     "winScore": 0.21195151083080485
+    },
+    "water": {
+     "n": 3,
+     "score": 0.2267006436152385,
+     "sd": 0.009870718397698215,
+     "winScore": 0.2267006436152385
+    },
+    "natureDps": {
+     "n": 11,
+     "score": 0.20637122149540957,
+     "sd": 0.004399042817491353,
+     "winScore": 0.20637122149540957
+    },
+    "cursedBow": {
+     "n": 1,
+     "score": 0.1705785834873314,
+     "sd": 0.010014731808582474,
+     "winScore": 0.1705785834873314
+    }
+   },
+   "bars": {
+    "wark": [
+     "provoke",
+     "taunt",
+     "spike_shell",
+     "retribution"
+    ],
+    "slash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "maim"
+    ],
+    "smash": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "fracturing_impact"
+    ],
+    "stab": [
+     "frenzy",
+     "berserk",
+     "precision",
+     "puncture"
+    ],
+    "cursedBow": [
+     "frenzy",
+     "berserk",
+     "penetrating_shot",
+     "rain_of_arrows"
+    ],
+    "ranged": [
+     "frenzy",
+     "berserk",
+     "pestilent_shot",
+     "rain_of_arrows"
+    ],
+    "fire": [
+     "elemental_affinity",
+     "smoke_burst",
+     "firestorm",
+     "fireball"
+    ],
+    "water": [
+     "precision",
+     "frost_surge",
+     "firestorm",
+     "water_strike"
+    ],
+    "natureDps": [
+     "elemental_affinity",
+     "frost_surge",
+     "natures_veil",
+     "firestorm"
+    ],
+    "natureSupport": [
+     "rejuvenate",
+     "smoke_burst",
+     "toxic_pollen",
+     "entangle"
+    ],
+    "manaSupport": [
+     "rejuvenate",
+     "mana_spring",
+     "toxic_pollen",
+     "entangle"
+    ]
+   }
+  }
+ ],
+ "l170Outcomes": {
+  "Trial Badger": {
+   "victory": 40
+  },
+  "Trial Chameleon": {
+   "victory": 40
+  },
+  "Trial Jellyfish": {
+   "victory": 33,
+   "defeat": 7
+  },
+  "Trial Hedgehog": {
+   "victory": 40
+  },
+  "Trial Swarm": {
+   "victory": 27,
+   "defeat": 13
+  }
+ }
+}

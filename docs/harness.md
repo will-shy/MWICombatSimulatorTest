@@ -357,6 +357,30 @@ This skips the import step, so it can't catch an edit the importer would have tr
 Use it for building levels, slot order, triggers and time caps. For anything that goes through the
 importer's resolution (equipment, levels, which abilities count as equipped), edit the roster.
 
+### Building a synthetic roster from presets
+
+For a "what if every X had Y" roster (the Boss Matrix), skip the page and build the job in Node from
+`data/testPlayers/*.json`, the way `soloExportToDTO` (`groupBattle.js:97`) does: equipment by
+`itemLocationHrid` → `/equipment_types/<slot>`, `food`/`drinks` `[null, null, null]`, abilities
+`{ hrid, level, triggers }` in slot order, no shrines. Enemies use the spec `buildWorkerEnemies`
+emits (`{ trial: true, hrid, level, name, uniqueHrid: "<hrid>#<i>" }`). Two traps:
+
+- **Presets don't carry the same achievements.** The T95 DPS presets have none; `wark` and
+  `nature_healer_revive` have 73, which completes the Elite tier (+2% damage). Set `achievements`
+  the same for everyone, e.g. every `/achievement_tiers/elite` hrid → `true`.
+- **Aura strength scales with the carrier's skill** (`group_battle.md` §4.5), so give each aura to a
+  player at the top of that skill. When several tie, pick a class you aren't scoring, so every scored
+  player keeps Insanity.
+
+At L170 with the guide's bars on a 56-player preset roster, Jellyfish (7/40) and Swarm (13/40) wiped
+under real damage. Report scores over victories as well as over all runs. At L160 (T7) the same
+roster won 200/200, so L160 is the level for a matrix without wipes.
+
+**The guide's bars cover every damage debuff in the game data:** Maim, Fracturing Impact,
+Puncture, Pestilent Shot, Smoke Burst, Frost Surge, Toxic Pollen, the Cursed Bow's curse, and
+Griffin Bulwark's weaken. Only the defensive debuffs are left out: Crippling Slash (−12% enemy
+damage), Silencing Shot and Stunning Blow.
+
 ---
 
 ## 6. Pitfalls
@@ -460,6 +484,18 @@ whole raid hits one enemy at a time: on Trial Swarm, Beetle, then Dragonfly, Was
 `i` is the target from the moment every enemy before it is dead until its own death. Averaged over
 all four Swarm enemies, Smoke Burst looked like 27% uptime; on the current target it was 89%. The
 waiting enemies are simply never hit.
+
+**Cursed Bow curse comes from every landed hit, auto-attack or ability, on every enemy hit.** Each
+landed hit by a unit with `curse` > 0 adds a stack to the hit target, up to 5, and resets a 15 s
+timer. When the timer runs out, every stack drops (`combatSimulator.js:563` and `:1564`,
+`events/curseExpirationEvent.js`). The stack lives on the target, so two bows share one stack.
+Nothing logs it, so rebuild it from the bows' landed `attack` entries in `battleLog`. On Trial Swarm,
+two bows (58 players, ladder, 40 runs) kept the **current target** cursed 98–100% of the time at
+4.6–4.9 average stacks on every bar tried. Their auto-attacks alone do that. The bar only changes the
+**waiting** enemies. Rain of Arrows (all enemies) and Penetrating Shot (pierces) pre-curse them to
+about 1–1.3 stacks, 60–70% of the time, with both bows on that bar. Pre-stacks stay low because Rain
+of Arrows' 20 s cooldown outlasts the 15 s curse. A single-target bar (Pestilent / Steady /
+Precision) leaves them at 0 until they become the target.
 
 **Watch for metrics hitting the floor.** Once a config reaches ~0% boss HP left there is no room to
 show further improvement — switch to kills and survivor counts, or test on a weaker baseline that

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Boss Matrix L160</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+html, body, h1, h2, h3, p, table, ul, li { margin: 0; padding: 0; }
+
+/* Shared token set with index.html, dps_build_sweep.html and trial_scorecard_L160.html. */
+:root {
+    --bg: #e9ebe7; --surface: #f8f9f6; --surface-2: #f1f3ef;
+    --ink: #171b18; --ink-2: #4b544e; --ink-3: #737d76;
+    --rule: #d2d7cf; --rule-strong: #b8c0b5;
+    --melee: #b4661f; --ranged: #2f7d43; --magic: #6a4fbf;
+    --top: #2f7d43; --top-soft: #2f7d4324;
+    --up: #2f7d43; --down: #b23a2e; --warn-soft: #b23a2e1c;
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    --measure: 68ch; --page: 1080px;
+}
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #101311; --surface: #171b18; --surface-2: #1d2220;
+        --ink: #e9ece7; --ink-2: #a5aea7; --ink-3: #7b857e;
+        --rule: #2a302c; --rule-strong: #3b433e;
+        --melee: #f0a45a; --ranged: #74cf83; --magic: #ad93ea;
+        --top: #74cf83; --top-soft: #74cf8326;
+        --up: #74cf83; --down: #f08a7e; --warn-soft: #f08a7e1f;
+    }
+}
+:root[data-theme="dark"] {
+    --bg: #101311; --surface: #171b18; --surface-2: #1d2220;
+    --ink: #e9ece7; --ink-2: #a5aea7; --ink-3: #7b857e;
+    --rule: #2a302c; --rule-strong: #3b433e;
+    --melee: #f0a45a; --ranged: #74cf83; --magic: #ad93ea;
+    --top: #74cf83; --top-soft: #74cf8326;
+    --up: #74cf83; --down: #f08a7e; --warn-soft: #f08a7e1f;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.page { max-width: var(--page); margin: 0 auto; padding: 56px 24px 96px; display: flex; flex-direction: column; gap: 56px; }
+h1, h2, h3, table { font-family: var(--display); }
+h1 { font-size: clamp(2.1rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.025em; line-height: 1.04; text-wrap: balance; }
+h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.015em; text-wrap: balance; }
+p { max-width: var(--measure); }
+a { color: inherit; }
+strong { font-weight: 600; }
+.eyebrow { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
+.standfirst { font-size: 1.12rem; color: var(--ink-2); }
+.note { font-size: 0.95rem; color: var(--ink-2); }
+header { display: flex; flex-direction: column; gap: 18px; }
+.rule-top { height: 3px; background: var(--ink); max-width: 96px; }
+.specs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.chip { font-family: var(--mono); font-size: 0.74rem; padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--ink-2); background: var(--surface); }
+.chip b { color: var(--ink); font-weight: 600; }
+section { display: flex; flex-direction: column; gap: 18px; }
+.section-head { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--rule-strong); padding-top: 14px; }
+ul.points { display: flex; flex-direction: column; gap: 8px; padding-left: 1.1em; max-width: var(--measure); }
+ul.points li { color: var(--ink-2); font-size: 0.97rem; }
+ul.points li strong { color: var(--ink); }
+.mono { font-family: var(--mono); font-size: 0.82em; }
+
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 0.88rem; }
+thead th { font-family: var(--mono); font-size: 0.68rem; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); text-align: center; padding: 0 8px 8px; border-bottom: 1px solid var(--rule-strong); white-space: nowrap; }
+thead th:first-child { text-align: left; padding-left: 0; }
+tbody th { text-align: left; font-weight: 600; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+tbody tr:last-child th, tbody tr:last-child td { border-bottom: none; }
+tbody th .who { display: block; font-family: var(--mono); font-size: 0.68rem; font-weight: 400; color: var(--ink-3); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.dot.melee { background: var(--melee); } .dot.ranged { background: var(--ranged); } .dot.magic { background: var(--magic); }
+.tag { font-family: var(--mono); font-size: 0.6rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); border: 1px solid var(--rule-strong); border-radius: 2px; padding: 0 4px; margin-left: 6px; vertical-align: 2px; }
+
+table.matrix { min-width: 760px; table-layout: fixed; }
+table.matrix thead th:first-child, table.matrix tbody th { width: 22%; }
+table.matrix td { text-align: center; padding: 8px 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+table.matrix td .main { display: block; font-weight: 600; font-size: 1.02rem; color: var(--ink); }
+table.matrix td .delta { display: block; font-family: var(--mono); font-size: 0.74rem; font-weight: 600; }
+table.matrix td .delta.up { color: var(--up); }
+table.matrix td .delta.down { color: var(--down); }
+table.matrix td .delta.flat { color: var(--ink-3); font-weight: 400; }
+table.matrix td .sub { display: block; font-family: var(--mono); font-size: 0.66rem; color: var(--ink-3); }
+table.matrix td.top { background: var(--top-soft); }
+table.matrix td.top .main { color: var(--top); }
+table.matrix tr.ref th, table.matrix tr.ref td { opacity: 0.72; }
+
+table.plain { min-width: 640px; }
+table.plain td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--rule); text-align: right; }
+table.plain thead th:not(:first-child) { text-align: right; }
+table.plain td.warn { background: var(--warn-soft); color: var(--down); font-weight: 600; }
+table.text td { text-align: left; font-family: var(--body); font-size: 0.9rem; color: var(--ink-2); vertical-align: top; padding: 9px 12px 9px 0; border-bottom: 1px solid var(--rule); }
+table.text thead th { text-align: left; }
+table.bars { min-width: 980px; }
+table.bars td { font-size: 0.82rem; }
+table.bars td.tweak { color: var(--ink); font-weight: 600; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-family: var(--mono); font-size: 0.72rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.sw { width: 22px; height: 14px; border-radius: 2px; display: inline-block; border: 1px solid var(--rule); }
+.sw.top { background: var(--top-soft); }
+.legend .up { color: var(--up); font-weight: 600; } .legend .down { color: var(--down); font-weight: 600; }
+
+footer { border-top: 1px solid var(--rule-strong); padding-top: 16px; font-family: var(--mono); font-size: 0.72rem; line-height: 1.7; color: var(--ink-3); }
+footer a { color: var(--ink-2); }
+@media (max-width: 620px) {
+    .page { padding: 40px 16px 64px; gap: 40px; }
+    body { font-size: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+    <div class="rule-top"></div>
+    <div class="eyebrow">Arsenal · simulated · 2 Oct 2026</div>
+    <h1>Boss Matrix L160</h1>
+    <p class="standfirst">A rerun of the guide's Boss Matrix: a 56-player raid on the guide's per-boss bars, each class scored by the share of the boss group's HP one of its Insanity players removes per minute. The scores are scaled to the current matrix's level, so each cell shows how far it has moved.</p>
+    <div class="specs">
+        <span class="chip">fight <b>L160 (T7)</b> · single tier · real damage</span>
+        <span class="chip"><b>40 runs</b> per boss · seed 170</span>
+        <span class="chip">gear <b>T95 presets</b></span>
+        <span class="chip">attributes <b>130</b> main · 120 others</span>
+        <span class="chip">house <b>all Lv 4</b> · Elite achievements (+2%)</span>
+        <span class="chip">abilities <b>Lv 40</b> · Fireball / Water Strike / Entangle Lv 60 · Insanity Lv 20 · auras Lv 35</span>
+        <span class="chip">buildings <b>library 2 · dojo 4 · others 1 · dining 0</b></span>
+    </div>
+</header>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Result</div>
+        <h2>The matrix, against the current scores</h2>
+    </div>
+    <div class="legend">
+        <span><i class="sw top"></i>the class's best boss</span>
+        <span><span class="up">+0.010</span> / <span class="down">−0.010</span> moved by 0.010 or more</span>
+        <span>now = the current matrix</span>
+    </div>
+    <div class="scroll"><table class="matrix">
+        <thead><tr><th>Class</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead>
+        <tbody>
+<tr class=""><th scope="row"><span class="dot melee"></span>Smash<span class="who">11 Insanity · melee</span></th><td class="" title="L160 raw 0.159 ±0.003 (sd over 40 runs) × 1.0286 = 0.163 · current 0.169"><span class="main">0.163</span><span class="delta flat">−0.006</span><span class="sub">now 0.169</span></td><td class="top" title="L160 raw 0.306 ±0.006 (sd over 40 runs) × 1.0286 = 0.315 · current 0.312"><span class="main">0.315</span><span class="delta flat">+0.003</span><span class="sub">now 0.312</span></td><td class="" title="L160 raw 0.216 ±0.011 (sd over 40 runs) × 1.0286 = 0.223 · current 0.209"><span class="main">0.223</span><span class="delta up">+0.014</span><span class="sub">now 0.209</span></td><td class="" title="L160 raw 0.216 ±0.005 (sd over 40 runs) × 1.0286 = 0.223 · current 0.235"><span class="main">0.223</span><span class="delta down">−0.012</span><span class="sub">now 0.235</span></td><td class="" title="L160 raw 0.237 ±0.005 (sd over 40 runs) × 1.0286 = 0.244 · current 0.246"><span class="main">0.244</span><span class="delta flat">−0.002</span><span class="sub">now 0.246</span></td></tr>
+<tr class=""><th scope="row"><span class="dot melee"></span>Stab<span class="who">3 Insanity · melee</span></th><td class="" title="L160 raw 0.180 ±0.006 (sd over 40 runs) × 1.0286 = 0.185 · current 0.196"><span class="main">0.185</span><span class="delta down">−0.011</span><span class="sub">now 0.196</span></td><td class="top" title="L160 raw 0.371 ±0.011 (sd over 40 runs) × 1.0286 = 0.381 · current 0.383"><span class="main">0.381</span><span class="delta flat">−0.002</span><span class="sub">now 0.383</span></td><td class="" title="L160 raw 0.283 ±0.019 (sd over 40 runs) × 1.0286 = 0.291 · current 0.291"><span class="main">0.291</span><span class="delta flat">±0.000</span><span class="sub">now 0.291</span></td><td class="" title="L160 raw 0.282 ±0.011 (sd over 40 runs) × 1.0286 = 0.290 · current 0.304"><span class="main">0.290</span><span class="delta down">−0.014</span><span class="sub">now 0.304</span></td><td class="" title="L160 raw 0.168 ±0.009 (sd over 40 runs) × 1.0286 = 0.172 · current 0.168"><span class="main">0.172</span><span class="delta flat">+0.004</span><span class="sub">now 0.168</span></td></tr>
+<tr class=""><th scope="row"><span class="dot ranged"></span>Ranged<span class="who">11 Insanity · ranged</span></th><td class="" title="L160 raw 0.145 ±0.003 (sd over 40 runs) × 1.0286 = 0.149 · current 0.154"><span class="main">0.149</span><span class="delta flat">−0.005</span><span class="sub">now 0.154</span></td><td class="" title="L160 raw 0.299 ±0.005 (sd over 40 runs) × 1.0286 = 0.308 · current 0.301"><span class="main">0.308</span><span class="delta flat">+0.007</span><span class="sub">now 0.301</span></td><td class="top" title="L160 raw 0.367 ±0.009 (sd over 40 runs) × 1.0286 = 0.377 · current 0.387"><span class="main">0.377</span><span class="delta flat">−0.010</span><span class="sub">now 0.387</span></td><td class="" title="L160 raw 0.250 ±0.005 (sd over 40 runs) × 1.0286 = 0.258 · current 0.263"><span class="main">0.258</span><span class="delta flat">−0.005</span><span class="sub">now 0.263</span></td><td class="" title="L160 raw 0.191 ±0.006 (sd over 40 runs) × 1.0286 = 0.196 · current 0.190"><span class="main">0.196</span><span class="delta flat">+0.006</span><span class="sub">now 0.190</span></td></tr>
+<tr class=""><th scope="row"><span class="dot magic"></span>Fire<span class="who">3 Insanity · magic</span></th><td class="top" title="L160 raw 0.301 ±0.013 (sd over 40 runs) × 1.0286 = 0.310 · current 0.292"><span class="main">0.310</span><span class="delta up">+0.018</span><span class="sub">now 0.292</span></td><td class="" title="L160 raw 0.121 ±0.007 (sd over 40 runs) × 1.0286 = 0.124 · current 0.120"><span class="main">0.124</span><span class="delta flat">+0.004</span><span class="sub">now 0.120</span></td><td class="" title="L160 raw 0.212 ±0.012 (sd over 40 runs) × 1.0286 = 0.218 · current 0.207"><span class="main">0.218</span><span class="delta up">+0.011</span><span class="sub">now 0.207</span></td><td class="" title="L160 raw 0.279 ±0.016 (sd over 40 runs) × 1.0286 = 0.287 · current 0.280"><span class="main">0.287</span><span class="delta flat">+0.007</span><span class="sub">now 0.280</span></td><td class="" title="L160 raw 0.212 ±0.011 (sd over 40 runs) × 1.0286 = 0.218 · current 0.209"><span class="main">0.218</span><span class="delta flat">+0.009</span><span class="sub">now 0.209</span></td></tr>
+<tr class=""><th scope="row"><span class="dot magic"></span>Water<span class="who">3 Insanity · magic</span></th><td class="top" title="L160 raw 0.270 ±0.012 (sd over 40 runs) × 1.0286 = 0.278 · current 0.301"><span class="main">0.278</span><span class="delta down">−0.023</span><span class="sub">now 0.301</span></td><td class="" title="L160 raw 0.118 ±0.005 (sd over 40 runs) × 1.0286 = 0.121 · current 0.115"><span class="main">0.121</span><span class="delta flat">+0.006</span><span class="sub">now 0.115</span></td><td class="" title="L160 raw 0.185 ±0.011 (sd over 40 runs) × 1.0286 = 0.190 · current 0.182"><span class="main">0.190</span><span class="delta flat">+0.008</span><span class="sub">now 0.182</span></td><td class="" title="L160 raw 0.202 ±0.008 (sd over 40 runs) × 1.0286 = 0.208 · current 0.197"><span class="main">0.208</span><span class="delta up">+0.011</span><span class="sub">now 0.197</span></td><td class="" title="L160 raw 0.227 ±0.010 (sd over 40 runs) × 1.0286 = 0.233 · current 0.232"><span class="main">0.233</span><span class="delta flat">+0.001</span><span class="sub">now 0.232</span></td></tr>
+<tr class=""><th scope="row"><span class="dot magic"></span>Nature DPS<span class="who">11 Insanity · magic</span></th><td class="top" title="L160 raw 0.242 ±0.007 (sd over 40 runs) × 1.0286 = 0.249 · current 0.259"><span class="main">0.249</span><span class="delta down">−0.010</span><span class="sub">now 0.259</span></td><td class="" title="L160 raw 0.104 ±0.004 (sd over 40 runs) × 1.0286 = 0.107 · current 0.107"><span class="main">0.107</span><span class="delta flat">±0.000</span><span class="sub">now 0.107</span></td><td class="" title="L160 raw 0.233 ±0.010 (sd over 40 runs) × 1.0286 = 0.240 · current 0.232"><span class="main">0.240</span><span class="delta flat">+0.008</span><span class="sub">now 0.232</span></td><td class="" title="L160 raw 0.199 ±0.008 (sd over 40 runs) × 1.0286 = 0.205 · current 0.207"><span class="main">0.205</span><span class="delta flat">−0.002</span><span class="sub">now 0.207</span></td><td class="" title="L160 raw 0.206 ±0.004 (sd over 40 runs) × 1.0286 = 0.212 · current 0.227"><span class="main">0.212</span><span class="delta down">−0.015</span><span class="sub">now 0.227</span></td></tr>
+<tr class="ref"><th scope="row"><span class="dot ranged"></span>Cursed Bower <span class="tag">1 player</span><span class="who">1 Insanity · ranged</span></th><td class="" title="L160 raw 0.115 ±0.008 (sd over 40 runs) × 1.0286 = 0.119 · current 0.148"><span class="main">0.119</span><span class="delta down">−0.029</span><span class="sub">now 0.148</span></td><td class="" title="L160 raw 0.278 ±0.013 (sd over 40 runs) × 1.0286 = 0.286 · current 0.290"><span class="main">0.286</span><span class="delta flat">−0.004</span><span class="sub">now 0.290</span></td><td class="top" title="L160 raw 0.341 ±0.025 (sd over 40 runs) × 1.0286 = 0.350 · current 0.388"><span class="main">0.350</span><span class="delta down">−0.038</span><span class="sub">now 0.388</span></td><td class="" title="L160 raw 0.237 ±0.017 (sd over 40 runs) × 1.0286 = 0.244 · current 0.254"><span class="main">0.244</span><span class="delta down">−0.010</span><span class="sub">now 0.254</span></td><td class="" title="L160 raw 0.171 ±0.010 (sd over 40 runs) × 1.0286 = 0.175 · current 0.176"><span class="main">0.175</span><span class="delta flat">−0.001</span><span class="sub">now 0.176</span></td></tr>
+        </tbody>
+    </table></div>
+    <p class="note"><strong>Normalised to the current matrix.</strong> The rerun fights L160 with a different roster from the one behind the current matrix, so its raw scores sit at a different level. Every new score is multiplied by one factor, <span class="mono">k = Σ current / Σ new = 1.0286</span>, taken over the 30 cells of the six classes above Cursed Bower. That keeps every ratio between cells and makes the six rows sum to the same total as the current matrix, so each delta is a change in a class's relative standing, not in the overall level. Hover a cell for the raw L160 score and its spread.</p>
+    <p class="note"><strong>Score</strong> = one player's damage on the boss group ÷ the group's total HP ÷ fight minutes × 100, averaged over the class's Insanity players and the 40 runs. Aura carriers are left out: they don't run Insanity.</p>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Diff</div>
+        <h2>What moved</h2>
+    </div>
+    <ul class="points">
+        <li><strong>Every class keeps its best boss:</strong> Smash Chameleon, Stab Chameleon, Ranged Jellyfish, Fire Badger, Water Badger, Nature DPS Badger.</li>
+<li><strong>Preferences between two bosses that flip or close up</strong> (2). The engine sends each DPS to whichever of the week's two bosses scores higher for their class, so these are the changes that could move players.</li>
+<li><strong>Smash: Jellyfish vs Hedgehog.</strong> The current matrix has Hedgehog ahead by 0.026; the rerun has them tied (0.223 vs 0.223). In a Jellyfish + Hedgehog week, which boss Smash players go to is now a coin flip.</li>
+<li><strong>Stab: Jellyfish vs Hedgehog.</strong> The current matrix has Hedgehog ahead by 0.013; the rerun has them tied (0.291 vs 0.290). In a Jellyfish + Hedgehog week, which boss Stab players go to is now a coin flip.</li>
+        <li><strong>Close calls within a boss.</strong> These change which class leads a boss, not where any player goes:
+            <ul class="points" style="margin-top:6px">
+<li><strong>Badger, places 1–2:</strong> Fire 0.310 now edges Water 0.278 (current: Water 0.301, Fire 0.292).</li>
+<li><strong>Hedgehog, places 5–6:</strong> Water 0.208 now edges Nature DPS 0.205 (current: Nature DPS 0.207, Water 0.197).</li>
+<li><strong>Swarm, places 3–4:</strong> Fire 0.218 now edges Nature DPS 0.212 (current: Nature DPS 0.227, Fire 0.209).</li>
+            </ul></li>
+        <li><strong>Largest moves:</strong>
+            <ul class="points" style="margin-top:6px">
+<li><strong>Water on Badger</strong> −0.023 (0.301 → 0.278)</li>
+<li><strong>Fire on Badger</strong> +0.018 (0.292 → 0.310)</li>
+<li><strong>Nature DPS on Swarm</strong> −0.015 (0.227 → 0.212)</li>
+<li><strong>Stab on Hedgehog</strong> −0.014 (0.304 → 0.290)</li>
+<li><strong>Smash on Jellyfish</strong> +0.014 (0.209 → 0.223)</li>
+            </ul></li>
+        <li><strong>Cursed Bower</strong> comes out lower everywhere, by up to 0.038 on Jellyfish, but that row is one player. The other Cursed Bow carries Critical Aura and runs no Insanity, so it isn't scored.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Fights</div>
+        <h2>No wipes at L160</h2>
+    </div>
+    <div class="scroll"><table class="plain">
+        <thead><tr><th>Boss</th><th>Won</th><th>Fight</th><th>Deaths / run</th><th>Survivors</th><th>Casts blocked (no MP) / run</th><th>Won at L170</th></tr></thead>
+        <tbody>
+<tr><th scope="row">Badger</th><td>40/40</td><td>582 s</td><td>0.0</td><td>56.0</td><td>714</td><td class="">40/40</td></tr>
+<tr><th scope="row">Chameleon</th><td>40/40</td><td>511 s</td><td>0.1</td><td>56.0</td><td>477</td><td class="">40/40</td></tr>
+<tr><th scope="row">Jellyfish</th><td>40/40</td><td>442 s</td><td>2.8</td><td>55.4</td><td>257</td><td class="warn">33/40</td></tr>
+<tr><th scope="row">Hedgehog</th><td>40/40</td><td>521 s</td><td>0.0</td><td>56.0</td><td>385</td><td class="">40/40</td></tr>
+<tr><th scope="row">Swarm</th><td>40/40</td><td>566 s</td><td>0.6</td><td>56.0</td><td>1108</td><td class="warn">27/40</td></tr>
+        </tbody>
+    </table></div>
+    <ul class="points">
+        <li><strong>Why L160.</strong> At L170 the same raid wiped 7 of 40 Jellyfish and 13 of 40 Swarm runs. A wipe cuts damage as players die and drags the score down, so the matrix is run one tier lower, where every fight is won.</li>
+        <li><strong>The mages run dry.</strong> Most blocked casts are Fire, Water and Nature DPS spells. That's part of what the score measures, since no one eats or drinks in a group battle.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Setup</div>
+        <h2>Roster</h2>
+    </div>
+    <div class="scroll"><table class="text">
+        <thead><tr><th>Class</th><th>Players</th><th>Gear preset</th><th>Main attributes (130)</th><th>Slot 1</th></tr></thead>
+        <tbody>
+<tr><th scope="row">Wark</th><td>2</td><td class="mono">wark</td><td>Defense + Stamina</td><td>Guardian (Defense) on 1; the rest Invincible (Insanity on Hedgehog)</td></tr>
+<tr><th scope="row">Nature Support</th><td>6</td><td class="mono">nature_healer_revive</td><td>Attack + Magic</td><td>Mystic (Magic) on 1; the rest Revive</td></tr>
+<tr><th scope="row">Mana Spring Support</th><td>2</td><td class="mono">nature_healer_revive</td><td>Attack + Magic</td><td>Revive</td></tr>
+<tr><th scope="row">Slash</th><td>2</td><td class="mono">slash_T95</td><td>Attack + Melee</td><td>Fierce (Melee), Speed (Attack) on 2; the rest Insanity</td></tr>
+<tr><th scope="row">Stab</th><td>3</td><td class="mono">stab_T95</td><td>Attack + Melee</td><td>Insanity</td></tr>
+<tr><th scope="row">Cursed Bower</th><td>2</td><td class="mono">bow_T95</td><td>Attack + Ranged</td><td>Critical (Ranged) on 1; the rest Insanity</td></tr>
+<tr><th scope="row">Fire</th><td>3</td><td class="mono">fire_T95</td><td>Attack + Magic</td><td>Insanity</td></tr>
+<tr><th scope="row">Water</th><td>3</td><td class="mono">water_T95</td><td>Attack + Magic</td><td>Insanity</td></tr>
+<tr><th scope="row">Nature DPS</th><td>11</td><td class="mono">nature_aoe_T95</td><td>Attack + Magic</td><td>Insanity</td></tr>
+<tr><th scope="row">Ranged</th><td>11</td><td class="mono">xbow_T95</td><td>Attack + Ranged</td><td>Insanity</td></tr>
+<tr><th scope="row">Smash</th><td>11</td><td class="mono">smash_T95</td><td>Attack + Melee</td><td>Insanity</td></tr>
+        </tbody>
+    </table></div>
+    <ul class="points">
+        <li><strong>Main attributes</strong> are Attack plus the damage skill, because Attack sets accuracy for every style. Warks get Defense and Stamina.</li>
+        <li><strong>One carrier per aura</strong>, at Lv 35, on a player at 130 in the skill the aura scales with. Several classes tie at 130, so each aura went to a class the matrix doesn't score, and every scored player keeps Insanity. That's why both Slashes are absent from the matrix.</li>
+        <li><strong>Triggers</strong> follow the guide: Rejuvenate at lowest ally HP ≤ 60%, Quick Aid below 50%, Insanity only above 50% HP. Insanity's 90 s cooldown caps it before the HP gate does. Everything else uses the game's default trigger.</li>
+    </ul>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Setup</div>
+        <h2>Bars, from the build guide</h2>
+    </div>
+    <p class="note">Slots 2–5. Bold is a boss tweak from the <a href="https://arsenal-trials-mwi.fly.dev/g/Arsenal">guide</a>; the rest is the class default.</p>
+    <div class="scroll"><table class="text bars">
+        <thead><tr><th>Class</th><th>Badger</th><th>Chameleon</th><th>Jellyfish</th><th>Hedgehog</th><th>Swarm</th></tr></thead>
+        <tbody>
+<tr><th scope="row">Wark</th><td class="">Provoke · Taunt · Spike Shell · Retribution</td><td class="">Provoke · Taunt · Spike Shell · Retribution</td><td class="">Provoke · Taunt · Spike Shell · Retribution</td><td class="tweak">Frenzy · Berserk · Precision · Shield Bash</td><td class="">Provoke · Taunt · Spike Shell · Retribution</td></tr>
+<tr><th scope="row">Slash</th><td class="">Frenzy · Berserk · Precision · Maim</td><td class="">Frenzy · Berserk · Precision · Maim</td><td class="">Frenzy · Berserk · Precision · Maim</td><td class="">Frenzy · Berserk · Precision · Maim</td><td class="">Frenzy · Berserk · Precision · Maim</td></tr>
+<tr><th scope="row">Smash</th><td class="">Frenzy · Berserk · Precision · Fracturing Impact</td><td class="">Frenzy · Berserk · Precision · Fracturing Impact</td><td class="">Frenzy · Berserk · Precision · Fracturing Impact</td><td class="">Frenzy · Berserk · Precision · Fracturing Impact</td><td class="">Frenzy · Berserk · Precision · Fracturing Impact</td></tr>
+<tr><th scope="row">Stab</th><td class="">Frenzy · Berserk · Precision · Puncture</td><td class="">Frenzy · Berserk · Precision · Puncture</td><td class="">Frenzy · Berserk · Precision · Puncture</td><td class="">Frenzy · Berserk · Precision · Puncture</td><td class="">Frenzy · Berserk · Precision · Puncture</td></tr>
+<tr><th scope="row">Cursed Bower</th><td class="">Frenzy · Berserk · Penetrating Shot · Rain of Arrows</td><td class="tweak">Frenzy · Berserk · Precision · Pestilent Shot</td><td class="tweak">Frenzy · Berserk · Precision · Pestilent Shot</td><td class="tweak">Frenzy · Berserk · Precision · Pestilent Shot</td><td class="">Frenzy · Berserk · Penetrating Shot · Rain of Arrows</td></tr>
+<tr><th scope="row">Ranged</th><td class="">Frenzy · Berserk · Pestilent Shot · Steady Shot</td><td class="">Frenzy · Berserk · Pestilent Shot · Steady Shot</td><td class="">Frenzy · Berserk · Pestilent Shot · Steady Shot</td><td class="">Frenzy · Berserk · Pestilent Shot · Steady Shot</td><td class="tweak">Frenzy · Berserk · Pestilent Shot · Rain of Arrows</td></tr>
+<tr><th scope="row">Fire</th><td class="">Elemental Affinity · Smoke Burst · Firestorm · Fireball</td><td class="tweak">Elemental Affinity · Smoke Burst · Life Drain · Fireball</td><td class="tweak">Elemental Affinity · Smoke Burst · Life Drain · Fireball</td><td class="tweak">Elemental Affinity · Smoke Burst · Life Drain · Fireball</td><td class="">Elemental Affinity · Smoke Burst · Firestorm · Fireball</td></tr>
+<tr><th scope="row">Water</th><td class="">Precision · Frost Surge · Ice Spear · Water Strike</td><td class="">Precision · Frost Surge · Ice Spear · Water Strike</td><td class="">Precision · Frost Surge · Ice Spear · Water Strike</td><td class="">Precision · Frost Surge · Ice Spear · Water Strike</td><td class="tweak">Precision · Frost Surge · Firestorm · Water Strike</td></tr>
+<tr><th scope="row">Nature DPS</th><td class="">Elemental Affinity · Smoke Burst · Life Drain · Entangle</td><td class="">Elemental Affinity · Smoke Burst · Life Drain · Entangle</td><td class="">Elemental Affinity · Smoke Burst · Life Drain · Entangle</td><td class="">Elemental Affinity · Smoke Burst · Life Drain · Entangle</td><td class="tweak">Elemental Affinity · Frost Surge · Nature's Veil · Firestorm</td></tr>
+<tr><th scope="row">Nature Support</th><td class="">Rejuvenate · Smoke Burst · Toxic Pollen · Entangle</td><td class="">Rejuvenate · Smoke Burst · Toxic Pollen · Entangle</td><td class="">Rejuvenate · Smoke Burst · Toxic Pollen · Entangle</td><td class="tweak">Rejuvenate · Quick Aid · Smoke Burst · Toxic Pollen</td><td class="">Rejuvenate · Smoke Burst · Toxic Pollen · Entangle</td></tr>
+<tr><th scope="row">Mana Spring Support</th><td class="">Rejuvenate · Mana Spring · Life Drain · Entangle</td><td class="">Rejuvenate · Mana Spring · Life Drain · Entangle</td><td class="">Rejuvenate · Mana Spring · Life Drain · Entangle</td><td class="tweak">Rejuvenate · Quick Aid · Mana Spring · Toxic Pollen</td><td class="tweak">Rejuvenate · Mana Spring · Toxic Pollen · Entangle</td></tr>
+        </tbody>
+    </table></div>
+    <p class="note"><strong>No damage debuff is missing.</strong> These bars carry every enemy debuff in the game data that raises damage: Maim, Fracturing Impact, Puncture, Pestilent Shot, Smoke Burst, Frost Surge, Toxic Pollen, the Cursed Bow's curse and the Griffin Bulwark's weaken. The ones they leave out only weaken the enemy: Crippling Slash (−12% enemy damage), Silencing Shot and Stunning Blow.</p>
+</section>
+
+<section>
+    <div class="section-head">
+        <div class="eyebrow">Limits</div>
+        <h2>What this doesn't settle</h2>
+    </div>
+    <ul class="points">
+        <li><strong>Small classes are noisy.</strong> Stab, Fire and Water have 3 scored players each and Cursed Bower 1. A delta under 0.010 is inside what a different roster or seed would move.</li>
+        <li><strong>Slash isn't rerun.</strong> Both Slashes carry an aura (Fierce, Speed), so neither runs Insanity.</li>
+        <li><strong>The current matrix's setup isn't known here.</strong> It was read off the Arsenal site on 2 Oct 2026. Normalising removes the difference in overall level, but not any difference in how the two were built.</li>
+        <li><strong>One composition.</strong> Debuff uptime and the raid's damage depend on how many of each class are in the raid: 11 Smash, 11 Ranged and 11 Nature DPS here.</li>
+    </ul>
+</section>
+
+<footer>
+    Simulated on the Group Battle wasm kernel, the same one <a href="../group-battle.html">group-battle.html</a> runs. Method: <a href="https://github.com/will-shy/MWICombatSimulatorTest/blob/testing/docs/harness.md">docs/harness.md</a> (building a synthetic roster from presets). Data: <a href="data/boss_matrix_L160.json">data/boss_matrix_L160.json</a>. <a href="index.html">All pages</a>.
+</footer>
+
+</div>
+</body>
+</html>
