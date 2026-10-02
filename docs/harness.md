@@ -454,6 +454,13 @@ lasts 12 s and doesn't stack between casters. Measure its uptime per enemy as th
 death. Change two classes together when they can both carry the same debuff, because coverage
 depends on who is left casting it.
 
+**Measure a single-target debuff on the current target, not averaged over every enemy.** Every
+player targets the first living enemy (`CombatUtilities.getTarget`), so on a multi-enemy group the
+whole raid hits one enemy at a time: on Trial Swarm, Beetle, then Dragonfly, Wasp, Firefly. Enemy
+`i` is the target from the moment every enemy before it is dead until its own death. Averaged over
+all four Swarm enemies, Smoke Burst looked like 27% uptime; on the current target it was 89%. The
+waiting enemies are simply never hit.
+
 **Watch for metrics hitting the floor.** Once a config reaches ~0% boss HP left there is no room to
 show further improvement — switch to kills and survivor counts, or test on a weaker baseline that
 has headroom.
