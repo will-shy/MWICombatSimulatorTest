@@ -445,6 +445,15 @@ grow with duration, so a change that shortens the fight looks like it reduced th
 be discarded for exactly this (317s vs 541s arms). Use per-second-alive rates, or hold duration
 fixed by capping and comparing boss HP left.
 
+**Score a bar change by raid DPS, not only the changed players' own DPS.** Debuffs land on the
+enemy and help everyone. On Trial Swarm, moving 17 Ranged off Pestilent Shot onto Penetrating Shot +
+Rain of Arrows raised their own DPS 9%, but raid DPS only 0.3%: the rest of the raid lost most of
+that gain. Pestilent's armor/resistance debuff applies **on hit only** (`combatSimulator.js:1509`),
+lasts 12 s and doesn't stack between casters. Measure its uptime per enemy as the union of
+`[hit, hit + 12 s]` over landed `pestilent_shot` attack entries in `battleLog`, up to that enemy's
+death. Change two classes together when they can both carry the same debuff, because coverage
+depends on who is left casting it.
+
 **Watch for metrics hitting the floor.** Once a config reaches ~0% boss HP left there is no room to
 show further improvement — switch to kills and survivor counts, or test on a weaker baseline that
 has headroom.
