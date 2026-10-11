@@ -9,5 +9,6 @@ establishes or changes a rule.
 | Area | Doc |
 | --- | --- |
 | Skill Lab (`skill-lab.html`) | `docs/skill_lab.md` (create it on first use) |
+| Optimization (`optimization.html`, `src/optimization.js`) | `docs/optimization.md` |
 | Group battle (`group-battle.html`, `src/groupBattle.js`, group-battle sim code) | `docs/group_battle.md` |
 | Local sim harness (`scripts/sim-sweep.mjs`, headless runs on the wasm kernel) | `docs/harness.md` |

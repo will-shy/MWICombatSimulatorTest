@@ -15,7 +15,12 @@ onmessage = async function (event) {
     const simulationTimeLimit = event.data.simulationTimeLimit;
 
     const hardwareWorkers = Number(navigator.hardwareConcurrency) || 4;
-    const poolSize = Math.max(1, Math.min(hardwareWorkers, MAX_POOL_SIZE, conditions.length));
+    // The most this browser can usefully run at once. A caller may ask for fewer (poolSize); it can
+    // not ask for more.
+    const maxPool = Math.min(hardwareWorkers, MAX_POOL_SIZE);
+    const requested = Math.floor(Number(event.data.poolSize));
+    const limit = requested > 0 ? Math.min(requested, maxPool) : maxPool;
+    const poolSize = Math.max(1, Math.min(limit, conditions.length));
 
     const queue = [...conditions];
     const outerWorker = this;

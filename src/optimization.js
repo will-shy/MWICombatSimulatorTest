@@ -25,8 +25,10 @@ const PLUGIN_MIRROR_KEY = "mwiPluginCharacters";
 const PLUGIN_MIRROR_NODE_ID = "mwi-plugin-data";
 const PLUGIN_MIRROR_EVENT = "mwi-plugin-data";
 const SETUP_KEY = "mwiOptimizationSetup";
-// Tier 3+ is the interesting range for fragments and matches the "T3-T5" sweep this page is for.
-const TIERS = [3, 4, 5];
+// T2-T5 can be swept. T4 and T5 are the interesting ones for fragments, so they are what a zone
+// starts with (DEFAULT_TIERS); T2 and T3 are opt-in.
+const TIERS = [2, 3, 4, 5];
+const DEFAULT_TIERS = [4, 5];
 // Must match MAX_POOL_SIZE in optimizationWorker.js: what the page promises is what the pool runs.
 const MAX_POOL_SIZE = 16;
 
@@ -46,6 +48,18 @@ const itemLabel = (hrid, fallback) => gameName("itemNames", hrid, fallback ?? it
 const fmt = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits) : "-";
 // Experience runs to millions per hour, so the table reads it in thousands.
 const fmtK = (value) => Number.isFinite(value) ? (value / 1000).toFixed(1) : "-";
+// A kit's name is its setup without the auras (special slot): initials for multi-word abilities,
+// the full name for single words, e.g. "QA+EA+NV+Entangle". Always from the English game names, so
+// the initials read the same in every language.
+const kitName = (kitSlots) => {
+    const parts = (kitSlots || [])
+        .filter((entry) => entry && entry.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility)
+        .map((entry) => {
+            const words = (abilityDetailMap[entry.hrid]?.name ?? entry.hrid.split("/").pop()).split(/\s+/);
+            return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : words[0];
+        });
+    return parts.length ? parts.join("+") : t("noAbilities");
+};
 const slotLabelFor = (i) => i === 0 ? t("slotSpecial") : t("slot", { n: i });
 
 // ------------------------------------------------------------------ plugin data
@@ -218,7 +232,15 @@ function initZones() {
     for (const zone of combatZones({ multiSpawnOnly: true })) {
         select.add(new Option(zoneName(zone), zone.hrid));
     }
-    select.addEventListener("change", () => { refreshFragmentOptions(); saveSetup(); });
+    select.addEventListener("change", () => {
+        // Switching zones starts over from the default tiers.
+        for (const tier of TIERS) {
+            el("tier" + tier).checked = DEFAULT_TIERS.includes(tier);
+        }
+        refreshFragmentOptions();
+        updateConditionCount();
+        saveSetup();
+    });
 }
 
 // Every planet drops exactly one key fragment, so there is normally no choice to make and the
@@ -266,6 +288,7 @@ function refreshFragmentOptions() {
 // ------------------------------------------------------------------ player slots
 
 function renderSlots() {
+    updateVariantHeaders();
     const container = el("playerSlots");
     container.innerHTML = "";
 
@@ -388,8 +411,7 @@ function renderCandidates(container, slotIndex, set) {
         card.className = "candidate-kit";
         card.innerHTML = `
             <div class="candidate-head">
-                <input type="text" value="${esc(candidate.name)}" maxlength="40" title="${esc(t("kitNameTitle"))}"
-                       data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="candidateName">
+                <span class="kit-name" title="${esc(t("kitNameTitle"))}">${esc(kitName(candidate.slots))}</span>
                 <button type="button" class="btn small ghost" data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="previewCandidate">${esc(t("preview"))}</button>
                 <button type="button" class="btn small ghost" data-slot="${slotIndex}" data-candidate="${candidateIndex}" data-field="copyBaseline"
                         title="${esc(t("resetTitle"))}">${esc(t("reset"))}</button>
@@ -464,9 +486,6 @@ function onSlotInput(event) {
             break;
         case "removeCandidate":
             slot.candidates.splice(candidateIndex, 1);
-            break;
-        case "candidateName":
-            candidate.name = target.value.trim() || t("kitName", { n: candidateIndex + 2 });
             break;
         case "candidateLoadout": {
             candidate.loadoutId = target.value;
@@ -653,7 +672,7 @@ function playerVariants(slotIndex) {
     }
 
     const baseline = baselineAbilitySlots(set);
-    let variants = [{ label: t("baseline"), detail: t("baselineDetail"), set, abilities: baseline }];
+    let variants = [{ label: kitName(baseline), detail: t("baselineDetail"), set, abilities: baseline }];
 
     slot.candidates.forEach((raw, index) => {
         const candidate = migrateCandidate(raw, baseline, index);
@@ -666,7 +685,7 @@ function playerVariants(slotIndex) {
             detail.unshift(t("gearFrom", { name }));
         }
         variants.push({
-            label: candidate.name,
+            label: kitName(candidate.slots),
             // The diff is what the table's tooltip explains; the name alone keeps columns narrow.
             detail: detail.join(" · ") || t("sameAsBaseline"),
             set: ownSet,
@@ -839,6 +858,7 @@ function average(row, field) {
 }
 
 function renderResults() {
+    updateVariantHeaders();
     const body = el("resultsBody");
     const ordered = sortedRows();
     // Always highlight the fragment-optimal condition, whatever the table is sorted by, so
@@ -861,25 +881,55 @@ function renderResults() {
             .map((label, i) => `<td class="variant" title="${esc(condition.details?.[i] ?? "")}">${esc(label)}</td>`).join("");
 
         if (row.error) {
-            return `<tr class="failed"><td>T${condition.difficultyTier}</td>${variantCells}` +
+            return `<tr class="failed"><td></td><td>T${condition.difficultyTier}</td>${variantCells}` +
                 `<td colspan="15">${esc(row.error)}</td></tr>`;
         }
 
         const metrics = row.metrics;
         const playerCells = PLAYER_HRIDS.map((hrid) => {
             const player = metrics.players[hrid];
-            return `<td>${fmt(player.fragsPerHour, 2)}</td>` +
+            return `<td class="sep">${fmt(player.fragsPerHour, 2)}</td>` +
                 `<td>${fmt(player.dps, 1)}</td>` +
                 `<td class="${player.deathsPerHour > 0 ? "warnCell" : ""}">${fmt(player.deathsPerHour, 2)}</td>` +
                 `<td>${fmtK(player.xpPerHour)}</td>`;
         }).join("");
 
         const classes = [condition.isBaseline ? "baseline" : "", row === best ? "best" : ""].filter(Boolean).join(" ");
-        return `<tr class="${classes}"><td>T${condition.difficultyTier}</td>${variantCells}` +
-            `<td class="strong">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
+        return `<tr class="${classes}"><td><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td>` +
+            `<td>T${condition.difficultyTier}</td>${variantCells}` +
+            `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
             `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
             `<td>${fmtK(average(row, "xpPerHour"))}</td>${playerCells}</tr>`;
     }).join("");
+}
+
+// Hands one result row's party to the Trigger Optimization page (docs/optimization.md) through
+// localStorage, which both pages share, and opens it in a new tab.
+function openTriggerOptimization(conditionId) {
+    const condition = conditions.find((c) => c.id === conditionId);
+    if (!condition) return;
+    const context = {
+        zoneHrid: condition.zoneHrid,
+        zoneName: gameName("actionNames", condition.zoneHrid, condition.zoneHrid),
+        difficultyTier: condition.difficultyTier,
+        hours: Math.max(1, Number(el("simHours").value) || 10),
+        itemHrid: el("fragmentSelect").value,
+        extra: {
+            mooPass: el("mooPass").checked,
+            comExp: Number(el("comExp").value) || 0,
+            comDrop: Number(el("comDrop").value) || 0,
+        },
+        labels: condition.labels,
+        playerNames: slots.map((slot) => pluginData.characters[slot.characterId]?.characterMeta?.name || ""),
+        players: condition.players.map((dto) => ({ dto })),
+    };
+    try {
+        localStorage.setItem("mwiTriggerOptContext", JSON.stringify(context));
+    } catch (e) {
+        alert(t("triggerOptStorageFailed"));
+        return;
+    }
+    window.open("trigger-optimization.html", "_blank");
 }
 
 function itemName() {
@@ -922,6 +972,18 @@ function exportCsv() {
 
 // Static markup carries its key in data-i18n-opt (text) or data-i18n-opt-title (tooltip), so the
 // HTML stays readable and the whole page can be re-labelled without re-rendering it.
+// The three variant columns are headed with the player's character name, falling back to the
+// static "P1 variant" text until a character is picked.
+function updateVariantHeaders() {
+    slots.forEach((slot, index) => {
+        const node = document.querySelector(`[data-i18n-opt="thP${index + 1}"]`);
+        const name = pluginData.characters[slot.characterId]?.characterMeta?.name;
+        if (node) {
+            node.textContent = name || t(`thP${index + 1}`);
+        }
+    });
+}
+
 function applyStaticText() {
     document.documentElement.lang = language() === "zh" ? "zh" : "en";
     document.title = t("pageTitle");
@@ -935,6 +997,7 @@ function applyStaticText() {
     for (const button of document.querySelectorAll("#langToggle button")) {
         button.classList.toggle("active", button.dataset.lang === language());
     }
+    updateVariantHeaders();
 }
 
 // Everything that holds generated text, in dependency order: the zone list feeds the fragment list.
@@ -969,6 +1032,10 @@ function init() {
     renderSlots();
 
     el("playerSlots").addEventListener("change", onSlotInput);
+    el("resultsBody").addEventListener("click", (event) => {
+        const button = event.target.closest("button[data-id]");
+        if (button) openTriggerOptimization(button.dataset.id);
+    });
     const CLICK_FIELDS = ["addCandidate", "removeCandidate", "copyBaseline",
         "previewBaseline", "previewCandidate"];
     el("playerSlots").addEventListener("click", (event) => {

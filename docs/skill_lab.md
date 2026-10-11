@@ -81,6 +81,12 @@ Choosing an ability in a slot resets that slot's level by this rule. Levels stay
 consequence: a kit that swaps an equipped ability (own level, say 85) for an unknown one (default
 40) is also comparing levels, not just abilities. Set the level by hand when that matters.
 
+### Kit names
+
+A kit has no editable name. It is shown as its setup without the auras (special-slot abilities):
+initials for multi-word abilities, the full name for single words, joined with `+`, e.g.
+`QA+EA+NV+Entangle` (`kitName` in `skillLab.js`). It updates when a slot changes.
+
 ### Runs and seeds
 
 - Default **10 runs per kit** (max 50).

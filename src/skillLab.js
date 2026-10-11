@@ -277,6 +277,17 @@ function sourceName(key) {
     return key;
 }
 
+// A kit's name is its setup without the auras: initials for multi-word abilities, the full name
+// for single words ("QA+EA+NV+Entangle").
+function kitName(kit) {
+    const parts = (kit || []).filter((s) => s && s.hrid && !(ABILITY_BY_HRID[s.hrid] || {}).isSpecial)
+        .map((s) => {
+            const words = shortName(s.hrid).split(/\s+/);
+            return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : words[0];
+        });
+    return parts.length ? parts.join("+") : "no abilities";
+}
+
 function kitText(kit) {
     const parts = (kit || []).filter((s) => s && s.hrid).map((s) => `${shortName(s.hrid)} ${s.level}`);
     return parts.length ? parts.join(" · ") : "no abilities";
@@ -583,8 +594,7 @@ function renderVariants() {
     host.innerHTML = state.variants.map((v, idx) => `
         <div class="variant" data-idx="${idx}" style="border-left-color:${color}">
             <div class="variant-head">
-                <input class="variant-label" data-field="label" value="${esc(v.label)}" aria-label="Kit name">
-                ${idx === 0 ? '<span class="tag baseline">baseline</span>' : ""}
+                <span class="variant-label">${esc(kitName(v.kit))}</span>
                 <span class="grow"></span>
                 <button type="button" class="btn small" data-act="preview" title="Preview the player with this kit">👁 preview</button>
                 <button type="button" class="btn small" data-act="copy" title="Add a copy of this kit below it">＋ kit</button>
@@ -614,9 +624,7 @@ function onVariantInput(e) {
     const field = e.target.dataset.field;
     const i = Number(e.target.dataset.slot);
 
-    if (field === "label") {
-        v.label = e.target.value;
-    } else if (field === "slotHrid") {
+    if (field === "slotHrid") {
         const hrid = e.target.value;
         v.kit[i] = hrid ? { hrid, level: abilityLevelFor(focusMember(), hrid) } : null;
         renderVariants();
@@ -636,7 +644,7 @@ function onVariantClick(e) {
     if (!v) return;
 
     if (btn.dataset.act === "preview") {
-        openPreview(`${state.focusName} — ${v.label}`, v.kit);
+        openPreview(`${state.focusName} — ${kitName(v.kit)}`, v.kit);
         return;
     }
     if (btn.dataset.act === "copy") {
@@ -1011,7 +1019,7 @@ function renderResult() {
                         : `${outcomeText(v.outcomes)}${v.bossHpFrac > 0 ? ` <span class="dim">· progress ${((1 - v.bossHpFrac) * 100).toFixed(1)}%</span>` : ""}`;
                     return `
                     <tr class="variant-row" data-idx="${i}">
-                        <td>${esc(v.label)} ${i === 0 ? '<span class="tag baseline">base</span>' : ""}${v === best && variants.length > 1 ? ' <span class="tag best">best</span>' : ""}
+                        <td>${esc(kitName(v.kit))}${v === best && variants.length > 1 ? ' <span class="tag best">best</span>' : ""}
                             <div class="dim" style="font-size:11px;white-space:normal;max-width:320px">${esc(kitText(v.kit))}</div></td>
                         <td><b>${fmt(v.dmg)}</b></td>
                         <td class="range">±${fmt(v.dmgCi)}</td>

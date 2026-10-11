@@ -7,6 +7,7 @@ module.exports = {
     groupBattle: './src/groupBattle.js',
     skillLab: './src/skillLab.js',
     optimization: './src/optimization.js',
+    triggerOptimization: './src/triggerOptimization.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -33,6 +34,7 @@ module.exports = {
         { from: path.resolve(__dirname, 'group-battle.html'), to: 'group-battle.html' },
         { from: path.resolve(__dirname, 'skill-lab.html'), to: 'skill-lab.html' },
         { from: path.resolve(__dirname, 'optimization.html'), to: 'optimization.html' },
+        { from: path.resolve(__dirname, 'trigger-optimization.html'), to: 'trigger-optimization.html' },
         { from: path.resolve(__dirname, 'pages'), to: 'pages' },
       ],
     }),

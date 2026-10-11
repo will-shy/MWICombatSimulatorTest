@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>触发器优化</title>
+    <link rel="icon" href="data:," />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next/21.6.10/i18next.min.js" integrity="sha512-4WlJJ18bTOvB8ask0iufUvS/N3NDs2NJUKXGeK9CGoFayxUASLGsiBAvMtO+dfdp+MNzaOZLStxIwc2rZz5hSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-browser-languagedetector/6.1.3/i18nextBrowserLanguageDetector.min.js" integrity="sha512-w/1n/omCK6/QXznOMYrp+arhVcWM87ioNqNkpWyFYhDFBgLNiwUG9Omp/YGPwy5Q/p7lktUI1eXZX3nN/TDDAA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/i18next-http-backend/1.3.2/i18nextHttpBackend.min.js" integrity="sha512-6KSl9S4uqyiqhlImZ5pcEQKCU7Mk/nyr+nJQAZe9ZY9en6cUmQKG/b3v1Db/1fOiV5zdOjjwWQ/S90p7eDLxgA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="js/i18n.js"></script>
+    <style>
+        /* Same palette as optimization.html so the tools read as one set. */
+        :root {
+            --bg: #1e1f24; --panel: #2a2c33; --panel2: #33353d; --text: #e8e8ea; --dim: #9aa0aa;
+            --accent: #5b9bd5; --border: #3d404a; --good: #4caf50; --bad: #e05252; --warn: #d4a13a;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+               background: var(--bg); color: var(--text); font-size: 14px; }
+        header { padding: 14px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+                 display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+        header h1 { font-size: 18px; margin: 0; }
+        header nav { margin-left: auto; display: flex; gap: 12px; }
+        header nav a { color: var(--accent); text-decoration: none; }
+        .dim { color: var(--dim); }
+        main { padding: 16px 20px 60px; display: flex; flex-direction: column; gap: 16px; }
+        section { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+        section > h2 { font-size: 14px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--dim); }
+        .row { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+        label.inline { display: flex; gap: 6px; align-items: center; }
+        select, input[type="number"] { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+                                       border-radius: 6px; padding: 5px 7px; font-size: 13px; }
+        input[type="number"] { width: 90px; }
+        .btn { background: var(--accent); color: #10131a; border: none; border-radius: 6px; padding: 8px 14px;
+               font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .btn.small { padding: 4px 8px; font-size: 12px; }
+        .btn.ghost { background: var(--panel2); color: var(--text); border: 1px solid var(--border); }
+        .btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--border); }
+        .players { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; }
+        .player > h3 { margin: 0 0 8px; font-size: 14px; }
+        .ability { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; background: var(--panel2); }
+        .ability-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .ability-head b { flex: 1; }
+        .current { font-size: 12px; color: var(--dim); margin: 4px 0; white-space: pre-wrap; }
+        .trig { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: 4px 0; }
+        .trig select { max-width: 170px; }
+        .hint { font-size: 12px; color: var(--dim); }
+        table { border-collapse: collapse; width: 100%; font-size: 12px; }
+        th, td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: right; }
+        th:first-child, td:first-child, td.left, th.left { text-align: left; }
+        th { color: var(--dim); font-weight: 600; }
+        tr.best td { background: rgba(76, 175, 80, 0.14); }
+        tr.base td { background: rgba(91, 155, 213, 0.08); }
+        .good { color: var(--good); } .bad { color: var(--bad); }
+        .plan-item { margin: 6px 0; }
+        /* js/i18n.js adds its own fixed switcher; this page has one in the header instead. */
+        .language-switcher { display: none !important; }
+        #langToggle { display: flex; gap: 4px; }
+        #langToggle button { background: var(--panel2); color: var(--dim); border: 1px solid var(--border);
+                             border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer; }
+        #langToggle button.active { color: var(--text); border-color: var(--accent); }
+        .error { color: var(--bad); white-space: pre-wrap; }
+        .progress { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; width: 240px; }
+        .progress > div { height: 100%; background: var(--accent); width: 0; }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1 data-i18n-opt="trTitle">触发器优化</h1>
+        <span class="dim" id="contextLine"></span>
+        <nav>
+            <a href="optimization.html" data-i18n-opt="trNavOptimization">配装优化</a>
+            <a href="index.html" data-i18n-opt="trNavSimulator">模拟器</a>
+            <span id="langToggle">
+                <button type="button" data-lang="zh">中文</button>
+                <button type="button" data-lang="en">EN</button>
+            </span>
+        </nav>
+    </header>
+    <main>
+        <div class="error" id="errorBox"></div>
+
+        <section>
+            <h2 data-i18n-opt="trSecAbilities">技能</h2>
+            <div class="hint" style="margin-bottom:10px" id="abilitiesHint"></div>
+            <div class="players" id="players"></div>
+        </section>
+
+        <section>
+            <h2 data-i18n-opt="trSecPlan">方案预览</h2>
+            <div id="planBox" class="hint"></div>
+            <div class="row" style="margin-top:12px">
+                <label class="inline"><span data-i18n-opt="trHours">每次模拟时长（小时）</span> <input type="number" id="simHours" min="1" max="1000" value="10"></label>
+                <label class="inline" data-i18n-opt-title="trConfirmHoursTitle"><span data-i18n-opt="trConfirmHours">确认模拟时长（小时）</span> <input type="number" id="confirmHours" min="1" max="10000" value="100"></label>
+                <label class="inline" data-i18n-opt-title="trPoolSizeTitle"><span data-i18n-opt="trPoolSize">同时模拟数</span> <input type="number" id="poolSize" min="1" value="1"> <span class="hint" id="poolMax"></span></label>
+                <label class="inline" data-i18n-opt-title="trParallelTitle"><input type="checkbox" id="parallel" checked> <span data-i18n-opt="trParallel">并行模拟</span></label>
+                <button type="button" class="btn" id="runBtn" data-i18n-opt="trRun" disabled>开始触发器优化</button>
+                <button type="button" class="btn ghost" id="stopBtn" data-i18n-opt="trStop" disabled>停止</button>
+                <div class="progress"><div id="progressBar"></div></div>
+                <span class="hint" id="progressText"></span>
+            </div>
+        </section>
+
+        <section>
+            <h2 data-i18n-opt="trSecResults">结果</h2>
+            <div id="resultsBox" class="hint"></div>
+        </section>
+    </main>
+
+    <script src="triggerOptimization.js"></script>
+</body>
+
+</html>
