@@ -188,6 +188,16 @@ a request can only lower the pool. The Optimization page itself does not send on
 Parallel mode only fills the pool when several searches have candidates at once: a single ability's
 round has 3–5 candidates, so with fewer abilities than cores some cores idle.
 
+**Stopping** (`stop`). The Stop button ends the run at once and the page keeps the partial results. Two
+rules matter: (1) `optimizationWorker.js` answers `cancel_optimization` by terminating its simulation
+workers, whose pending runs then never settle, so **it never posts `optimization_cancelled`**. A page
+that waits for that message hangs forever, so the page terminates the pool itself and rejects the
+running batch as "stopped" (`stopBatch`). (2) Everything queued or requested afterwards rejects as
+"stopped" too (`createSimulator` checks the `stopped` flag when a request is made and before each
+batch), so a search that is between batches cannot start a new one. The stage that is running
+(search or confirmation) does not matter; the confirmation is skipped after a stop. The Optimization
+page's own Stop has a different path (it ends the run itself after a timeout).
+
 **Results** start with the **recommended triggers** (the adopted ones, at the top), then baseline, the
 combined run (parallel), best so far, and a table per ability and pass with every trial. The page has no way to write them back to the game or the
 Optimization page; copy them over.

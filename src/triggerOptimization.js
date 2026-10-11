@@ -104,6 +104,8 @@ let drafts = [];
 let running = false;
 let stopped = false;
 let worker = null;
+// Ends the batch that is running right now as "stopped" (null between batches).
+let stopBatch = null;
 let report = null;
 
 const el = (id) => document.getElementById(id);
@@ -345,8 +347,10 @@ function runBatch(conditions, hours, poolSize) {
         const finish = (fn, value) => {
             batchWorker.terminate();
             if (worker === batchWorker) worker = null;
+            stopBatch = null;
             fn(value);
         };
+        stopBatch = () => finish(reject, new Error("stopped"));
         batchWorker.onmessage = (event) => {
             const data = event.data;
             if (data.type === "optimization_condition_result") {
@@ -395,6 +399,10 @@ function createSimulator(hours, poolSize, onSimDone) {
             while (pending.length > 0) {
                 const batch = pending;
                 pending = [];
+                if (stopped) {
+                    batch.forEach((x) => x.reject(new Error("stopped")));
+                    continue;
+                }
                 try {
                     const results = await runBatch(batch.map((x, i) => buildCondition(`c${i}`, x.merged)), hours, poolSize);
                     batch.forEach((x, i) => {
@@ -418,6 +426,7 @@ function createSimulator(hours, poolSize, onSimDone) {
     };
 
     return (merged) => {
+        if (stopped) return Promise.reject(new Error("stopped"));
         const key = JSON.stringify([...merged.entries()].sort());
         if (!inflight.has(key)) {
             const promise = new Promise((resolve, reject) => pending.push({ merged, resolve, reject }));
@@ -635,13 +644,18 @@ async function optimize() {
     }
 }
 
+// Stops the run at once. The pool cannot be relied on to report back: on cancel it terminates its
+// simulation workers, whose pending runs then never settle, so it never posts "cancelled". Terminate
+// the pool here and end the batch ourselves; queued requests and every later one reject as "stopped".
 function stop() {
+    if (!running) return;
     stopped = true;
+    el("stopBtn").disabled = true;
+    el("progressText").textContent = t("trStopping");
     if (worker) {
         worker.postMessage({ type: "cancel_optimization" });
-        const current = worker;
-        setTimeout(() => current.terminate(), 1000);
     }
+    if (stopBatch) stopBatch();
 }
 
 // ------------------------------------------------------------------ results
