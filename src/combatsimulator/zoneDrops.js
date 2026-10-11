@@ -106,6 +106,24 @@ export function expectedDropsFor(simResult, itemHrid, playerHrid) {
     return total;
 }
 
+// Charms are scored as one number: a basic charm is worth 1, an advanced charm 8.1. Only these two
+// tiers drop from monsters (trainee/expert/master/grandmaster charms are not in any drop table), and
+// every charm type counts, since which ones a zone drops is the zone's business, not the build's.
+export const CHARM_VALUES = { basic: 1, advanced: 8.1 };
+const CHARM_ITEMS = Object.keys(itemDetailMap)
+    .map((hrid) => ({ hrid, tier: hrid.match(/^\/items\/(basic|advanced)_[a-z_]+_charm$/)?.[1] }))
+    .filter((item) => item.tier);
+
+// Expected charm score of one player over the whole simulation (same expected-value drops as
+// expectedDropsFor, so it is directly comparable between runs).
+export function charmScoreFor(simResult, playerHrid) {
+    let score = 0;
+    for (const { hrid, tier } of CHARM_ITEMS) {
+        score += CHARM_VALUES[tier] * expectedDropsFor(simResult, hrid, playerHrid);
+    }
+    return score;
+}
+
 // Total damage a player dealt, read off the attack log: keys are the damage done, values the number
 // of times that much landed, and "miss" is not damage.
 function damageDealtBy(simResult, playerHrid) {
@@ -133,6 +151,7 @@ export function metricsFor(simResult, itemHrid, playerHrids) {
             deathsPerHour: (simResult.deaths?.[hrid] ?? 0) / hours,
             dps: damageDealtBy(simResult, hrid) / seconds,
             fragsPerHour: itemHrid ? expectedDropsFor(simResult, itemHrid, hrid) / hours : 0,
+            charmsPerHour: charmScoreFor(simResult, hrid) / hours,
             xpPerHour: Object.values(simResult.experienceGained?.[hrid] ?? {})
                 .reduce((prev, cur) => prev + cur, 0) / hours,
         };
@@ -145,6 +164,7 @@ export function metricsFor(simResult, itemHrid, playerHrids) {
         players,
         // The ranking number: the average player's fragments per hour.
         avgFragsPerHour: fragValues.reduce((prev, cur) => prev + cur, 0) / (fragValues.length || 1),
+        avgCharmsPerHour: playerHrids.reduce((prev, hrid) => prev + players[hrid].charmsPerHour, 0) / (playerHrids.length || 1),
         groupFragsPerHour: fragValues.reduce((prev, cur) => prev + cur, 0),
     };
 }

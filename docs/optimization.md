@@ -44,7 +44,8 @@ preview title and the CSV.
 kits as data (`kits`, `infos`), and the variant names and the cell tooltips (`conditionLabels`,
 `conditionDetail`) are rebuilt on every render, so switching to Chinese relabels existing rows,
 including the ability names inside the tooltips. `kitName` lives in `src/kitName.js`, shared with the
-Trigger Optimization page, which receives `kits` in its context and names the players' kits itself.
+Trigger Optimization page, which names each player's kit from the DTO's abilities (not from labels or kits stored in
+`mwiTriggerOptContext`, so a context saved by an older version still follows the language).
 
 **Chinese:** in zh there are no initials: each non-aura ability shows its full Chinese name, joined with
 `+` (so no collision handling is needed). Rows build their names from the stored kits at render time
@@ -63,10 +64,35 @@ gear loadout). The table cell tooltip (`detail`, the diff against baseline, plus
 tells them apart. Initials can also collide across abilities (Quick Aid / Quick Shot both QA).
 The same rule is used on Skill Lab (`docs/skill_lab.md`).
 
+## Goals and charms
+
+The **Goal** select has three choices: fragments/h (default, with the fragment item picker, shown only
+for this goal), XP/h and charms/h. The goal decides (`SORT_FOR_GOAL`, `goalValue`):
+
+- what the **best-row highlight** and the results summary judge on, whatever the table is sorted by;
+- the sort the table starts on. Picking a goal also sets the sort select to it (frags / xp / charms),
+  which can then be changed freely.
+
+The goal is saved with the setup (`mwiOptimizationSetup.goal`).
+
+**Charm score** (`charmScoreFor`, `CHARM_VALUES` in `zoneDrops.js`): every basic charm counts 1 and every
+advanced charm 8.1, summed over all charm types, as **expected drops** (same maths as fragments:
+kills × effective drop rate × average stack, with the player's drop bonuses and the party split). Only
+basic and advanced charms are counted: they are the only charm tiers in any monster drop table. A charm's
+drop rate can be negative plus a per-tier increment, so an advanced charm may not drop at all at low
+difficulty tiers (a rate ≤ 0 is skipped, as for every item). The score is per hour in
+`metrics.players[h].charmsPerHour` and `metrics.avgCharmsPerHour`, shown as a team-average column and a
+column in each player group, and in the CSV.
+
 ## Results table
 
+Each kit name is followed by that player's DPS and its share of the party's DPS, e.g. `(235, 34%)`
+(rounded; DPS is the same number as the player's DPS column, the share is out of the three players'
+total). Rows that failed show the name only.
+
 Columns: tier, the three players' kit names, then the team group (avg frags/h, **EPH** =
-encounters/h, avg XP/h) and one group per player (frags/h, DPS, **DPH** = deaths/h, XP/h). The
+encounters/h, avg XP/h, avg charms/h) and one group per player (frags/h, DPS, **DPH** = deaths/h, XP/h,
+charms/h). The
 English headers are EPH and DPH (zh stays 遭遇/时 and 死亡/时). The first column of the team group
 and of each player group carries the `sep` class, a 2px accent left border on both header and body
 cells, so the groups read apart. A new column group needs `sep` on its first header and body cell.

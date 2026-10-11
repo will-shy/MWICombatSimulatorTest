@@ -255,7 +255,7 @@ function triggerRowHtml(p, a, ti, trigger) {
 function renderPlayers() {
     el("players").innerHTML = ctx.players.map((player, p) => `
         <div class="player">
-            <h3>${esc(playerName(p))} <span class="dim">· ${esc(ctx.kits?.[p] ? kitName(ctx.kits[p]) : ctx.labels?.[p] ?? "")}</span></h3>
+            <h3>${esc(playerName(p))} <span class="dim">· ${esc(kitName(player.dto.abilities))}</span></h3>
             ${player.dto.abilities.map((ability, a) => {
                 const draft = drafts[p][a];
                 const at = `data-p="${p}" data-a="${a}"`;

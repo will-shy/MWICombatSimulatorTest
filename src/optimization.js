@@ -26,6 +26,8 @@ const PLUGIN_MIRROR_KEY = "mwiPluginCharacters";
 const PLUGIN_MIRROR_NODE_ID = "mwi-plugin-data";
 const PLUGIN_MIRROR_EVENT = "mwi-plugin-data";
 const SETUP_KEY = "mwiOptimizationSetup";
+// What each goal ranks by: the sort the table starts on, and the number the best row is judged on.
+const SORT_FOR_GOAL = { fragments: "frags", xp: "xp", charms: "charms" };
 // T2-T5 can be swept. T4 and T5 are the interesting ones for fragments, so they are what a zone
 // starts with (DEFAULT_TIERS); T2 and T3 are opt-in.
 const TIERS = [2, 3, 4, 5];
@@ -167,6 +169,7 @@ function saveSetup() {
     try {
         localStorage.setItem(SETUP_KEY, JSON.stringify({
             zone: el("zoneSelect").value,
+            goal: el("goalSelect").value,
             fragment: el("fragmentSelect").value,
             tiers: TIERS.filter((tier) => el("tier" + tier).checked),
             hours: el("simHours").value,
@@ -190,6 +193,10 @@ function loadSetup() {
     }
 
     if (saved.zone) el("zoneSelect").value = saved.zone;
+    if (saved.goal && [...el("goalSelect").options].some((o) => o.value === saved.goal)) {
+        el("goalSelect").value = saved.goal;
+        el("sortSelect").value = SORT_FOR_GOAL[saved.goal];
+    }
     if (Array.isArray(saved.tiers)) {
         for (const tier of TIERS) {
             el("tier" + tier).checked = saved.tiers.includes(tier);
@@ -258,9 +265,11 @@ function refreshFragmentOptions() {
         select.value = offered[0].hrid;
     }
 
-    el("fragmentField").classList.toggle("hidden", !needsChoice);
+    const fragmentGoal = el("goalSelect").value === "fragments";
+    el("fragmentField").classList.toggle("hidden", !needsChoice || !fragmentGoal);
 
     const note = el("fragmentNote");
+    note.style.display = fragmentGoal ? "" : "none";
     const item = itemName();
     if (fragments.length === 0) {
         note.textContent = t("fragNoteNone");
@@ -858,12 +867,22 @@ function sortedRows() {
         switch (key) {
             case "eph": return row.metrics.encountersPerHour;
             case "xp": return average(row, "xpPerHour");
+            case "charms": return row.metrics.avgCharmsPerHour;
             case "dps": return average(row, "dps");
             case "deaths": return -average(row, "deathsPerHour");
             default: return row.metrics.avgFragsPerHour;
         }
     };
     return rows.slice().sort((a, b) => score(b) - score(a));
+}
+
+// The number the selected goal is judged on, for the best-row highlight and the summary.
+function goalValue(metrics) {
+    switch (el("goalSelect").value) {
+        case "xp": return PLAYER_HRIDS.reduce((s, h) => s + metrics.players[h].xpPerHour, 0) / PLAYER_HRIDS.length;
+        case "charms": return metrics.avgCharmsPerHour;
+        default: return metrics.avgFragsPerHour;
+    }
 }
 
 function average(row, field) {
@@ -875,28 +894,38 @@ function renderResults() {
     updateVariantHeaders();
     const body = el("resultsBody");
     const ordered = sortedRows();
-    // Always highlight the fragment-optimal condition, whatever the table is sorted by, so
-    // re-sorting to inspect deaths or xp does not move the goal.
+    // Always highlight the condition that is best for the goal, whatever the table is sorted by, so
+    // re-sorting to inspect deaths or dps does not move the goal.
+    const goal = el("goalSelect").value;
     const best = rows.filter((row) => row.metrics)
-        .sort((a, b) => b.metrics.avgFragsPerHour - a.metrics.avgFragsPerHour)[0];
+        .sort((a, b) => goalValue(b.metrics) - goalValue(a.metrics))[0];
 
     el("resultsSummary").textContent = rows.length === 0 || !best
         ? ""
-        : t("resultsSummary", {
+        : t(goal === "xp" ? "resultsSummaryXp" : goal === "charms" ? "resultsSummaryCharms" : "resultsSummary", {
             n: rows.length,
-            value: fmt(best.metrics.avgFragsPerHour, 2),
+            value: goal === "xp" ? fmtK(goalValue(best.metrics)) : fmt(goalValue(best.metrics), 2),
             item: itemName(),
             tier: best.condition.difficultyTier,
         });
 
     body.innerHTML = ordered.map((row) => {
         const condition = row.condition;
+        // After each kit name: that player's DPS and its share of the party's DPS, e.g. "(235, 34%)".
+        const dpsOf = (i) => row.metrics?.players[PLAYER_HRIDS[i]]?.dps;
+        const totalDps = row.metrics ? PLAYER_HRIDS.reduce((sum, hrid) => sum + row.metrics.players[hrid].dps, 0) : 0;
         const variantCells = conditionLabels(condition)
-            .map((label, i) => `<td class="variant" title="${esc(conditionDetail(condition, i))}">${esc(label)}</td>`).join("");
+            .map((label, i) => {
+                const dps = dpsOf(i);
+                const share = Number.isFinite(dps)
+                    ? ` <span class="dim">(${Math.round(dps)}, ${totalDps > 0 ? Math.round((dps / totalDps) * 100) : 0}%)</span>`
+                    : "";
+                return `<td class="variant" title="${esc(conditionDetail(condition, i))}">${esc(label)}${share}</td>`;
+            }).join("");
 
         if (row.error) {
             return `<tr class="failed"><td></td><td>T${condition.difficultyTier}</td>${variantCells}` +
-                `<td colspan="15">${esc(row.error)}</td></tr>`;
+                `<td colspan="19">${esc(row.error)}</td></tr>`;
         }
 
         const metrics = row.metrics;
@@ -905,7 +934,8 @@ function renderResults() {
             return `<td class="sep">${fmt(player.fragsPerHour, 2)}</td>` +
                 `<td>${fmt(player.dps, 1)}</td>` +
                 `<td class="${player.deathsPerHour > 0 ? "warnCell" : ""}">${fmt(player.deathsPerHour, 2)}</td>` +
-                `<td>${fmtK(player.xpPerHour)}</td>`;
+                `<td>${fmtK(player.xpPerHour)}</td>` +
+                `<td>${fmt(player.charmsPerHour, 2)}</td>`;
         }).join("");
 
         const classes = [condition.isBaseline ? "baseline" : "", row === best ? "best" : ""].filter(Boolean).join(" ");
@@ -913,7 +943,8 @@ function renderResults() {
             `<td>T${condition.difficultyTier}</td>${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
             `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
-            `<td>${fmtK(average(row, "xpPerHour"))}</td>${playerCells}</tr>`;
+            `<td>${fmtK(average(row, "xpPerHour"))}</td>` +
+            `<td>${fmt(metrics.avgCharmsPerHour, 2)}</td>${playerCells}</tr>`;
     }).join("");
 }
 
@@ -954,9 +985,9 @@ function itemName() {
 
 function exportCsv() {
     const header = ["tier", "player1 variant", "player2 variant", "player3 variant",
-        "avg frags/h", "encounters/h", "avg xp/h"];
+        "avg frags/h", "encounters/h", "avg xp/h", "avg charm score/h"];
     for (const hrid of PLAYER_HRIDS) {
-        header.push(`${hrid} frags/h`, `${hrid} dps`, `${hrid} deaths/h`, `${hrid} xp/h`);
+        header.push(`${hrid} frags/h`, `${hrid} dps`, `${hrid} deaths/h`, `${hrid} xp/h`, `${hrid} charm score/h`);
     }
 
     const lines = [header.join(",")];
@@ -966,11 +997,11 @@ function exportCsv() {
         }
         let cells = [row.condition.difficultyTier, ...conditionLabels(row.condition).map((l) => `"${l.replace(/"/g, '""')}"`),
             row.metrics.avgFragsPerHour.toFixed(4), row.metrics.encountersPerHour.toFixed(2),
-            average(row, "xpPerHour").toFixed(0)];
+            average(row, "xpPerHour").toFixed(0), row.metrics.avgCharmsPerHour.toFixed(4)];
         for (const hrid of PLAYER_HRIDS) {
             const player = row.metrics.players[hrid];
             cells.push(player.fragsPerHour.toFixed(4), player.dps.toFixed(2),
-                player.deathsPerHour.toFixed(4), player.xpPerHour.toFixed(0));
+                player.deathsPerHour.toFixed(4), player.xpPerHour.toFixed(0), player.charmsPerHour.toFixed(4));
         }
         lines.push(cells.join(","));
     }
@@ -1071,6 +1102,13 @@ function init() {
     el("comExp").addEventListener("change", saveSetup);
     el("comDrop").addEventListener("change", saveSetup);
     el("sortSelect").addEventListener("change", renderResults);
+    // Picking a goal also sorts the table by it.
+    el("goalSelect").addEventListener("change", () => {
+        el("sortSelect").value = SORT_FOR_GOAL[el("goalSelect").value];
+        refreshFragmentOptions();
+        saveSetup();
+        renderResults();
+    });
     el("previewClose").addEventListener("click", closePreview);
     el("previewModal").addEventListener("click", (event) => {
         // Clicking the backdrop closes; clicking inside the dialog does not.

@@ -259,7 +259,8 @@
         th:first-child, td:first-child, .variant { text-align: left; }
         thead th { color: var(--dim); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
         thead tr.group th { border-bottom: none; color: var(--accent); }
-        td.variant { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+        /* Long ranger kit names wrap rather than cut off the DPS that follows them. */
+        td.variant { max-width: 320px; white-space: normal; }
         th.sep, td.sep { border-left: 2px solid var(--accent); }
         td.strong { font-weight: 700; }
         td.warnCell { color: var(--warn); }
@@ -294,6 +295,8 @@
                 <label><span data-i18n-opt="labelGoal">优化目标</span>
                     <select id="goalSelect">
                         <option value="fragments" data-i18n-opt="goalFragments">每小时碎片数</option>
+                        <option value="xp" data-i18n-opt="goalXp">每小时经验</option>
+                        <option value="charms" data-i18n-opt="goalCharms">每小时护符</option>
                     </select>
                 </label>
                 <label id="fragmentField" class="hidden"><span data-i18n-opt="labelItem">物品</span>
@@ -350,6 +353,7 @@
                 <label><span data-i18n-opt="sortBy">排序</span>
                     <select id="sortSelect">
                         <option value="frags" data-i18n-opt="sortFrags">碎片/时（每人）</option>
+                        <option value="charms" data-i18n-opt="sortCharms">护符/时（人均）</option>
                         <option value="eph" data-i18n-opt="sortEph">遭遇/时</option>
                         <option value="xp" data-i18n-opt="sortXp">经验/时（人均）</option>
                         <option value="dps" data-i18n-opt="sortDps">DPS（人均）</option>
@@ -364,10 +368,10 @@
                     <thead>
                         <tr class="group">
                             <th colspan="5"></th>
-                            <th class="sep" colspan="3" data-i18n-opt="thGroup">团队</th>
-                            <th class="sep" colspan="4" data-i18n-opt="thPlayer1">玩家1</th>
-                            <th class="sep" colspan="4" data-i18n-opt="thPlayer2">玩家2</th>
-                            <th class="sep" colspan="4" data-i18n-opt="thPlayer3">玩家3</th>
+                            <th class="sep" colspan="4" data-i18n-opt="thGroup">团队</th>
+                            <th class="sep" colspan="5" data-i18n-opt="thPlayer1">玩家1</th>
+                            <th class="sep" colspan="5" data-i18n-opt="thPlayer2">玩家2</th>
+                            <th class="sep" colspan="5" data-i18n-opt="thPlayer3">玩家3</th>
                         </tr>
                         <tr>
                             <th></th>
@@ -378,9 +382,10 @@
                             <th class="sep" data-i18n-opt="thFragsAvg" data-i18n-opt-title="avgTitle">碎片/时 均</th>
                             <th data-i18n-opt="thEnc">遭遇/时</th>
                             <th data-i18n-opt="thXpAvg" data-i18n-opt-title="avgTitle">经验/时 均 (k)</th>
-                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th>
-                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th>
-                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th>
+                            <th data-i18n-opt="thCharmAvg" data-i18n-opt-title="charmTitle">护符/时 均</th>
+                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th><th data-i18n-opt="thCharm" data-i18n-opt-title="charmTitle">护符/时</th>
+                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th><th data-i18n-opt="thCharm" data-i18n-opt-title="charmTitle">护符/时</th>
+                            <th class="sep" data-i18n-opt="thFrags">碎片/时</th><th data-i18n-opt="thDps">DPS</th><th data-i18n-opt="thDeaths">死亡/时</th><th data-i18n-opt="thXp">经验/时 (k)</th><th data-i18n-opt="thCharm" data-i18n-opt-title="charmTitle">护符/时</th>
                         </tr>
                     </thead>
                     <tbody id="resultsBody"></tbody>
