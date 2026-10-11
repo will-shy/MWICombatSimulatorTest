@@ -90,6 +90,16 @@ Each kit name is followed by that player's DPS and its share of the party's DPS,
 (rounded; DPS is the same number as the player's DPS column, the share is out of the three players'
 total). Rows that failed show the name only.
 
+**Weapon icon.** Each kit cell starts with the weapon that player carries in that row
+(`weaponIconHtml`): the two-hand slot, else the main hand, read from the row's own DTO, so a candidate
+kit that borrows another loadout shows that loadout's weapon. It is drawn from the item sprite
+`assets/items_sprite.svg` (the game's `items_sprite` SVG: one `<symbol>` per item, id = the item hrid
+without `/items/`, e.g. `rainbow_sword`), copied by webpack to the site root and used as
+`<use href="items_sprite.svg#rainbow_sword">`. The reference has to be same-origin, so the file is
+hosted here, not hot-linked. Unarmed players, or an item the sprite lacks, show no icon. The sprite was
+checked before adding it: only drawing elements (`symbol`, `path`, `circle`, ...), no script, style,
+handler or external link. It is about 3.9 MB, loaded once and cached.
+
 Columns: tier, the three players' kit names, then the team group (avg frags/h, **EPH** =
 encounters/h, avg XP/h, avg charms/h) and one group per player (frags/h, DPS, **DPH** = deaths/h, XP/h,
 charms/h). The

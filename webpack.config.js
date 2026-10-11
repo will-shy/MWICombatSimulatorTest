@@ -36,6 +36,8 @@ module.exports = {
         { from: path.resolve(__dirname, 'optimization.html'), to: 'optimization.html' },
         { from: path.resolve(__dirname, 'trigger-optimization.html'), to: 'trigger-optimization.html' },
         { from: path.resolve(__dirname, 'pages'), to: 'pages' },
+        // Item icon sprite (symbol id = item hrid without "/items/"), used with <use href="items_sprite.svg#id">.
+        { from: path.resolve(__dirname, 'assets/items_sprite.svg'), to: 'items_sprite.svg' },
       ],
     }),
   ],

@@ -700,6 +700,18 @@ function playerVariants(slotIndex) {
 // The variant names of a result row, built from its kits when it has them so they follow the page
 // language (a row's stored labels were made in whatever language was on when it ran).
 // The tooltip text is rebuilt the same way, so ability names in it follow the language too.
+// The weapon a result row's player carries, as a small icon from the item sprite (assets/items_sprite.svg,
+// copied to the site root; symbol ids are the item hrid without "/items/"). Two-handers win over a
+// main hand; nothing is drawn for an unarmed player or an item the sprite does not have.
+function weaponIconHtml(dto) {
+    const weapon = dto?.equipment?.["/equipment_types/two_hand"] ?? dto?.equipment?.["/equipment_types/main_hand"];
+    const id = weapon?.hrid?.replace("/items/", "");
+    if (!id) return "";
+    const name = itemLabel(weapon.hrid);
+    return `<svg class="weapon-icon" role="img" aria-label="${esc(name)}"><title>${esc(name)}</title>` +
+        `<use href="items_sprite.svg#${esc(id)}"></use></svg>`;
+}
+
 function conditionDetail(condition, i) {
     const info = condition.infos?.[i];
     if (!info) return condition.details?.[i] ?? "";
@@ -917,10 +929,11 @@ function renderResults() {
         const variantCells = conditionLabels(condition)
             .map((label, i) => {
                 const dps = dpsOf(i);
+                const icon = weaponIconHtml(condition.players?.[i]);
                 const share = Number.isFinite(dps)
                     ? ` <span class="dim">(${Math.round(dps)}, ${totalDps > 0 ? Math.round((dps / totalDps) * 100) : 0}%)</span>`
                     : "";
-                return `<td class="variant" title="${esc(conditionDetail(condition, i))}">${esc(label)}${share}</td>`;
+                return `<td class="variant" title="${esc(conditionDetail(condition, i))}">${icon}${esc(label)}${share}</td>`;
             }).join("");
 
         if (row.error) {
