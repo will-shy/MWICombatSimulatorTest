@@ -50,14 +50,17 @@ const fmt = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits
 const fmtK = (value) => Number.isFinite(value) ? (value / 1000).toFixed(1) : "-";
 // A kit's name is its setup without the auras (special slot): initials for multi-word abilities,
 // the full name for single words, e.g. "QA+EA+NV+Entangle". Always from the English game names, so
-// the initials read the same in every language.
+// the initials read the same in every language. Abilities of one kit whose initials collide
+// (Penetrating Shot and Pestilent Shot are both PS) keep their full names.
 const kitName = (kitSlots) => {
-    const parts = (kitSlots || [])
+    const names = (kitSlots || [])
         .filter((entry) => entry && entry.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility)
-        .map((entry) => {
-            const words = (abilityDetailMap[entry.hrid]?.name ?? entry.hrid.split("/").pop()).split(/\s+/);
-            return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : words[0];
-        });
+        .map((entry) => abilityDetailMap[entry.hrid]?.name ?? entry.hrid.split("/").pop());
+    const short = names.map((name) => {
+        const words = name.split(/\s+/);
+        return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : name;
+    });
+    const parts = names.map((name, i) => short.filter((s) => s === short[i]).length > 1 ? name : short[i]);
     return parts.length ? parts.join("+") : t("noAbilities");
 };
 const slotLabelFor = (i) => i === 0 ? t("slotSpecial") : t("slot", { n: i });

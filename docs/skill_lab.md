@@ -85,7 +85,7 @@ consequence: a kit that swaps an equipped ability (own level, say 85) for an unk
 
 A kit has no editable name. It is shown as its setup without the auras (special-slot abilities):
 initials for multi-word abilities, the full name for single words, joined with `+`, e.g.
-`QA+EA+NV+Entangle` (`kitName` in `skillLab.js`). It updates when a slot changes.
+`QA+EA+NV+Entangle` (`kitName` in `skillLab.js`). When two abilities of one kit share initials (Penetrating Shot / Pestilent Shot are both PS), those keep their full names. It updates when a slot changes.
 
 ### Runs and seeds
 

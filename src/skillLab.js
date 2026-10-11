@@ -278,13 +278,16 @@ function sourceName(key) {
 }
 
 // A kit's name is its setup without the auras: initials for multi-word abilities, the full name
-// for single words ("QA+EA+NV+Entangle").
+// for single words ("QA+EA+NV+Entangle"). Abilities of one kit whose initials collide
+// (Penetrating Shot and Pestilent Shot are both PS) keep their full names.
 function kitName(kit) {
-    const parts = (kit || []).filter((s) => s && s.hrid && !(ABILITY_BY_HRID[s.hrid] || {}).isSpecial)
-        .map((s) => {
-            const words = shortName(s.hrid).split(/\s+/);
-            return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : words[0];
-        });
+    const names = (kit || []).filter((s) => s && s.hrid && !(ABILITY_BY_HRID[s.hrid] || {}).isSpecial)
+        .map((s) => shortName(s.hrid));
+    const short = names.map((name) => {
+        const words = name.split(/\s+/);
+        return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : name;
+    });
+    const parts = names.map((name, i) => short.filter((s) => s === short[i]).length > 1 ? name : short[i]);
     return parts.length ? parts.join("+") : "no abilities";
 }
 

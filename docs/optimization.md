@@ -40,6 +40,10 @@ English `abilityDetailMap` name in every language so they read the same in zh an
 auras shows "no abilities". The name feeds the card header, the results table's variant columns, the
 preview title and the CSV.
 
+**Colliding initials:** if two abilities *in the same kit* get the same initials (Penetrating Shot and
+Pestilent Shot are both PS), those abilities keep their full names (`Penetrating Shot+Pestilent Shot`).
+Only the colliding ones are expanded.
+
 Consequence: two variants can share a name (same non-aura abilities with different levels or another
 gear loadout). The table cell tooltip (`detail`, the diff against baseline, plus "gear from …")
 tells them apart. Initials can also collide across abilities (Quick Aid / Quick Shot both QA).
