@@ -17,6 +17,7 @@ import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import combatTriggerDependencyDetailMap from "./combatsimulator/data/combatTriggerDependencyDetailMap.json";
 import combatTriggerConditionDetailMap from "./combatsimulator/data/combatTriggerConditionDetailMap.json";
 import combatTriggerComparatorDetailMap from "./combatsimulator/data/combatTriggerComparatorDetailMap.json";
+import { kitName } from "./kitName.js";
 import { metricsFor } from "./combatsimulator/zoneDrops.js";
 import { gameName, initLanguage, language, onSharedI18nReady, setLanguage, t } from "./optimizationI18n.js";
 
@@ -254,7 +255,7 @@ function triggerRowHtml(p, a, ti, trigger) {
 function renderPlayers() {
     el("players").innerHTML = ctx.players.map((player, p) => `
         <div class="player">
-            <h3>${esc(playerName(p))} <span class="dim">· ${esc(ctx.labels?.[p] ?? "")}</span></h3>
+            <h3>${esc(playerName(p))} <span class="dim">· ${esc(ctx.kits?.[p] ? kitName(ctx.kits[p]) : ctx.labels?.[p] ?? "")}</span></h3>
             ${player.dto.abilities.map((ability, a) => {
                 const draft = drafts[p][a];
                 const at = `data-p="${p}" data-a="${a}"`;

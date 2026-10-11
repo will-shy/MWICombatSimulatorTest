@@ -12,6 +12,7 @@ import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json";
 import Player from "./combatsimulator/player.js";
 import { applyLevelGapDebuff, baselineAbilitySlots, importSetToPlayerDTO } from "./combatsimulator/importSet.js";
 import { combatZones, metricsFor, zoneDropItems, zoneFragmentItems } from "./combatsimulator/zoneDrops.js";
+import { kitName } from "./kitName.js";
 import { gameName, initLanguage, language, onSharedI18nReady, setLanguage, t } from "./optimizationI18n.js";
 
 const ONE_HOUR = 60 * 60 * 1e9;
@@ -48,21 +49,6 @@ const itemLabel = (hrid, fallback) => gameName("itemNames", hrid, fallback ?? it
 const fmt = (value, digits = 1) => Number.isFinite(value) ? value.toFixed(digits) : "-";
 // Experience runs to millions per hour, so the table reads it in thousands.
 const fmtK = (value) => Number.isFinite(value) ? (value / 1000).toFixed(1) : "-";
-// A kit's name is its setup without the auras (special slot): initials for multi-word abilities,
-// the full name for single words, e.g. "QA+EA+NV+Entangle". Always from the English game names, so
-// the initials read the same in every language. Abilities of one kit whose initials collide
-// (Penetrating Shot and Pestilent Shot are both PS) keep their full names.
-const kitName = (kitSlots) => {
-    const names = (kitSlots || [])
-        .filter((entry) => entry && entry.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility)
-        .map((entry) => abilityDetailMap[entry.hrid]?.name ?? entry.hrid.split("/").pop());
-    const short = names.map((name) => {
-        const words = name.split(/\s+/);
-        return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : name;
-    });
-    const parts = names.map((name, i) => short.filter((s) => s === short[i]).length > 1 ? name : short[i]);
-    return parts.length ? parts.join("+") : t("noAbilities");
-};
 const slotLabelFor = (i) => i === 0 ? t("slotSpecial") : t("slot", { n: i });
 
 // ------------------------------------------------------------------ plugin data
@@ -675,19 +661,23 @@ function playerVariants(slotIndex) {
     }
 
     const baseline = baselineAbilitySlots(set);
-    let variants = [{ label: kitName(baseline), detail: t("baselineDetail"), set, abilities: baseline }];
+    let variants = [{ label: kitName(baseline), detail: t("baselineDetail"), isBase: true, baseline, set, abilities: baseline }];
 
     slot.candidates.forEach((raw, index) => {
         const candidate = migrateCandidate(raw, baseline, index);
         // A candidate may bring its own loadout, in which case its gear and levels come from there.
         const ownSet = candidateSet(slotIndex, candidate) ?? set;
         let detail = candidateDiff(candidate, baseline);
+        let gearFrom = null;
         if (candidate.loadoutId && candidate.loadoutId !== slot.loadoutId) {
-            const name = loadoutEntries(slot.characterId)
+            gearFrom = loadoutEntries(slot.characterId)
                 .find((entry) => entry.id === candidate.loadoutId)?.name ?? candidate.loadoutId;
-            detail.unshift(t("gearFrom", { name }));
+            detail.unshift(t("gearFrom", { name: gearFrom }));
         }
         variants.push({
+            isBase: false,
+            baseline,
+            gearFrom,
             label: kitName(candidate.slots),
             // The diff is what the table's tooltip explains; the name alone keeps columns narrow.
             detail: detail.join(" · ") || t("sameAsBaseline"),
@@ -697,6 +687,22 @@ function playerVariants(slotIndex) {
     });
     return variants;
 }
+
+// The variant names of a result row, built from its kits when it has them so they follow the page
+// language (a row's stored labels were made in whatever language was on when it ran).
+// The tooltip text is rebuilt the same way, so ability names in it follow the language too.
+function conditionDetail(condition, i) {
+    const info = condition.infos?.[i];
+    if (!info) return condition.details?.[i] ?? "";
+    if (info.isBase) return t("baselineDetail");
+    const changes = candidateDiff({ slots: info.abilities }, info.baseline);
+    if (info.gearFrom) changes.unshift(t("gearFrom", { name: info.gearFrom }));
+    return changes.join(" · ") || t("sameAsBaseline");
+}
+
+const conditionLabels = (condition) => condition.kits
+    ? condition.kits.map((kit) => kitName(kit))
+    : condition.labels;
 
 function buildConditions() {
     const zoneHrid = el("zoneSelect").value;
@@ -717,6 +723,11 @@ function buildConditions() {
                         zoneHrid,
                         difficultyTier: tier,
                         labels: picked.map((variant) => variant.label),
+                        kits: picked.map((variant) => variant.abilities),
+                        infos: picked.map((variant) => ({
+                            isBase: variant.isBase, baseline: variant.baseline,
+                            abilities: variant.abilities, gearFrom: variant.gearFrom ?? null,
+                        })),
                         details: picked.map((variant) => variant.detail ?? t("baselineDetail")),
                         isBaseline: i === 0 && j === 0 && k === 0,
                         players: applyLevelGapDebuff(picked.map((variant, index) =>
@@ -880,8 +891,8 @@ function renderResults() {
 
     body.innerHTML = ordered.map((row) => {
         const condition = row.condition;
-        const variantCells = condition.labels
-            .map((label, i) => `<td class="variant" title="${esc(condition.details?.[i] ?? "")}">${esc(label)}</td>`).join("");
+        const variantCells = conditionLabels(condition)
+            .map((label, i) => `<td class="variant" title="${esc(conditionDetail(condition, i))}">${esc(label)}</td>`).join("");
 
         if (row.error) {
             return `<tr class="failed"><td></td><td>T${condition.difficultyTier}</td>${variantCells}` +
@@ -922,7 +933,8 @@ function openTriggerOptimization(conditionId) {
             comExp: Number(el("comExp").value) || 0,
             comDrop: Number(el("comDrop").value) || 0,
         },
-        labels: condition.labels,
+        labels: conditionLabels(condition),
+        kits: condition.kits,
         playerNames: slots.map((slot) => pluginData.characters[slot.characterId]?.characterMeta?.name || ""),
         players: condition.players.map((dto) => ({ dto })),
     };
@@ -952,7 +964,7 @@ function exportCsv() {
         if (!row.metrics) {
             continue;
         }
-        let cells = [row.condition.difficultyTier, ...row.condition.labels.map((l) => `"${l.replace(/"/g, '""')}"`),
+        let cells = [row.condition.difficultyTier, ...conditionLabels(row.condition).map((l) => `"${l.replace(/"/g, '""')}"`),
             row.metrics.avgFragsPerHour.toFixed(4), row.metrics.encountersPerHour.toFixed(2),
             average(row, "xpPerHour").toFixed(0)];
         for (const hrid of PLAYER_HRIDS) {

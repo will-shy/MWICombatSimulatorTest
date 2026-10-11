@@ -40,6 +40,16 @@ English `abilityDetailMap` name in every language so they read the same in zh an
 auras shows "no abilities". The name feeds the card header, the results table's variant columns, the
 preview title and the CSV.
 
+**Language switching.** Nothing language-dependent is baked into a result row. Each condition stores its
+kits as data (`kits`, `infos`), and the variant names and the cell tooltips (`conditionLabels`,
+`conditionDetail`) are rebuilt on every render, so switching to Chinese relabels existing rows,
+including the ability names inside the tooltips. `kitName` lives in `src/kitName.js`, shared with the
+Trigger Optimization page, which receives `kits` in its context and names the players' kits itself.
+
+**Chinese:** in zh there are no initials: each non-aura ability shows its full Chinese name, joined with
+`+` (so no collision handling is needed). Rows build their names from the stored kits at render time
+(`conditionLabels`), so switching language relabels the table.
+
 **Colliding initials:** if two abilities *in the same kit* get the same initials (Penetrating Shot and
 Pestilent Shot are both PS), those abilities keep their full names (`Penetrating Shot+Pestilent Shot`).
 Only the colliding ones are expanded.
