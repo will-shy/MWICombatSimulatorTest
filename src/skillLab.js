@@ -283,6 +283,11 @@ function sourceName(key) {
 function kitName(kit) {
     const names = (kit || []).filter((s) => s && s.hrid && !(ABILITY_BY_HRID[s.hrid] || {}).isSpecial)
         .map((s) => shortName(s.hrid));
+    // A ranger's kit (any ranged ability) always uses full names: too many of them share initials.
+    if ((kit || []).some((s) => s && s.hrid && (abilityDetailMap[s.hrid]?.abilityEffects ?? [])
+        .some((effect) => effect.combatStyleHrid === "/combat_styles/ranged"))) {
+        return names.length ? names.join("+") : "no abilities";
+    }
     const short = names.map((name) => {
         const words = name.split(/\s+/);
         return words.length > 1 ? words.map((w) => w[0].toUpperCase()).join("") : name;

@@ -2,11 +2,15 @@
 import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import { gameName, language, t } from "./optimizationI18n.js";
 
+const isRangedAbility = (hrid) => (abilityDetailMap[hrid]?.abilityEffects ?? [])
+    .some((effect) => effect.combatStyleHrid === "/combat_styles/ranged");
+
 // A kit's name is its setup without the auras (special slot): initials for multi-word abilities,
 // the full name for single words, e.g. "QA+EA+NV+Entangle". Always from the English game names, so
 // the initials read the same in every language. Abilities of one kit whose initials collide
-// (Penetrating Shot and Pestilent Shot are both PS) keep their full names. In Chinese there are no
-// initials: every ability shows its full Chinese name.
+// (Penetrating Shot and Pestilent Shot are both PS) keep their full names. A ranger's kit (any ranged
+// ability) always uses full names. In Chinese there are no initials: every ability shows its full
+// Chinese name.
 export const kitName = (kitSlots) => {
     const names = (kitSlots || [])
         .filter((entry) => entry && entry.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility)
@@ -16,6 +20,12 @@ export const kitName = (kitSlots) => {
             .filter((entry) => entry && entry.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility)
             .map((entry, i) => gameName("abilityNames", entry.hrid, names[i]));
         return zhNames.length ? zhNames.join("+") : t("noAbilities");
+    }
+    // A ranger's kit always shows full names: so many ranged abilities share initials (Penetrating
+    // Shot and Pestilent Shot are both PS) that initials stop being readable.
+    const isRanger = (kitSlots || []).some((entry) => entry && isRangedAbility(entry.hrid));
+    if (isRanger) {
+        return names.length ? names.join("+") : t("noAbilities");
     }
     const short = names.map((name) => {
         const words = name.split(/\s+/);

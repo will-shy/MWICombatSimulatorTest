@@ -50,6 +50,10 @@ Trigger Optimization page, which receives `kits` in its context and names the pl
 `+` (so no collision handling is needed). Rows build their names from the stored kits at render time
 (`conditionLabels`), so switching language relabels the table.
 
+**Rangers:** a kit containing any ranged-style ability (`combatStyleHrid` `/combat_styles/ranged` on one of its
+effects: Quick Shot, Steady Shot, Penetrating/Pestilent/Silencing Shot, Aqua/Flame Arrow, Rain Of Arrows) always
+uses full English names for every ability, so a ranger's kit never shows initials (applies to Skill Lab too).
+
 **Colliding initials:** if two abilities *in the same kit* get the same initials (Penetrating Shot and
 Pestilent Shot are both PS), those abilities keep their full names (`Penetrating Shot+Pestilent Shot`).
 Only the colliding ones are expanded.
