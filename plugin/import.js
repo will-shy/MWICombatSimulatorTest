@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         [战斗模拟器]配装导入
-// @version      1.7.0
+// @version      1.8.0
 // @description  配装导入模拟器
-// @author       AstroV GPT DiamondMoo
+// @author       AstroV GPT DiamondMoo willshy
 // @match        https://www.milkywayidle.com/*
 // @match        https://www.milkywayidlecn.com/*
 // @match        https://test.milkywayidle.com/*
@@ -83,7 +83,8 @@ const DEFAULT_SETTINGS = {
   SIM_THEME: "follow",
   GAME_THEME: "dark",
   LOADOUT_BLOCK_WORDS: [],
-  LANGUAGE: "en"
+  LANGUAGE: "en",
+  SIM_AUTO_LOAD_BINDINGS: true
 };
 
 // 界面文案。默认英文，设置面板里可切到中文。{name} 这种占位符由 t() 替换。
@@ -128,6 +129,14 @@ const I18N = {
     setReadOnlyIroncow: "Hide standard characters",
     setBlockTest: "Hide test server characters",
     setAutoRead: "Read character on entering the game",
+    setAutoLoadBindings: "Load bound slots when opening the panel",
+    slotBoundTo: "Slot {slot}: {char} - {loadout}",
+    slotNotBound: "Slot {slot}: not bound (import a loadout to bind it)",
+    slotBindingMissing: "Slot {slot}: bound loadout no longer exists",
+    unbind: "Unbind",
+    unbindAll: "Clear all",
+    bindingsCleared: "All slot bindings cleared",
+    loadedBound: "Loaded {n} bound slot(s)",
     setBlockWords: "Loadout name block words",
     blockWordsPlaceholder: "One block word per line, e.g.:\nGathering\nBoss",
     saveBlockWords: "Save",
@@ -184,6 +193,14 @@ const I18N = {
     setReadOnlyIroncow: "屏蔽标准角色",
     setBlockTest: "屏蔽测试服角色",
     setAutoRead: "进入游戏时读取角色配置",
+    setAutoLoadBindings: "打开面板时自动载入各序号绑定的配装",
+    slotBoundTo: "序号{slot}：{char} - {loadout}",
+    slotNotBound: "序号{slot}：未绑定（导入一套配装即绑定）",
+    slotBindingMissing: "序号{slot}：绑定的配装已不存在",
+    unbind: "解除绑定",
+    unbindAll: "全部清除",
+    bindingsCleared: "已清除所有序号绑定",
+    loadedBound: "已载入 {n} 个绑定序号",
     setBlockWords: "配装名称屏蔽词",
     blockWordsPlaceholder: "每行一个屏蔽词，例如：\n采集\nBoss",
     saveBlockWords: "保存屏蔽词",
@@ -247,6 +264,11 @@ GM_addStyle(`
 .mwi-item-btn:hover, .mwi-slot-btn:hover { transform:translateY(-2px); box-shadow:0 6px 12px rgba(0,0,0,0.08); }
 .mwi-item-btn.selected{border-color:var(--mwi-accent,#69a8ff); background:var(--mwi-selected-bg,#e0efff); color:var(--mwi-selected-color,#111);}
 .mwi-slot-btn.selected{border-color:var(--mwi-accent,#69a8ff); background:var(--mwi-selected-bg,#e0efff); color:var(--mwi-selected-color,#111);}
+.mwi-slot-btn.mwi-bound{position:relative}
+.mwi-slot-btn.mwi-bound::after{content:"";position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;background:var(--mwi-accent,#69a8ff)}
+#mwi-slot-binding{display:flex;align-items:center;gap:8px;font-size:12px !important;min-height:18px}
+#mwi-slot-binding-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mwi-slot-unbind,#mwi-slot-unbind-all{cursor:pointer;color:var(--mwi-danger,#ff6b6b);white-space:nowrap}
 #mwi-char-detail{border:1px solid var(--mwi-btn-border);border-radius:8px;padding:6px 8px}
 #mwi-char-detail>summary{cursor:pointer;list-style:none;font-size:12px !important;color:var(--mwi-muted,#888)}
 #mwi-char-detail>summary::-webkit-details-marker{display:none}
@@ -289,7 +311,7 @@ GM_addStyle(`
 :root.mwi-theme-dark #mwi-floating-btn { background: var(--mwi-floating-bg); color:var(--mwi-fg); border:1px solid var(--mwi-floating-border); }
 :root.mwi-sim-scale #mwi-panel{transform-origin:top left}
 :root.mwi-sim-scale #mwi-floating-btn{transform-origin:top left}
-#mwi-settings-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483650;width:520px;max-width:95%;background:#fff;border-radius:12px;padding:16px;box-shadow:0 22px 54px rgba(0,0,0,0.6);display:none;color:#111;transition:transform .2s ease;}
+#mwi-settings-modal{position:fixed;left:12px;top:12px;transform-origin:top left;max-height:calc(100vh - 24px);overflow:auto;z-index:2147483650;width:520px;max-width:95%;background:#fff;border-radius:12px;padding:16px;box-shadow:0 22px 54px rgba(0,0,0,0.6);display:none;color:#111;transition:transform .2s ease;}
 #mwi-settings-modal.dark{background:var(--mwi-bg);color:var(--mwi-fg);border:1px solid var(--mwi-panel-border);}
 #mwi-settings-modal h3{margin:0 0 8px 0;font-size:16px !important;}
 #mwi-settings-list{display:flex;flex-direction:column;gap:8px}
@@ -797,6 +819,66 @@ async function importLoadoutToSimulator(data, slotNum, characterTriggerMap) {
   }
 }
 
+// 模拟器页：每个序号记住上次导入的是哪个角色的哪套配装，存在模拟器域名的
+// localStorage 里（只有模拟器页用得到）。打开面板时按绑定把各序号一次性载入。
+const SLOT_BINDINGS_KEY = "mwiPluginSlotBindings";
+
+function loadSlotBindings() {
+  try { return safeJSONParse(localStorage.getItem(SLOT_BINDINGS_KEY), {}) || {}; } catch { return {}; }
+}
+
+function setSlotBinding(slot, binding) {
+  const bindings = loadSlotBindings();
+  if (binding) bindings[slot] = binding;
+  else delete bindings[slot];
+  try { localStorage.setItem(SLOT_BINDINGS_KEY, JSON.stringify(bindings)); } catch { }
+}
+
+// 按 id 找；游戏里重建过的配装 id 会变，退回按同名找。
+function resolveSlotBinding(all, binding) {
+  const char = binding && all[binding.charId];
+  if (!char?.loadouts) return null;
+  const los = Object.values(char.loadouts);
+  const lo = char.loadouts[binding.loadoutId] || los.find(l => l.name && l.name === binding.loadoutName);
+  return lo ? { char, lo } : null;
+}
+
+function setInputValue(input, value) {
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+// 把所有能解析的绑定填进各自序号的导入框，然后只点一次导入：模拟器的组队导入会
+// 一次读完 5 个框。没绑定（或绑定已失效）的序号把框清空，模拟器对空框什么都不做，
+// 这样框里残留的旧内容不会被顺带导入。"全部玩家"框优先级更高，也得先清空。
+// 返回载入的序号数。
+async function loadBoundSlotsIntoSimulator() {
+  if (!IS_SIM) return 0;
+  const bindings = loadSlotBindings();
+  const all = await loadAllData();
+  let loaded = 0;
+  for (let slot = 1; slot <= 5; slot++) {
+    const hit = resolveSlotBinding(all, bindings[slot]);
+    const input = document.querySelector(`#inputSetGroupCombatplayer${slot}`);
+    if (!input) continue;
+    if (!hit) { setInputValue(input, ""); continue; }
+    const importData = convertLoadoutToImportFormat(hit.lo.data, hit.char.triggerMap || {});
+    setInputValue(input, JSON.stringify(importData || {}));
+    const tabLink = $(`#player${slot}-tab`);
+    if (tabLink && hit.lo.data?.characterName) tabLink.innerText = hit.lo.data.characterName;
+    loaded++;
+  }
+  if (!loaded) return 0;
+  const allInput = $("#inputSetGroupCombatAll");
+  if (allInput) setInputValue(allInput, "");
+  // 导入按钮按导入弹窗里当前激活的页签分流，单人页签会去读单人框。
+  const groupTab = $("#group-combat-tab");
+  if (groupTab && !groupTab.classList.contains("active")) groupTab.click();
+  setTimeout(() => $("#buttonImportSet")?.click(), 150);
+  return loaded;
+}
+
 function waitForGameReady(timeoutMs = 8000, interval = 300) {
   return new Promise((resolve) => {
     const start = Date.now();
@@ -910,17 +992,22 @@ async function createFloatingUI() {
     </div>
     <div id="mwi-select-label"><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="slot"></div></div>
     <div class="mwi-row" id="mwi-slot-row"></div>
+    <div id="mwi-slot-binding" class="mwi-small-muted">
+      <span id="mwi-slot-binding-text"></span>
+      <span id="mwi-slot-unbind" data-mwi-i18n="unbind"></span>
+      <span id="mwi-slot-unbind-all" data-mwi-i18n="unbindAll"></span>
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <div class="mwi-section-label mwi-small-muted" data-mwi-i18n="character"></div>
       <button id="mwi-refresh-btn" class="mwi-item-btn mwi-btn-text" style="min-width:70px;height:26px;padding:0 8px"></button>
     </div>
     <div class="mwi-row" id="mwi-char-row"></div>
+    <div><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="loadouts"></div></div>
+    <div class="mwi-row" id="mwi-load-row"></div>
     <details id="mwi-char-detail">
       <summary id="mwi-char-detail-summary"></summary>
       <div id="mwi-char-detail-body"></div>
     </details>
-    <div><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="loadouts"></div></div>
-    <div class="mwi-row" id="mwi-load-row"></div>
   `;
   document.body.appendChild(panel);
 
@@ -958,7 +1045,7 @@ async function createFloatingUI() {
       btn.style.transform = `scale(${currentScale})`;
       btn.style.transformOrigin = "top left";
       const modal = $("#mwi-settings-modal");
-      if (modal) modal.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+      if (modal) modal.style.transform = `scale(${currentScale})`;
       applyGameTheme(s.GAME_THEME);
     } else {
       root.classList.add("mwi-sim-scale");
@@ -967,7 +1054,7 @@ async function createFloatingUI() {
       btn.style.transform = `scale(${currentScale})`;
       btn.style.transformOrigin = "top left";
       const modal = $("#mwi-settings-modal");
-      if (modal) modal.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+      if (modal) modal.style.transform = `scale(${currentScale})`;
       applySimTheme(s.SIM_THEME);
     }
     panel.style.fontSize = "14px";
@@ -1120,30 +1207,89 @@ async function createFloatingUI() {
   const roleLastSavedEl = $("#mwi-role-last-saved"), refreshBtn = $("#mwi-refresh-btn"), panelCloseBtn = $("#mwi-panel-close");
   const charDetailSummary = $("#mwi-char-detail-summary");
   const charDetailBody = $("#mwi-char-detail-body");
+  const slotBindingRow = $("#mwi-slot-binding"), slotBindingTextEl = $("#mwi-slot-binding-text"), slotUnbindBtn = $("#mwi-slot-unbind"), slotUnbindAllBtn = $("#mwi-slot-unbind-all");
   let selectedSlot = 1;
   let selectedCharacterId = null;
+
+  slotUnbindBtn?.addEventListener("click", () => {
+    setSlotBinding(selectedSlot, null);
+    renderSlots();
+  });
+
+  slotUnbindAllBtn?.addEventListener("click", () => {
+    try { localStorage.removeItem(SLOT_BINDINGS_KEY); } catch { }
+    renderSlots();
+    showToast(t("bindingsCleared"));
+  });
 
   panelCloseBtn.addEventListener("click", async () => {
     panel.style.display = "none";
     if (IS_SIM) await GM_setValue(KEY_SIM_PANEL_OPEN, "closed");
   });
 
-  function renderSlots() {
+  // 各个 render 都是异步的，切语言、改设置时会被好几个监听器同时触发。每次调用拿一个
+  // 序号，await 回来后只有最新的那次才动 DOM；清空也放在 await 之后，否则几次调用
+  // 会各自往同一个容器里追加一遍。
+  const renderSeq = {};
+  function beginRender(name) {
+    const id = (renderSeq[name] = (renderSeq[name] || 0) + 1);
+    return () => renderSeq[name] === id;
+  }
+
+  function slotBindingText(all, slot, binding) {
+    if (!binding) return t("slotNotBound", { slot });
+    const hit = resolveSlotBinding(all, binding);
+    if (!hit) return t("slotBindingMissing", { slot });
+    return t("slotBoundTo", { slot, char: hit.char.characterMeta?.name || binding.charName || "#" + binding.charId, loadout: hit.lo.name || binding.loadoutName || "#" + hit.lo.id });
+  }
+
+  async function renderSlots() {
     if (!slotRow) return;
+    const isCurrent = beginRender("slots");
+    const bindings = IS_SIM ? loadSlotBindings() : {};
+    const all = IS_SIM ? await loadAllData() : {};
+    if (!isCurrent()) return;
     slotRow.innerHTML = "";
     for (let i = 1; i <= 5; i++) {
       const b = document.createElement("div");
       b.className = "mwi-slot-btn mwi-ui mwi-btn-text";
       b.innerText = String(i);
       if (i === selectedSlot) b.classList.add("selected");
-      b.onclick = () => {
+      if (bindings[i]) {
+        b.classList.add("mwi-bound");
+        b.title = slotBindingText(all, i, bindings[i]);
+      }
+      b.onclick = async () => {
         selectedSlot = i;
         $$(".mwi-slot-btn").forEach(x => x.classList.remove("selected"));
         b.classList.add("selected");
+        renderSlotBinding();
+        // 序号有绑定就跳到绑定的角色，配装列表里会高亮绑定的那套。
+        const binding = IS_SIM ? loadSlotBindings()[i] : null;
+        const hit = binding && resolveSlotBinding(await loadAllData(), binding);
+        if (hit && selectedSlot === i && selectedCharacterId !== String(binding.charId)) {
+          selectedCharacterId = String(binding.charId);
+          await renderCharacters();
+        }
         renderLoadouts();
       };
       slotRow.appendChild(b);
     }
+    renderSlotBinding();
+  }
+
+  async function renderSlotBinding() {
+    if (!slotBindingRow) return;
+    if (!IS_SIM) { slotBindingRow.style.display = "none"; return; }
+    const isCurrent = beginRender("slotBinding");
+    const bindings = loadSlotBindings();
+    const binding = bindings[selectedSlot];
+    const all = await loadAllData();
+    if (!isCurrent()) return;
+    slotBindingTextEl.innerText = slotBindingText(all, selectedSlot, binding);
+    slotBindingTextEl.title = slotBindingTextEl.innerText;
+    slotUnbindBtn.style.display = binding ? "" : "none";
+    slotUnbindAllBtn.style.display = Object.keys(bindings).length ? "" : "none";
   }
 
   async function updateRoleLastSavedDisplay() {
@@ -1191,14 +1337,17 @@ async function createFloatingUI() {
   // 选中角色后的只读预览：神龛等级 + 已学的全部技能等级。默认折叠，
   // 展开状态不随重渲染变化，所以切角色时内容会就地更新。
   async function renderCharacterDetails() {
-    charDetailBody.innerHTML = "";
+    const isCurrent = beginRender("charDetails");
     if (!selectedCharacterId) {
+      charDetailBody.innerHTML = "";
       charDetailSummary.innerText = t("charDetail");
       charDetailBody.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("pickCharacter")}</div>`;
       return;
     }
 
     const all = await loadAllData();
+    if (!isCurrent()) return;
+    charDetailBody.innerHTML = "";
     const char = all[selectedCharacterId];
     if (!char) {
       charDetailSummary.innerText = t("charDetail");
@@ -1223,9 +1372,10 @@ async function createFloatingUI() {
   }
 
   async function renderCharacters() {
+    const isCurrent = beginRender("characters");
     const all = await loadAllData();
+    if (!isCurrent()) return;
     mirrorStoreToPage();
-    charRow.innerHTML = "";
     const ids = Reflect.ownKeys(all);
     if (ids.length === 0) {
       charRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("noCharacters")}</div>`;
@@ -1240,10 +1390,12 @@ async function createFloatingUI() {
         else selectedCharacterId = ids[0];
       } else {
         const last = await GM_getValue(KEY_LAST_ACTIVE_CHAR, null);
+        if (!isCurrent()) return;
         if (last && all[last]) selectedCharacterId = last;
         else selectedCharacterId = ids[0];
       }
     }
+    charRow.innerHTML = "";
     for (const id of ids) {
       const meta = all[id].characterMeta || {};
       const name = meta.name || ("#" + id);
@@ -1285,19 +1437,24 @@ async function createFloatingUI() {
   }
 
   async function renderLoadouts() {
-    loadRow.innerHTML = "";
+    const isCurrent = beginRender("loadouts");
     if (!selectedCharacterId) {
       loadRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("pickCharacter")}</div>`;
       return;
     }
     const all = await loadAllData();
+    const settings = await getSettings();
+    if (!isCurrent()) return;
+    loadRow.innerHTML = "";
     const char = all[selectedCharacterId];
     if (!char || !char.loadouts || Reflect.ownKeys(char.loadouts).length === 0) {
       loadRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("noLoadouts")}</div>`;
       return;
     }
     const characterTriggerMap = char.triggerMap || {};
-    const settings = await getSettings();
+    const slotBinding = IS_SIM ? loadSlotBindings()[selectedSlot] : null;
+    const boundLoadout = slotBinding && String(slotBinding.charId) === String(selectedCharacterId)
+      ? resolveSlotBinding(all, slotBinding)?.lo : null;
     const blockedWords = (settings.LOADOUT_BLOCK_WORDS || []).map(word => String(word).trim()).filter(Boolean);
     const visibleLoadouts = Object.values(char.loadouts).filter(lo =>
       !blockedWords.some(word => String(lo.name || "").includes(word))
@@ -1310,6 +1467,7 @@ async function createFloatingUI() {
       const b = document.createElement("div");
       b.className = "mwi-item-btn mwi-ui mwi-btn-text";
       b.innerText = lo.name || ("#" + lo.id);
+      if (lo === boundLoadout) b.classList.add("selected");
       b.onclick = async () => {
         if (!selectedCharacterId || !selectedSlot) return;
         const charData = all[selectedCharacterId];
@@ -1325,7 +1483,11 @@ async function createFloatingUI() {
           }
         } else {
           await importLoadoutToSimulator(loadoutData, selectedSlot, characterTriggerMap);
+          setSlotBinding(selectedSlot, { charId: selectedCharacterId, loadoutId: lo.id, charName: charData.characterMeta?.name || "", loadoutName: lo.name || "" });
+          renderSlots();
+          renderLoadouts();
           showToast(t("importedToSlot", { slot: selectedSlot }));
+          return;
         }
         b.classList.add("selected");
         setTimeout(() => b.classList.remove("selected"), 700);
@@ -1436,7 +1598,13 @@ async function createFloatingUI() {
       }
       refreshPanelUI();
       positionPanelNearButton(btn, panel);
-      if (IS_SIM) await GM_setValue(KEY_SIM_PANEL_OPEN, "open");
+      if (IS_SIM) {
+        await GM_setValue(KEY_SIM_PANEL_OPEN, "open");
+        if (window.__mwi_settings_cache.SIM_AUTO_LOAD_BINDINGS) {
+          const loaded = await loadBoundSlotsIntoSimulator();
+          if (loaded) showToast(t("loadedBound", { n: loaded }));
+        }
+      }
     }
   });
 
@@ -1514,6 +1682,7 @@ function buildSettingsModal() {
     chkReadOnly: null,
     chkBlockTest: null,
     chkAutoRead: null,
+    chkAutoLoadBindings: null,
     simScaleInput: null,
     simScaleLabel: null,
     mwiScaleInput: null,
@@ -1588,6 +1757,18 @@ function buildSettingsModal() {
     settingsControls.chkAutoRead = chkAutoRead;
     list.appendChild(row("setAutoRead", chkAutoRead));
 
+    if (IS_SIM) {
+      const chkAutoLoadBindings = document.createElement("input");
+      chkAutoLoadBindings.type = "checkbox";
+      chkAutoLoadBindings.checked = !!s.SIM_AUTO_LOAD_BINDINGS;
+      chkAutoLoadBindings.onchange = async () => {
+        window.__mwi_settings_cache.SIM_AUTO_LOAD_BINDINGS = chkAutoLoadBindings.checked;
+        await saveSettings(window.__mwi_settings_cache);
+      };
+      settingsControls.chkAutoLoadBindings = chkAutoLoadBindings;
+      list.appendChild(row("setAutoLoadBindings", chkAutoLoadBindings));
+    }
+
     const blockWordsWrap = document.createElement("div");
     const blockWordsInput = document.createElement("textarea");
     blockWordsInput.id = "mwi-block-words";
@@ -1628,7 +1809,7 @@ function buildSettingsModal() {
         document.querySelector("#mwi-panel")?.style.setProperty("transform", `scale(${newScale})`);
         document.querySelector("#mwi-floating-btn")?.style.setProperty("transform", `scale(${newScale})`);
         const modal = $("#mwi-settings-modal");
-        modal?.style.setProperty("transform", `translate(-50%, -50%) scale(${newScale})`);
+        modal?.style.setProperty("transform", `scale(${newScale})`);
 
         currentScale = newScale;
         const btn = document.querySelector("#mwi-floating-btn");
@@ -1664,7 +1845,7 @@ function buildSettingsModal() {
         document.querySelector("#mwi-panel")?.style.setProperty("transform", `scale(${newScale})`);
         document.querySelector("#mwi-floating-btn")?.style.setProperty("transform", `scale(${newScale})`);
         const modal = $("#mwi-settings-modal");
-        modal?.style.setProperty("transform", `translate(-50%, -50%) scale(${newScale})`);
+        modal?.style.setProperty("transform", `scale(${newScale})`);
 
         currentScale = newScale;
         const btn = document.querySelector("#mwi-floating-btn");
@@ -1735,6 +1916,7 @@ function buildSettingsModal() {
       if (settingsControls.chkReadOnly) settingsControls.chkReadOnly.checked = freshSettings.READ_ONLY_IRONCOW;
       if (settingsControls.chkBlockTest) settingsControls.chkBlockTest.checked = !!freshSettings.BLOCK_TEST_SERVERS;
       if (settingsControls.chkAutoRead) settingsControls.chkAutoRead.checked = !!freshSettings.ENABLE_AUTO_READ_ON_ENTER;
+      if (settingsControls.chkAutoLoadBindings) settingsControls.chkAutoLoadBindings.checked = !!freshSettings.SIM_AUTO_LOAD_BINDINGS;
 
       if (IS_SIM && settingsControls.simScaleInput) {
         const savedScale = freshSettings.SIM_SCALE || 1.0;
@@ -1791,7 +1973,7 @@ async function main() {
       const panel = document.querySelector("#mwi-panel");
       if (panel) panel.style.transform = `scale(${currentScale})`;
       const modal = $("#mwi-settings-modal");
-      if (modal) modal.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+      if (modal) modal.style.transform = `scale(${currentScale})`;
       if (window.__mwi_settings_cache.SIM_THEME === "follow") {
         const chk = $("#darkModeToggle");
         if (chk) {
@@ -1809,7 +1991,7 @@ async function main() {
       const panel = document.querySelector("#mwi-panel");
       if (panel) panel.style.transform = `scale(${currentScale})`;
       const modal = $("#mwi-settings-modal");
-      if (modal) modal.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+      if (modal) modal.style.transform = `scale(${currentScale})`;
       if (window.__mwi_settings_cache.GAME_THEME === "dark") {
         document.documentElement.classList.remove("mwi-theme-light");
         document.documentElement.classList.add("mwi-theme-dark");
@@ -1828,7 +2010,7 @@ async function main() {
         const modal = $("#mwi-settings-modal");
         if (modal) {
           modal.classList.toggle("dark", IS_SIM ? window.__mwi_settings_cache.SIM_THEME === "dark" : window.__mwi_settings_cache.GAME_THEME === "dark");
-          modal.style.transform = `translate(-50%, -50%) scale(${currentScale})`;
+          modal.style.transform = `scale(${currentScale})`;
         }
 
         const panel = $("#mwi-panel"), btn = $("#mwi-floating-btn");
