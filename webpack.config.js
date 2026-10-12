@@ -8,6 +8,7 @@ module.exports = {
     skillLab: './src/skillLab.js',
     optimization: './src/optimization.js',
     triggerOptimization: './src/triggerOptimization.js',
+    trialAssign: './src/trialAssign.js',
   },
   output: {
     path: path.resolve(__dirname, 'dist'),
@@ -23,6 +24,14 @@ module.exports = {
     compress: true,
     port: 9000,
     open: true,
+    // The guild site's API sends no CORS headers, so the browser can't read it from this origin.
+    // The dev server fetches it on the page's behalf: /site-api/... -> https://arsenal-trials-mwi.fly.dev/api/...
+    proxy: [{
+      context: ['/site-api'],
+      target: 'https://arsenal-trials-mwi.fly.dev',
+      changeOrigin: true,
+      pathRewrite: { '^/site-api': '/api' },
+    }],
   },
   plugins: [
     new CopyWebpackPlugin({
@@ -35,7 +44,7 @@ module.exports = {
         { from: path.resolve(__dirname, 'skill-lab.html'), to: 'skill-lab.html' },
         { from: path.resolve(__dirname, 'optimization.html'), to: 'optimization.html' },
         { from: path.resolve(__dirname, 'trigger-optimization.html'), to: 'trigger-optimization.html' },
-        { from: path.resolve(__dirname, 'pages'), to: 'pages' },
+        { from: path.resolve(__dirname, 'trial-assign.html'), to: 'trial-assign.html' },
         // Item icon sprite (symbol id = item hrid without "/items/"), used with <use href="items_sprite.svg#id">.
         { from: path.resolve(__dirname, 'assets/items_sprite.svg'), to: 'items_sprite.svg' },
       ],
