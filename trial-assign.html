@@ -64,7 +64,16 @@
         #progressBar { height: 100%; width: 0; background: var(--accent); transition: width 0.2s ease; }
         #progressLabel { font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
         #steps { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--dim); line-height: 1.7; }
-        #previewOut { white-space: pre-wrap; font-size: 13px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+        #previewOut { font-size: 13px; margin-top: 10px; font-variant-numeric: tabular-nums; color: var(--text); }
+        /* Score tiles (site preview and best assignment): total first, then each boss, one even row. */
+        #previewOut .stat-row, #summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 6px; }
+        #summary { max-width: 760px; margin-bottom: 12px; }
+        #previewOut .stat, #summary .stat { min-width: 0; }
+        @media (max-width: 560px) { #previewOut .stat-row, #summary { grid-template-columns: 1fr; } }
+        .stat small b.pts { font-size: 12px; display: inline; color: var(--text); margin: 0; }
+        /* The number the preview exists for. */
+        .stat.total { border-color: var(--accent); background: rgba(91, 155, 213, 0.12); }
+        .stat.total b { font-size: 26px; color: var(--accent); }
         .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
         .stat { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; min-width: 170px; }
         .stat span { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -83,7 +92,9 @@
         @media (max-width: 1080px) { .teams { grid-template-columns: 1fr; } }
         .team h3 { margin: 0 0 2px; font-size: 15px; }
         .team table { margin-top: 8px; }
-        #copyOut { display: none; margin-top: 8px; }
+        #copyOut { display: none; margin: 0 0 12px; }
+        .result-actions { margin: 8px 0 12px; }
+        #copyText { font-size: 14px; padding: 8px 16px; }
     </style>
     <script defer src="trialAssign.js"></script>
 </head>
@@ -145,7 +156,7 @@
                     <div class="row" style="margin-top:10px">
                         <button class="btn" id="previewBtn" type="button">Preview: simulate the site's teams</button>
                     </div>
-                    <div id="previewOut" class="dim"></div>
+                    <div id="previewOut"></div>
                 </div>
             </div>
 
@@ -191,6 +202,13 @@
 
         <div class="card" id="result" style="display:none">
             <h2>Best assignment</h2>
+            <div class="row result-actions">
+                <button class="btn primary" id="copyText" type="button">📋 Copy teams as text</button>
+                <button class="btn" id="dlA" type="button">Download roster A</button>
+                <button class="btn" id="dlB" type="button">Download roster B</button>
+                <span class="dim small">Rosters are guild trial exports with the guide's bars and carriers written in, ready for Group Battle.</span>
+            </div>
+            <textarea id="copyOut" readonly></textarea>
             <div class="stat-row" id="summary"></div>
             <h3 class="sub">Splits compared</h3>
             <p class="card-hint">Predicted progress comes from the plan's arithmetic; simulated is the full ladder on the kernel,
@@ -199,13 +217,6 @@
             <h3 class="sub">Teams</h3>
             <div class="teams" id="teams"></div>
             <p class="dim small" id="benchNote"></p>
-            <div class="row" style="margin-top:12px">
-                <button class="btn" id="dlA" type="button">Download roster A</button>
-                <button class="btn" id="dlB" type="button">Download roster B</button>
-                <button class="btn" id="copyText" type="button">Copy teams as text</button>
-                <span class="dim small">Each roster is a guild trial export with the guide's bars and carriers written in, ready for the Group Battle page.</span>
-            </div>
-            <textarea id="copyOut" readonly></textarea>
         </div>
     </div>
 </body>

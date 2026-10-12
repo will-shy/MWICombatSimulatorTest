@@ -485,10 +485,14 @@ async function previewSite() {
         const line = (boss) => {
             const rs = by[boss], p = mean(rs.map((r) => r.progress)), sc = mean(rs.map((r) => scoreAt(r.progress)));
             const t = Math.floor(p + 1e-9), clr = rs.filter((r) => r.cleared >= t).length;
-            return { boss, p, sc, text: `${boss}: ${tierText(p)} (${p.toFixed(2)}), ${fmt(sc)} pts, ${clr}/${rs.length} clear T${t}, ${teams[boss].length} players` };
+            return { boss, p, sc, clr, n: rs.length, t, size: teams[boss].length };
         };
         const a = line(A), b = line(B);
-        el("previewOut").textContent = `${a.text}\n${b.text}\nTotal ${fmt(a.sc + b.sc)} (${effort.verifyRuns} ladders per boss). Run "Find best assignment" to compare with the best split.`;
+        const tile = (x) => `<div class="stat"><span>${esc(x.boss)}</span><b>${esc(tierText(x.p))}</b>
+            <small><b class="pts">${fmt(x.sc)} pts</b> · ${x.clr}/${x.n} clear T${x.t} · ${x.size} players</small></div>`;
+        el("previewOut").innerHTML = `<div class="stat-row">
+            <div class="stat total"><span>Total score</span><b>${fmt(a.sc + b.sc)}</b><small>current assignment · ${effort.verifyRuns} ladders per boss</small></div>${tile(a)}${tile(b)}</div>
+            <div class="dim small">Run <b>Find best assignment</b> to compare it with the best split.</div>`;
         site.preview = { [A]: a, [B]: b, total: a.sc + b.sc };
     } catch (e) {
         showError(e.message || String(e));
@@ -585,7 +589,11 @@ async function loadSiteFromApi() {
         showError("");
     } catch (e) {
         el("sitePasteBox").open = true;
-        showError(`The site doesn't let other pages read it directly (${e.message || e}). Open ${"https://arsenal-trials-mwi.fly.dev/g/" + guild}, select the Combat Trials section from the first boss heading down to the bench, copy it, and paste it below. Pasting the page text also brings who carries which aura.`);
+        const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+        showError((local
+            ? `Couldn't reach the site through the local proxy (${e.message || e}). Restart the dev server, or paste instead.`
+            : `This copy of the page can't load from the site: the site doesn't allow other websites to read it, and only the local dev server (npx webpack serve) can fetch it on the page's behalf.`)
+            + ` To paste: open https://arsenal-trials-mwi.fly.dev/g/${guild}, select the Combat Trials section from the first boss heading down to the bench, copy it, and paste it below. The page text also says who carries which aura.`);
     }
 }
 
@@ -664,12 +672,12 @@ function renderResult() {
     const current = cands.find((c) => c.isCurrent);
     const clears = (c, boss) => { const n = c.simClear[boss].length, t = Math.floor(c.simProgress[boss] + 1e-9); return `${c.simClear[boss].filter((x) => x >= t).length}/${n} clear T${t}`; };
 
-    const tiles = [
-        [`${A}`, tierText(best.simProgress[A]), `${fmt(best.simScore[A])} pts · ${clears(best, A)}`],
-        [`${B}`, tierText(best.simProgress[B]), `${fmt(best.simScore[B])} pts · ${clears(best, B)}`],
-        ["Total score", fmt(best.simTotal), current ? `${best.simTotal >= current.simTotal ? "+" : ""}${fmt(best.simTotal - current.simTotal)} vs the ${current.label.toLowerCase()}` : `${R.effort.verifyRuns} simulated ladders per boss`],
-    ];
-    el("summary").innerHTML = tiles.map(([k, v, s]) => `<div class="stat"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join("");
+    // Same tiles as the site preview: the total first and accented, then each boss.
+    const bossTile = (boss) => `<div class="stat"><span>${esc(boss)}</span><b>${esc(tierText(best.simProgress[boss]))}</b>
+        <small><b class="pts">${fmt(best.simScore[boss])} pts</b> · ${clears(best, boss)} · ${best.teams[boss].length} players</small></div>`;
+    const delta = current ? best.simTotal - current.simTotal : null;
+    el("summary").innerHTML = `<div class="stat total"><span>Total score</span><b>${fmt(best.simTotal)}</b>
+        <small>${delta == null ? `best split · ${R.effort.verifyRuns} ladders per boss` : `<b class="pts">${delta >= 0 ? "+" : ""}${fmt(delta)}</b> vs the ${esc(current.label.toLowerCase())} (${fmt(current.simTotal)})`}</small></div>${bossTile(A)}${bossTile(B)}`;
 
     const candRows = cands.map((c) => `<tr class="${c === best ? "best" : ""}">
         <td>${esc(c.label)}${c === best ? ' <span class="tag best">picked</span>' : ""}</td>
@@ -782,8 +790,8 @@ document.addEventListener("DOMContentLoaded", () => {
     el("copyText").addEventListener("click", async () => {
         if (!lastResult) return;
         const text = summaryText();
-        try { await navigator.clipboard.writeText(text); el("copyText").textContent = "Copied"; } catch (e) { el("copyOut").value = text; el("copyOut").style.display = "block"; }
-        setTimeout(() => (el("copyText").textContent = "Copy teams as text"), 1500);
+        try { await navigator.clipboard.writeText(text); el("copyText").textContent = "✓ Copied"; } catch (e) { el("copyOut").value = text; el("copyOut").style.display = "block"; }
+        setTimeout(() => (el("copyText").textContent = "📋 Copy teams as text"), 1500);
     });
     // The download buttons are relabelled with the bosses once there's a result.
     new MutationObserver(() => { if (lastResult) { el("dlA").textContent = `Download ${lastResult.A} roster`; el("dlB").textContent = `Download ${lastResult.B} roster`; } })
