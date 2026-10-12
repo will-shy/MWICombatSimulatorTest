@@ -109,7 +109,7 @@ async function main() {
         runs: 40,
         cap: 900,            // seconds; single-tier time cap, or the shared budget in ladder mode
         ladder: false,
-        buildings: '{"diningRoom":0,"library":2,"dojo":4,"armory":1,"gym":1,"archeryRange":1,"mysticalStudy":1}',
+        buildings: '{"diningRoom":0,"library":2,"dojo":4,"armory":1,"gym":1,"archeryRange":2,"mysticalStudy":1}',
         seed: "",            // base seed; drawn at random when omitted
         seeds: "",           // explicit comma-separated run seeds, e.g. one run to replay from --json
         jobs: Math.max(1, availableParallelism() - 1),

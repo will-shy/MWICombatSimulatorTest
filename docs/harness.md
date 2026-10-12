@@ -129,12 +129,16 @@ committed.
 
 ### Guild building levels
 
+**Default for every sim: library 2, dojo 4, armory 1, gym 1, archery range 2, mystical study 1, dining
+room 0.** `sim-sweep`'s `--buildings` default is exactly this; pass `--buildings` only to test a
+different guild. Don't use the page's own default (all 0) for a harness run.
+
 Set them in `localStorage` **before** the page reads them, then reload:
 
 ```js
 await page.goto("http://localhost:9000/group-battle.html");
 await page.evaluate((l) => localStorage.setItem("mwiGuildBuildingLevels", JSON.stringify(l)),
-  { diningRoom: 0, library: 2, dojo: 4, armory: 1, gym: 1, archeryRange: 1, mysticalStudy: 1 });
+  { diningRoom: 0, library: 2, dojo: 4, armory: 1, gym: 1, archeryRange: 2, mysticalStudy: 1 });
 await page.reload();
 ```
 
@@ -356,6 +360,116 @@ writeFileSync("/tmp/jobs/variant.json", JSON.stringify(job));
 This skips the import step, so it can't catch an edit the importer would have treated differently.
 Use it for building levels, slot order, triggers and time caps. For anything that goes through the
 importer's resolution (equipment, levels, which abilities count as equipped), edit the roster.
+
+### Building a roster from the guild's weekly assignments
+
+**Generate them with `scripts/build-trial-rosters.mjs`.** With the dev server up, `node
+scripts/build-trial-rosters.mjs` writes `<boss>_<YYYYMMDD>.json` for each of the week's bosses next to
+`~/work/mwi/data/arsenal_roster.json`, ready for the group-battle page's guild trial import (the same
+files `sim-sweep --arm` takes). Flags: `--date`, `--out`, `--roster`, `--skills`, `--bosses
+Badger,Chameleon`, `--insanity-hp 0.5`, and for what-ifs `--swap "Badger:Nature Support>Nature DPS:2"` with
+`--suffix _ns2` (moves the N lowest-CMB players of a build to another build, repeatable). Use `--bosses`
+with one boss and the script still reads the other boss's heading, so a single-boss run is clean. It reads the week's bosses from `/config`, the teams from the
+rendered page, the bars from `skills.md`, and does the max-HP pass below itself. It fails loudly on a
+member missing from the roster export or a build missing from `skills.md`, so **refresh
+`arsenal_roster.json` and `skills.md` first**: the roster export's gear and ability levels are
+whatever was exported, and the script cannot tell they are a week old.
+
+What it does, by hand if you ever need to:
+
+The guild's trial assignments live on `https://arsenal-trials-mwi.fly.dev/g/Arsenal` (a Next.js page).
+Its JSON API is under `/api/g/Arsenal`: `/roster` holds members, builds and aura stats, and
+`/config` holds the week's bosses, caps and `frozen` (a snapshot of the assignment). **Aura carriers
+are not in the API.** The page works them out in the browser, so get the published teams by rendering
+the page with Playwright and reading `#combat`'s `innerText`. Each row reads
+`<name> <build> · bring <aura>` or `<name> <build> 🔮 brings <aura> <level>`.
+
+The Build Guide on the same page gives each build's bar per boss: a Default bar, plus tweaks for
+some bosses. They are written down in `~/work/mwi/data/skills.md`. To apply a bar, put the aura in
+slot 1. Revive counts as an aura. If the player has an ability equipped, use their level for it.
+If they don't, give it the level of an ability leaving their bar, aura for aura. The guide's
+"Insanity only above 50% HP" trigger needs each player's max HP, which you can read from
+`playerFinalState` after a 1-second kernel run of the job. It made no measurable difference on
+Jellyfish or Swarm (200 runs each).
+
+**Run it on a bar built for the boss, with the boss's `combatTrial`.** The export's `combatTrial` is
+whatever the member last played (`/guild_combat/badger`, `/guild_combat/hedgehog`), and the import
+points the enemy group at the majority. For a boss nobody last played (Chameleon), rewrite
+`combatTrial` to `/guild_combat/<boss>` on every member before importing, or the sweep fights Badger.
+The page's `#combat` list also names the Insanity trigger it recommends (80% HP at the time of
+writing); `skills.md` has 50%. They disagree, so say which one a run used.
+
+**A ladder can end on the time budget, not a wipe.** When every run reports `timeout` with the raid
+alive, the score is how far the budget's kill time reaches, so look at `tiers[].dur` instead of
+survival. Dining Room and Armory then score nothing, since they only buy survivability.
+
+**A `--swap`ped player inherits levels for abilities they never equipped**, by the aura-for-aura rule,
+so a support moved to DPS gets Insanity at their Revive level, which can be 1. Check the swapped
+bars before concluding a swap doesn't pay.
+
+**Test guild buildings on saved jobs.** Save each boss's job once, write one copy per building with
+`guildBuildingLevels[k]` + 1, and sweep them all against the saved baseline in one invocation.
+`--buildings` applies to every roster arm in a run, so it can't vary per arm.
+
+### Scoring players per trial monster
+
+`scripts/trial-scores.mjs` writes `trial_scores_<date>.json` + `.md` next to the roster export: per
+member and boss, damage and healing per second alive, plus a **static** score. Each member is
+measured alone in slot 56 of one fixed 55-player reference raid (2 Wark, 6 Nature Support, 2 Mana
+Spring, 2 Cursed Bower, the best carrier of each aura, the rest by main stat). Same raid around
+everyone, so scores compare across teams. A probe that drops a whole team on another boss doesn't
+compare: its players are measured inside a weaker raid and read low.
+
+**The Boss Matrix carries a static score to any boss.** The guild page's Boss Matrix gives each build
+a factor per boss. Measured dps is close to static score x factor x a per-boss scale. Fitted on
+Badger and Chameleon, it predicts one boss from the other at a median error of 6-7%, and players'
+ranks within a class barely move between bosses (rank correlation 0.96-1.0, Nature DPS and Cursed
+Bower 0.75-0.8). The class misfits were Cursed Bower (its Badger bar differs; the matrix scores it as
+Ranged) and Water, each off by ~15%. The matrix's columns are not on one scale (Badger vs Chameleon
+differed by ~19%), which doesn't matter for splitting, since only shares within a boss are compared.
+Supports and Warks aren't in the matrix: their static score is the plain mean, and healing is
+measured as hps (regen excluded).
+
+### Assigning players to two bosses
+
+The trial score is **200 per tier cleared + 100 x progress into the tier the ladder stops in**,
+summed over both bosses. A tier boundary is worth a jump: 8.99 scores 1699, 9.00 scores 1800. So
+judge a split by its expected score over runs, not by mean progress.
+
+`node scripts/trial-assign.mjs [--bosses A,B]` writes `<boss>_<date>_auto.json` for both bosses
+and `assign_<date>_auto.md` (every simulated split with its score) next to the roster export. It reads
+the newest `trial_scores_*.json`, so run `trial-scores.mjs` first when the roster changes. Flags:
+`--runs 30`, `--candidates 7`, `--refine 2`, `--floors none` (drop the guild's debuff minimums),
+`--buildings`, `--dry` (print aura picks and the frontier, simulate nothing). It does: roles and aura carriers first, then a Lagrangian sweep over
+the DPS (rank by share on A - lambda x share on B, fill A from the top). Every lambda is a point on the
+best trade-off curve of the linear model. Then it simulates candidates along that curve and refines
+around the best. What the linear model misses, and the simulation catches:
+
+- **Debuffs.** Moving a boss's only Water took its Frost Surge, and the boss lost more than its dps
+  share said. Per-player dps doesn't see a debuff's value to the raid.
+- **Survival.** A boss with little spare healing starts losing players when supports move.
+- **Tier boundaries**, which make the score non-linear.
+
+Lessons from splitting real teams:
+
+- **Comparative advantage, not raw strength.** A boss weak to magic (Badger) and one weak to physical
+  (Chameleon) are best served by moving magic to the first and the weakest physical players to the
+  second. Taking the best 56 for one boss costs the other boss more than it gains.
+- **The best split can be lopsided.** Every tier is worth the same 200 on either boss, so if one
+  boss converts damage into tiers faster, piling damage onto it can beat balancing both. Simulate
+  the ends of the frontier, not just the middle.
+- **Auras go to the best holder already on each team**, weighted by what that team deals. Placing
+  carriers first and splitting around them let a carrier's own damage outbid a stronger aura.
+  Warks don't carry when the config's `tanksBringAuras` is false. An aura that amplifies almost
+  nothing on a team (Mystic on a physical team) is left off.
+- **A support moved to DPS should be the strongest one**, who has real ability levels. A weak one
+  inherits low levels (see `--swap` above) and gains nothing.
+
+### Trigger comparators
+
+The game has only `less_than_equal` ("less than" in the game), `greater_than_equal`, `is_active` and
+`is_inactive`. A trigger with `less_than` or `greater_than` makes the kernel throw `Unknown
+comparatorHrid`, which fails the whole sweep. Write the guide's "< 50" as `less_than_equal` 50.
 
 ### Building a synthetic roster from presets
 
