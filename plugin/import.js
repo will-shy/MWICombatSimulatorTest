@@ -100,7 +100,6 @@ const I18N = {
     slot: "Slot",
     character: "Character",
     refresh: "Refresh",
-    refreshing: "Reading...",
     refreshOk: "Refreshed",
     refreshFail: "Refresh failed",
     charDetail: "Character details",
@@ -164,7 +163,6 @@ const I18N = {
     slot: "序号",
     character: "角色",
     refresh: "刷新",
-    refreshing: "读取中...",
     refreshOk: "刷新成功",
     refreshFail: "刷新失败",
     charDetail: "角色详情",
@@ -319,17 +317,23 @@ GM_addStyle(`
 .mwi-settings-row label{flex:1;font-size:14px !important;}
 .mwi-settings-controls{min-width:220px;display:flex;gap:8px;align-items:center}
 #s_mwi_settings_close{position:absolute;right:8px;top:8px;cursor:pointer;font-size:14px !important;z-index:2147483651;}
-#s_mwi_settings_btn{position:absolute;right:8px;bottom:8px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--mwi-btn-border);background:rgba(255,255,255,0.06);color:inherit}
+#s_mwi_settings_btn{flex-shrink:0;width:26px;height:26px;font-size:14px !important;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:1px solid var(--mwi-btn-border);background:rgba(255,255,255,0.06);color:inherit}
 #mwi-refresh-btn {
   background: var(--mwi-bg) !important;
   color: var(--mwi-fg) !important;
   border: 1px solid var(--mwi-btn-border) !important;
-  min-width: 70px !important;
+  min-width: 30px !important;
+  width: 30px !important;
+  padding: 0 !important;
+  font-size: 16px !important;
   height: 26px !important;
   border-radius: 8px !important;
   transition: all .12s !important;
   font-size: 14px !important;
 }
+#mwi-refresh-btn .mwi-refresh-icon { display: inline-block; line-height: 1; }
+#mwi-refresh-btn.mwi-refreshing .mwi-refresh-icon { animation: mwi-spin .8s linear infinite; }
+@keyframes mwi-spin { to { transform: rotate(360deg); } }
 #mwi-refresh-btn:hover {
   transform: translateY(-2px) !important;
   box-shadow: 0 6px 12px rgba(0,0,0,0.08) !important;
@@ -983,6 +987,7 @@ async function createFloatingUI() {
   panel.innerHTML = `
     <div id="mwi-panel-drag-handle" style="display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
+        <div id="s_mwi_settings_btn" class="mwi-ui" data-mwi-i18n-title="settings">⚙️</div>
         <h4 class="mwi-title" style="margin:0;" data-mwi-i18n="panelTitle"></h4>
         <div id="mwi-role-last-saved" class="mwi-section-label mwi-small-muted"></div>
       </div>
@@ -999,7 +1004,7 @@ async function createFloatingUI() {
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
       <div class="mwi-section-label mwi-small-muted" data-mwi-i18n="character"></div>
-      <button id="mwi-refresh-btn" class="mwi-item-btn mwi-btn-text" style="min-width:70px;height:26px;padding:0 8px"></button>
+      <button id="mwi-refresh-btn" class="mwi-item-btn mwi-btn-text" data-mwi-i18n-title="refresh"><span class="mwi-refresh-icon">⟳</span></button>
     </div>
     <div class="mwi-row" id="mwi-char-row"></div>
     <div><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="loadouts"></div></div>
@@ -1128,7 +1133,7 @@ async function createFloatingUI() {
     let panelDragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0;
 
     dragHandle.addEventListener("pointerdown", event => {
-      if (event.button !== 0 || event.target.closest("button")) return;
+      if (event.button !== 0 || event.target.closest("button, #s_mwi_settings_btn")) return;
       panelDragging = true;
       startX = event.clientX; startY = event.clientY;
       startLeft = parseFloat(panel.style.left) || 0;
@@ -1496,9 +1501,8 @@ async function createFloatingUI() {
     }
   }
 
-  refreshBtn.dataset.mwiI18n = "refresh";
   refreshBtn.addEventListener("click", async () => {
-    refreshBtn.innerText = t("refreshing");
+    refreshBtn.classList.add("mwi-refreshing");
     refreshBtn.disabled = true;
     try {
       const currentSelectedCharId = selectedCharacterId;
@@ -1530,7 +1534,7 @@ async function createFloatingUI() {
       showToast(t("refreshFail"));
     }
     refreshBtn.disabled = false;
-    refreshBtn.innerText = t("refresh");
+    refreshBtn.classList.remove("mwi-refreshing");
   });
 
   function refreshPanelUI() {
@@ -1608,12 +1612,7 @@ async function createFloatingUI() {
     }
   });
 
-  const settingsBtn = document.createElement("div");
-  settingsBtn.id = "s_mwi_settings_btn";
-  settingsBtn.className = "mwi-ui";
-  settingsBtn.dataset.mwiI18nTitle = "settings";
-  settingsBtn.innerText = "⚙️";
-  panel.appendChild(settingsBtn);
+  const settingsBtn = $("#s_mwi_settings_btn");
   let settingsModalOpen = false;
 
   settingsBtn.addEventListener("click", async () => {
