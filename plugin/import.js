@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         [战斗模拟器]配装导入
-// @version      1.6.6
+// @version      1.7.0
 // @description  配装导入模拟器
 // @author       AstroV GPT DiamondMoo
 // @match        https://www.milkywayidle.com/*
@@ -60,7 +60,7 @@ function nowTs() { return Date.now(); }
 // createFloatingUI 的闭包之外，之前调用会直接抛 ReferenceError。元素按需创建，
 // 样式挂在 #mwi-toast 上，面板还没初始化时也能提示。
 let toastTimer = null;
-function showToast(t) {
+function showToast(msg) {
   let toast = document.getElementById("mwi-toast");
   if (!toast) {
     if (!document.body) return;
@@ -68,7 +68,7 @@ function showToast(t) {
     toast.id = "mwi-toast";
     document.body.appendChild(toast);
   }
-  toast.innerText = t;
+  toast.innerText = msg;
   toast.style.opacity = "1";
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => toast.style.opacity = "0", 1500);
@@ -82,17 +82,159 @@ const DEFAULT_SETTINGS = {
   MWI_SCALE: 1.0,
   SIM_THEME: "follow",
   GAME_THEME: "dark",
-  LOADOUT_BLOCK_WORDS: []
+  LOADOUT_BLOCK_WORDS: [],
+  LANGUAGE: "en"
 };
+
+// 界面文案。默认英文，设置面板里可切到中文。{name} 这种占位符由 t() 替换。
+const I18N = {
+  en: {
+    floatingBtn: "Loadout",
+    floatingBtnTitle: "Loadout import (drag to move)",
+    panelTitle: "Loadout Import",
+    closePanel: "Close",
+    notSelected: "(none selected)",
+    notRead: "(not read yet)",
+    lastSynced: "Last synced: {time}",
+    slot: "Slot",
+    character: "Character",
+    refresh: "Refresh",
+    refreshing: "Reading...",
+    refreshOk: "Refreshed",
+    refreshFail: "Refresh failed",
+    charDetail: "Character details",
+    charDetailCount: "Character details · Shrines {shrines} · Abilities {abilities}",
+    pickCharacter: "Select a character",
+    noCharData: "No data for this character",
+    shrines: "Guild shrines",
+    abilityLevels: "Ability levels",
+    noShrineData: "No shrine data. Refresh on the game page.",
+    noAbilityData: "No ability data. Refresh on the game page.",
+    loadouts: "Loadouts",
+    noCharacters: "No characters read yet",
+    noLoadouts: "This character has no loadouts",
+    allBlocked: "All loadouts are hidden by the block words",
+    confirmDelete: "Delete character {name} from local storage?",
+    unknownChar: "Unknown character",
+    unknownLoadout: "Unknown loadout",
+    copiedLoadout: "Copied [{char}] - [{loadout}]",
+    copied: "Loadout data copied",
+    copyFail: "Copy failed, please copy manually",
+    importFail: "Import failed",
+    importedToSlot: "Imported loadout to slot {slot}",
+    settings: "Settings",
+    settingsTitle: "Loadout Import Settings",
+    setLanguage: "Language",
+    setReadOnlyIroncow: "Hide standard characters",
+    setBlockTest: "Hide test server characters",
+    setAutoRead: "Read character on entering the game",
+    setBlockWords: "Loadout name block words",
+    blockWordsPlaceholder: "One block word per line, e.g.:\nGathering\nBoss",
+    saveBlockWords: "Save",
+    setSimScale: "Simulator scale",
+    setMwiScale: "MWI scale",
+    scaleSaved: "Scale saved: {scale}×",
+    setSimTheme: "Simulator theme",
+    setGameTheme: "MWI page theme",
+    themeFollow: "Follow",
+    themeDark: "Dark",
+    themeLight: "Light",
+    shrine_force: "Shrine of Force",
+    shrine_tempo: "Shrine of Tempo",
+    shrine_spirit: "Shrine of Spirit",
+    shrine_scholar: "Shrine of Scholar"
+  },
+  zh: {
+    floatingBtn: "配装",
+    floatingBtnTitle: "配装导入（可拖动）",
+    panelTitle: "配装导入",
+    closePanel: "关闭配装导入",
+    notSelected: "（未选择）",
+    notRead: "（未读取）",
+    lastSynced: "最后同步：{time}",
+    slot: "序号",
+    character: "角色",
+    refresh: "刷新",
+    refreshing: "读取中...",
+    refreshOk: "刷新成功",
+    refreshFail: "刷新失败",
+    charDetail: "角色详情",
+    charDetailCount: "角色详情 · 神龛 {shrines} · 技能 {abilities}",
+    pickCharacter: "请选择角色",
+    noCharData: "该角色暂无数据",
+    shrines: "公会神龛",
+    abilityLevels: "技能等级",
+    noShrineData: "未读取到神龛数据，请在游戏页刷新",
+    noAbilityData: "未读取到技能数据，请在游戏页刷新",
+    loadouts: "配装",
+    noCharacters: "暂无已读取角色",
+    noLoadouts: "该角色暂无配装",
+    allBlocked: "没有符合当前屏蔽规则的配装",
+    confirmDelete: "确定从本地删除角色 {name} 吗？",
+    unknownChar: "未知角色",
+    unknownLoadout: "未知配装",
+    copiedLoadout: "已复制【{char}】-【{loadout}】",
+    copied: "已复制配装数据",
+    copyFail: "复制失败，请手动复制",
+    importFail: "导入失败",
+    importedToSlot: "已导入配装到序号{slot}",
+    settings: "设置",
+    settingsTitle: "配装导入 设置",
+    setLanguage: "语言",
+    setReadOnlyIroncow: "屏蔽标准角色",
+    setBlockTest: "屏蔽测试服角色",
+    setAutoRead: "进入游戏时读取角色配置",
+    setBlockWords: "配装名称屏蔽词",
+    blockWordsPlaceholder: "每行一个屏蔽词，例如：\n采集\nBoss",
+    saveBlockWords: "保存屏蔽词",
+    setSimScale: "战斗模拟器缩放倍率",
+    setMwiScale: "MWI缩放倍率",
+    scaleSaved: "缩放倍率已保存: {scale}×",
+    setSimTheme: "战斗模拟器主题",
+    setGameTheme: "MWI页面主题",
+    themeFollow: "跟随",
+    themeDark: "黑暗",
+    themeLight: "明亮",
+    shrine_force: "力量神龛",
+    shrine_tempo: "节奏神龛",
+    shrine_spirit: "精神神龛",
+    shrine_scholar: "学者神龛"
+  }
+};
+
+// 设置还没读到时（脚本刚启动）按默认英文走。
+function currentLang() {
+  const lang = window.__mwi_settings_cache?.LANGUAGE;
+  return I18N[lang] ? lang : DEFAULT_SETTINGS.LANGUAGE;
+}
+
+function t(key, vars) {
+  const s = I18N[currentLang()][key] ?? I18N.en[key] ?? key;
+  return vars ? s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+}
+
+// 切语言：静态文案就地换，面板里的动态内容（角色、配装、详情）整体重画。
+function applyLanguage() {
+  applyStaticTexts();
+  window.__mwi_panel?.refresh?.();
+}
+
+// 静态文案挂 data-mwi-i18n（文本）、data-mwi-i18n-title（title）、
+// data-mwi-i18n-placeholder，切语言时统一刷新；动态内容由各自的 render 重画。
+function applyStaticTexts(scope = document) {
+  if (!scope) return;
+  scope.querySelectorAll("[data-mwi-i18n]").forEach(el => { el.innerText = t(el.dataset.mwiI18n); });
+  scope.querySelectorAll("[data-mwi-i18n-title]").forEach(el => { el.title = t(el.dataset.mwiI18nTitle); });
+  scope.querySelectorAll("[data-mwi-i18n-placeholder]").forEach(el => { el.placeholder = t(el.dataset.mwiI18nPlaceholder); });
+}
 
 GM_addStyle(`
 .mwi-ui { box-sizing: border-box; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto; user-select: none !important; }
 #mwi-floating-btn, #mwi-panel, #mwi-panel * { -webkit-user-select:none !important; -moz-user-select:none !important; user-select:none !important; }
-#mwi-floating-btn{position:fixed;left:12px;top:25%;z-index:2147483647;width:44px;height:33px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:grab;transition:box-shadow .18s,transform .12s;font-weight:700}
+#mwi-floating-btn{position:fixed;left:12px;top:25%;z-index:2147483647;min-width:44px;height:33px;padding:0 10px;white-space:nowrap;touch-action:none;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:grab;transition:box-shadow .18s,transform .12s;font-weight:700}
 #mwi-floating-btn.round{border-radius:50%}
 #mwi-panel{position:fixed;left:60px;top:24%;width:360px;max-height:560px;overflow:auto;z-index:2147483646;border-radius:12px;padding:12px;display:none;flex-direction:column;gap:8px;box-shadow:0 18px 38px rgba(0,0,0,0.25);border:1px solid var(--mwi-panel-border);font-size:14px}
 #mwi-panel-drag-handle{cursor:grab;touch-action:none}
-#mwi-loadout-read-btn{margin-left:8px}
 .mwi-row{display:flex;flex-wrap:wrap;gap:8px}
 .mwi-title { font-size: 16px !important; }
 .mwi-section-label { font-size: 12px !important; }
@@ -392,7 +534,7 @@ function readCharacterExtrasFromPage() {
   };
 }
 
-const SHRINE_LABELS = { force: "力量神龛", tempo: "节奏神龛", spirit: "精神神龛", scholar: "学者神龛" };
+const shrineLabel = key => COMBAT_SHRINES.includes(key) ? t("shrine_" + key) : key;
 
 // 技能中文名。和仓库 js/i18n.js 里的 zh.abilityNames 一致，直接内嵌：面板在游戏页和
 // 模拟器页都能显示中文，不依赖游戏内部数据，也不用联网。
@@ -458,7 +600,7 @@ const ABILITY_NAMES_CN = {
 
 // 没收录的 hrid（比如新出的技能）退回可读的英文名，完整 hrid 在 title 里备查。
 function prettyAbilityName(hrid) {
-  if (ABILITY_NAMES_CN[hrid]) return ABILITY_NAMES_CN[hrid];
+  if (currentLang() === "zh" && ABILITY_NAMES_CN[hrid]) return ABILITY_NAMES_CN[hrid];
   return String(hrid).replace("/abilities/", "").split("_")
     .map(w => w ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
 }
@@ -644,14 +786,14 @@ async function importLoadoutToSimulator(data, slotNum, characterTriggerMap) {
     } else {
       try {
         await navigator.clipboard.writeText(payload);
-        showToast("已复制配装数据");
+        showToast(t("copied"));
       } catch {
-        showToast("复制失败，请手动复制");
+        showToast(t("copyFail"));
       }
     }
   } catch (e) {
     console.error("Import error:", e);
-    showToast("导入失败");
+    showToast(t("importFail"));
   }
 }
 
@@ -750,8 +892,8 @@ async function createFloatingUI() {
   const btn = document.createElement("div");
   btn.id = "mwi-floating-btn";
   btn.className = "mwi-ui";
-  btn.title = "配装";
-  btn.innerText = "配装";
+  btn.dataset.mwiI18n = "floatingBtn";
+  btn.dataset.mwiI18nTitle = "floatingBtnTitle";
   document.body.appendChild(btn);
   const panel = document.createElement("div");
   panel.id = "mwi-panel";
@@ -759,63 +901,33 @@ async function createFloatingUI() {
   panel.innerHTML = `
     <div id="mwi-panel-drag-handle" style="display:flex;justify-content:space-between;align-items:center">
       <div style="display:flex;align-items:center;gap:8px">
-        <h4 class="mwi-title" style="margin:0;">配装导入</h4>
-        <div id="mwi-role-last-saved" class="mwi-section-label mwi-small-muted">（未选择）</div>
+        <h4 class="mwi-title" style="margin:0;" data-mwi-i18n="panelTitle"></h4>
+        <div id="mwi-role-last-saved" class="mwi-section-label mwi-small-muted"></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <button id="mwi-panel-close" class="mwi-item-btn mwi-btn-text" title="关闭配装导入">✕</button>
+        <button id="mwi-panel-close" class="mwi-item-btn mwi-btn-text" data-mwi-i18n-title="closePanel">✕</button>
       </div>
     </div>
-    <div id="mwi-select-label"><div class="mwi-section-label mwi-small-muted">序号</div></div>
+    <div id="mwi-select-label"><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="slot"></div></div>
     <div class="mwi-row" id="mwi-slot-row"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-      <div class="mwi-section-label mwi-small-muted">角色</div>
-      <button id="mwi-refresh-btn" class="mwi-item-btn mwi-btn-text" style="min-width:70px;height:26px;padding:0 8px">刷新</button>
+      <div class="mwi-section-label mwi-small-muted" data-mwi-i18n="character"></div>
+      <button id="mwi-refresh-btn" class="mwi-item-btn mwi-btn-text" style="min-width:70px;height:26px;padding:0 8px"></button>
     </div>
     <div class="mwi-row" id="mwi-char-row"></div>
     <details id="mwi-char-detail">
-      <summary id="mwi-char-detail-summary">角色详情</summary>
+      <summary id="mwi-char-detail-summary"></summary>
       <div id="mwi-char-detail-body"></div>
     </details>
-    <div><div class="mwi-section-label mwi-small-muted">配装</div></div>
+    <div><div class="mwi-section-label mwi-small-muted" data-mwi-i18n="loadouts"></div></div>
     <div class="mwi-row" id="mwi-load-row"></div>
   `;
   document.body.appendChild(panel);
 
-  // 游戏页入口嵌入“创建配装”按钮之后，替代原先的悬浮入口。
-  if (IS_MILKY) {
-    btn.style.display = "none";
-    const readButton = document.createElement("button");
-    readButton.id = "mwi-loadout-read-btn";
-    readButton.className = "Button_button__1Fe9z";
-    readButton.type = "button";
-    readButton.innerText = "配装读取";
-    readButton.addEventListener("click", () => btn.click());
-    // 修正后的挂载函数
-    const attachReadButton = () => {
-      // 若按钮错误跑到导航栏，先移除
-      const navWrap = document.querySelector(".LoadoutsPanel_navButtons__9PiGQ");
-      if (navWrap && navWrap.contains(readButton)) {
-        readButton.remove();
-      }
-      // 下方原有逻辑不变
-      const targetWrap = document.querySelector(".LoadoutsPanel_newLoadoutInputs__3Ry3G");
-      if (!targetWrap) return;
-      const createBtn = Array.from(targetWrap.querySelectorAll("button"))
-        .find(btn => btn.innerText.trim() === "创建配装");
-      if (!createBtn) return;
-      if (readButton.parentElement !== targetWrap) {
-        targetWrap.appendChild(readButton);
-      }
-      if (readButton.previousElementSibling !== createBtn) {
-        createBtn.after(readButton);
-      }
-    };
-    attachReadButton();
-    new MutationObserver(attachReadButton).observe(document.body, { childList: true, subtree: true });
-  }
+  // 游戏页和模拟器页都用同一个可拖动的悬浮按钮作为入口。
   const settingsModal = buildSettingsModal();
   document.body.appendChild(settingsModal.modal);
+  applyStaticTexts();
   const root = document.documentElement;
   const currentSite = IS_SIM ? "sim" : "game";
   const UI_POS_LAST_CURRENT = IS_SIM ? UI_POS_LAST_SIM : UI_POS_LAST_GAME;
@@ -903,7 +1015,7 @@ async function createFloatingUI() {
         await GM_setValue(UI_POS_PANEL_GAME, JSON.stringify({ left: parseFloat(panel.style.left), top: parseFloat(panel.style.top) }));
       }
       panel.dataset.mwiPositioned = "true";
-      return;
+      // 游戏页的面板位置独立保存，悬浮按钮的位置照常往下读。
     }
     const pos = safeJSONParse(await GM_getValue(uiKey, null), null);
     const last = safeJSONParse(await GM_getValue(UI_POS_LAST_CURRENT, null), null);
@@ -1037,11 +1149,11 @@ async function createFloatingUI() {
   async function updateRoleLastSavedDisplay() {
     const all = await loadAllData();
     if (!selectedCharacterId || !all[selectedCharacterId]) {
-      roleLastSavedEl.innerText = "（未选择）";
+      roleLastSavedEl.innerText = t("notSelected");
       return;
     }
-    const t = all[selectedCharacterId].lastSavedAt;
-    roleLastSavedEl.innerText = t ? `最后同步：${new Date(t).toLocaleString()}` : "（未读取）";
+    const ts = all[selectedCharacterId].lastSavedAt;
+    roleLastSavedEl.innerText = ts ? t("lastSynced", { time: new Date(ts).toLocaleString() }) : t("notRead");
   }
 
   function detailGroup(title, rows, emptyText) {
@@ -1081,33 +1193,33 @@ async function createFloatingUI() {
   async function renderCharacterDetails() {
     charDetailBody.innerHTML = "";
     if (!selectedCharacterId) {
-      charDetailSummary.innerText = "角色详情";
-      charDetailBody.innerHTML = '<div class="mwi-section-label mwi-small-muted">请选择角色</div>';
+      charDetailSummary.innerText = t("charDetail");
+      charDetailBody.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("pickCharacter")}</div>`;
       return;
     }
 
     const all = await loadAllData();
     const char = all[selectedCharacterId];
     if (!char) {
-      charDetailSummary.innerText = "角色详情";
-      charDetailBody.innerHTML = '<div class="mwi-section-label mwi-small-muted">该角色暂无数据</div>';
+      charDetailSummary.innerText = t("charDetail");
+      charDetailBody.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("noCharData")}</div>`;
       return;
     }
 
     const { guildShrine, abilityLevels } = characterExtras(char);
 
-    const shrineKeys = Object.keys(SHRINE_LABELS)
-      .concat(Object.keys(guildShrine || {}).filter(k => !SHRINE_LABELS[k]))
+    const shrineKeys = COMBAT_SHRINES
+      .concat(Object.keys(guildShrine || {}).filter(k => !COMBAT_SHRINES.includes(k)))
       .filter(k => guildShrine && k in guildShrine);
-    const shrineRows = shrineKeys.map(k => [SHRINE_LABELS[k] || k, Number(guildShrine[k]) || 0, "/shrines/" + k]);
+    const shrineRows = shrineKeys.map(k => [shrineLabel(k), Number(guildShrine[k]) || 0, "/shrines/" + k]);
 
     const abilityRows = Object.entries(abilityLevels || {})
       .map(([hrid, level]) => [prettyAbilityName(hrid), Number(level) || 0, hrid])
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-    charDetailSummary.innerText = `角色详情 · 神龛 ${shrineRows.length} · 技能 ${abilityRows.length}`;
-    charDetailBody.appendChild(detailGroup("公会神龛", shrineRows, "未读取到神龛数据，请在游戏页刷新"));
-    charDetailBody.appendChild(detailGroup("技能等级", abilityRows, "未读取到技能数据，请在游戏页刷新"));
+    charDetailSummary.innerText = t("charDetailCount", { shrines: shrineRows.length, abilities: abilityRows.length });
+    charDetailBody.appendChild(detailGroup(t("shrines"), shrineRows, t("noShrineData")));
+    charDetailBody.appendChild(detailGroup(t("abilityLevels"), abilityRows, t("noAbilityData")));
   }
 
   async function renderCharacters() {
@@ -1116,8 +1228,8 @@ async function createFloatingUI() {
     charRow.innerHTML = "";
     const ids = Reflect.ownKeys(all);
     if (ids.length === 0) {
-      charRow.innerHTML = '<div class="mwi-section-label mwi-small-muted">暂无已读取角色</div>';
-      roleLastSavedEl.innerText = "（未选择）";
+      charRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("noCharacters")}</div>`;
+      roleLastSavedEl.innerText = t("notSelected");
       renderCharacterDetails();
       return;
     }
@@ -1156,7 +1268,7 @@ async function createFloatingUI() {
       del.innerText = "✕";
       del.onclick = async e => {
         e.stopPropagation();
-        if (confirm(`确定从本地删除角色 ${name} 吗？`)) {
+        if (confirm(t("confirmDelete", { name }))) {
           const all2 = await loadAllData();
           delete all2[id];
           await saveAllData(all2);
@@ -1175,13 +1287,13 @@ async function createFloatingUI() {
   async function renderLoadouts() {
     loadRow.innerHTML = "";
     if (!selectedCharacterId) {
-      loadRow.innerHTML = '<div class="mwi-section-label mwi-small-muted">请选择角色</div>';
+      loadRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("pickCharacter")}</div>`;
       return;
     }
     const all = await loadAllData();
     const char = all[selectedCharacterId];
     if (!char || !char.loadouts || Reflect.ownKeys(char.loadouts).length === 0) {
-      loadRow.innerHTML = '<div class="mwi-section-label mwi-small-muted">该角色暂无配装</div>';
+      loadRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("noLoadouts")}</div>`;
       return;
     }
     const characterTriggerMap = char.triggerMap || {};
@@ -1191,7 +1303,7 @@ async function createFloatingUI() {
       !blockedWords.some(word => String(lo.name || "").includes(word))
     );
     if (visibleLoadouts.length === 0) {
-      loadRow.innerHTML = '<div class="mwi-section-label mwi-small-muted">没有符合当前屏蔽规则的配装</div>';
+      loadRow.innerHTML = `<div class="mwi-section-label mwi-small-muted">${t("allBlocked")}</div>`;
       return;
     }
     for (const lo of visibleLoadouts) {
@@ -1207,13 +1319,13 @@ async function createFloatingUI() {
             const mergedData = convertLoadoutToImportFormat(loadoutData, characterTriggerMap);
             const payload = JSON.stringify(mergedData || {});
             await navigator.clipboard.writeText(payload);
-            showToast(`已复制【${charData.characterMeta.name || "未知角色"}】-【${lo.name || "未知配装"}】`);
+            showToast(t("copiedLoadout", { char: charData.characterMeta.name || t("unknownChar"), loadout: lo.name || t("unknownLoadout") }));
           } catch {
-            showToast("复制失败，请手动操作");
+            showToast(t("copyFail"));
           }
         } else {
           await importLoadoutToSimulator(loadoutData, selectedSlot, characterTriggerMap);
-          showToast(`已导入配装到序号${selectedSlot}`);
+          showToast(t("importedToSlot", { slot: selectedSlot }));
         }
         b.classList.add("selected");
         setTimeout(() => b.classList.remove("selected"), 700);
@@ -1222,9 +1334,9 @@ async function createFloatingUI() {
     }
   }
 
-  refreshBtn.innerText = "刷新";
+  refreshBtn.dataset.mwiI18n = "refresh";
   refreshBtn.addEventListener("click", async () => {
-    refreshBtn.innerText = "读取中...";
+    refreshBtn.innerText = t("refreshing");
     refreshBtn.disabled = true;
     try {
       const currentSelectedCharId = selectedCharacterId;
@@ -1250,13 +1362,13 @@ async function createFloatingUI() {
       }
       $$(".mwi-slot-btn").forEach(x => x.classList.remove("selected"));
       $(`.mwi-slot-btn:nth-child(${selectedSlot})`).classList.add("selected");
-      showToast("刷新成功");
+      showToast(t("refreshOk"));
     } catch (e) {
       console.error("Refresh error:", e);
-      showToast("刷新失败");
+      showToast(t("refreshFail"));
     }
     refreshBtn.disabled = false;
-    refreshBtn.innerText = "刷新";
+    refreshBtn.innerText = t("refresh");
   });
 
   function refreshPanelUI() {
@@ -1312,6 +1424,8 @@ async function createFloatingUI() {
       if (IS_MILKY) {
         const st = readGameStateFromPage();
         if (st && st.character) selectedCharacterId = String(st.character.id);
+        // 每次打开都按游戏当前状态重新读一遍，面板里的配装不会是旧的。
+        try { await readAndSaveCurrentPageConfig(); } catch (err) { console.error("Auto refresh error:", err); }
       }
       else {
         const last = await GM_getValue(KEY_LAST_ACTIVE_CHAR, null);
@@ -1329,7 +1443,7 @@ async function createFloatingUI() {
   const settingsBtn = document.createElement("div");
   settingsBtn.id = "s_mwi_settings_btn";
   settingsBtn.className = "mwi-ui";
-  settingsBtn.title = "设置";
+  settingsBtn.dataset.mwiI18nTitle = "settings";
   settingsBtn.innerText = "⚙️";
   panel.appendChild(settingsBtn);
   let settingsModalOpen = false;
@@ -1369,6 +1483,7 @@ async function createFloatingUI() {
       if (!s) return;
       window.__mwi_settings_cache = Object.assign({}, DEFAULT_SETTINGS, s);
       applyScalesAndTheme();
+      applyLanguage();
       await syncSettingsToModal();
     } catch (e) { console.error("Settings sync error:", e) }
   });
@@ -1378,6 +1493,7 @@ async function createFloatingUI() {
       const fresh = await getSettings();
       window.__mwi_settings_cache = Object.assign({}, DEFAULT_SETTINGS, fresh);
       applyScalesAndTheme();
+      applyLanguage();
       await syncSettingsToModal();
     } catch (e) { console.error("Settings ts sync error:", e) }
   });
@@ -1390,7 +1506,7 @@ function buildSettingsModal() {
   modal.id = "mwi-settings-modal";
   modal.className = "mwi-ui";
   modal.innerHTML = `
-    <h3 class="mwi-title">配装导入 设置</h3>
+    <h3 class="mwi-title" data-mwi-i18n="settingsTitle"></h3>
     <div id="mwi-settings-list"></div>
   `;
   const list = modal.querySelector("#mwi-settings-list");
@@ -1404,18 +1520,19 @@ function buildSettingsModal() {
     mwiScaleLabel: null,
     simThemeSelect: null,
     gameThemeSelect: null,
-    blockWordsInput: null
+    blockWordsInput: null,
+    languageSelect: null
   };
 
   (async () => {
     const s = await getSettings();
     window.__mwi_settings_cache = Object.assign({}, DEFAULT_SETTINGS, s);
 
-    function row(labelHtml, controlEl) {
+    function row(labelKey, controlEl) {
       const r = document.createElement("div");
       r.className = "mwi-settings-row";
       const lab = document.createElement("label");
-      lab.innerHTML = labelHtml;
+      lab.dataset.mwiI18n = labelKey;
       const wrap = document.createElement("div");
       wrap.className = "mwi-settings-controls";
       wrap.appendChild(controlEl);
@@ -1423,6 +1540,23 @@ function buildSettingsModal() {
       r.appendChild(wrap);
       return r;
     }
+
+    const languageSelect = document.createElement("select");
+    languageSelect.className = "mwi-btn-text";
+    [["en", "English"], ["zh", "中文"]].forEach(([v, label]) => {
+      const o = document.createElement("option");
+      o.value = v;
+      o.innerText = label;
+      languageSelect.appendChild(o);
+    });
+    languageSelect.value = I18N[s.LANGUAGE] ? s.LANGUAGE : DEFAULT_SETTINGS.LANGUAGE;
+    languageSelect.onchange = async () => {
+      window.__mwi_settings_cache.LANGUAGE = languageSelect.value;
+      applyLanguage();
+      await saveSettings(window.__mwi_settings_cache);
+    };
+    settingsControls.languageSelect = languageSelect;
+    list.appendChild(row("setLanguage", languageSelect));
 
     const chkReadOnly = document.createElement("input");
     chkReadOnly.type = "checkbox";
@@ -1432,7 +1566,7 @@ function buildSettingsModal() {
       await saveSettings(window.__mwi_settings_cache);
     };
     settingsControls.chkReadOnly = chkReadOnly;
-    list.appendChild(row("屏蔽标准角色", chkReadOnly));
+    list.appendChild(row("setReadOnlyIroncow", chkReadOnly));
 
     const chkBlockTest = document.createElement("input");
     chkBlockTest.type = "checkbox";
@@ -1442,7 +1576,7 @@ function buildSettingsModal() {
       await saveSettings(window.__mwi_settings_cache);
     };
     settingsControls.chkBlockTest = chkBlockTest;
-    list.appendChild(row("屏蔽测试服角色", chkBlockTest));
+    list.appendChild(row("setBlockTest", chkBlockTest));
 
     const chkAutoRead = document.createElement("input");
     chkAutoRead.type = "checkbox";
@@ -1452,18 +1586,18 @@ function buildSettingsModal() {
       await saveSettings(window.__mwi_settings_cache);
     };
     settingsControls.chkAutoRead = chkAutoRead;
-    list.appendChild(row("进入游戏时读取角色配置", chkAutoRead));
+    list.appendChild(row("setAutoRead", chkAutoRead));
 
     const blockWordsWrap = document.createElement("div");
     const blockWordsInput = document.createElement("textarea");
     blockWordsInput.id = "mwi-block-words";
-    blockWordsInput.placeholder = "每行一个屏蔽词，例如：\n采集\nBoss";
+    blockWordsInput.dataset.mwiI18nPlaceholder = "blockWordsPlaceholder";
     blockWordsInput.value = (s.LOADOUT_BLOCK_WORDS || []).join("\n");
     const saveBlockWords = document.createElement("button");
     saveBlockWords.type = "button";
     saveBlockWords.className = "mwi-item-btn mwi-btn-text";
     saveBlockWords.style.cssText = "min-width:70px;height:28px;margin-top:6px";
-    saveBlockWords.innerText = "保存屏蔽词";
+    saveBlockWords.dataset.mwiI18n = "saveBlockWords";
     saveBlockWords.onclick = async () => {
       const words = blockWordsInput.value.split(/\r?\n|,/).map(word => word.trim()).filter(Boolean);
       window.__mwi_settings_cache.LOADOUT_BLOCK_WORDS = [...new Set(words)];
@@ -1473,7 +1607,7 @@ function buildSettingsModal() {
     };
     blockWordsWrap.append(blockWordsInput, saveBlockWords);
     settingsControls.blockWordsInput = blockWordsInput;
-    list.appendChild(row("配装名称屏蔽词", blockWordsWrap));
+    list.appendChild(row("setBlockWords", blockWordsWrap));
 
     if (IS_SIM) {
       const simScaleInput = document.createElement("input");
@@ -1502,7 +1636,7 @@ function buildSettingsModal() {
         if (btn && panel) positionPanelNearButton(btn, panel);
 
         await saveSettings(window.__mwi_settings_cache);
-        showToast(`缩放倍率已保存: ${newScale}×`);
+        showToast(t("scaleSaved", { scale: newScale }));
       };
 
       settingsControls.simScaleInput = simScaleInput;
@@ -1510,7 +1644,7 @@ function buildSettingsModal() {
       const simWrap = document.createElement("div");
       simWrap.appendChild(simScaleInput);
       simWrap.appendChild(simScaleLabel);
-      list.appendChild(row("战斗模拟器缩放倍率", simWrap));
+      list.appendChild(row("setSimScale", simWrap));
     } else {
       const mwiScaleInput = document.createElement("input");
       mwiScaleInput.type = "range";
@@ -1538,7 +1672,7 @@ function buildSettingsModal() {
         if (btn && panel) positionPanelNearButton(btn, panel);
 
         await saveSettings(window.__mwi_settings_cache);
-        showToast(`缩放倍率已保存: ${newScale}×`);
+        showToast(t("scaleSaved", { scale: newScale }));
       };
 
       settingsControls.mwiScaleInput = mwiScaleInput;
@@ -1546,16 +1680,16 @@ function buildSettingsModal() {
       const mwiWrap = document.createElement("div");
       mwiWrap.appendChild(mwiScaleInput);
       mwiWrap.appendChild(mwiScaleLabel);
-      list.appendChild(row("MWI缩放倍率", mwiWrap));
+      list.appendChild(row("setMwiScale", mwiWrap));
     }
 
     if (IS_SIM) {
       const simThemeSelect = document.createElement("select");
       simThemeSelect.className = "mwi-btn-text";
-      [["follow", "跟随"], ["dark", "黑暗"], ["light", "明亮"]].forEach(([v, t]) => {
+      [["follow", "themeFollow"], ["dark", "themeDark"], ["light", "themeLight"]].forEach(([v, key]) => {
         const o = document.createElement("option");
         o.value = v;
-        o.innerText = t;
+        o.dataset.mwiI18n = key;
         simThemeSelect.appendChild(o);
       });
       simThemeSelect.value = s.SIM_THEME || "follow";
@@ -1570,14 +1704,14 @@ function buildSettingsModal() {
         await saveSettings(window.__mwi_settings_cache);
       };
       settingsControls.simThemeSelect = simThemeSelect;
-      list.appendChild(row("战斗模拟器主题", simThemeSelect));
+      list.appendChild(row("setSimTheme", simThemeSelect));
     } else {
       const gameThemeSelect = document.createElement("select");
       gameThemeSelect.className = "mwi-btn-text";
-      [["dark", "黑暗"], ["light", "明亮"]].forEach(([v, t]) => {
+      [["dark", "themeDark"], ["light", "themeLight"]].forEach(([v, key]) => {
         const o = document.createElement("option");
         o.value = v;
-        o.innerText = t;
+        o.dataset.mwiI18n = key;
         gameThemeSelect.appendChild(o);
       });
       gameThemeSelect.value = s.GAME_THEME || "dark";
@@ -1588,8 +1722,9 @@ function buildSettingsModal() {
         await saveSettings(window.__mwi_settings_cache);
       };
       settingsControls.gameThemeSelect = gameThemeSelect;
-      list.appendChild(row("MWI页面主题", gameThemeSelect));
+      list.appendChild(row("setGameTheme", gameThemeSelect));
     }
+    applyStaticTexts(modal);
   })();
 
   window.syncSettingsToModal = async function () {
@@ -1617,6 +1752,7 @@ function buildSettingsModal() {
 
       if (IS_SIM && settingsControls.simThemeSelect) settingsControls.simThemeSelect.value = freshSettings.SIM_THEME || "follow";
       if (IS_MILKY && settingsControls.gameThemeSelect) settingsControls.gameThemeSelect.value = freshSettings.GAME_THEME || "dark";
+      if (settingsControls.languageSelect) settingsControls.languageSelect.value = I18N[freshSettings.LANGUAGE] ? freshSettings.LANGUAGE : DEFAULT_SETTINGS.LANGUAGE;
       if (settingsControls.blockWordsInput) settingsControls.blockWordsInput.value = (freshSettings.LOADOUT_BLOCK_WORDS || []).join("\n");
 
       const btn = document.querySelector("#mwi-floating-btn");
