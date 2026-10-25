@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         [战斗模拟器]配装导入
-// @version      1.8.3
+// @version      1.8.4
 // @description  配装导入模拟器
 // @author       AstroV GPT DiamondMoo willshy
 // @match        https://www.milkywayidle.com/*
@@ -8,8 +8,7 @@
 // @match        https://test.milkywayidle.com/*
 // @match        https://test.milkywayidlecn.com/*
 // @match        https://shykai.github.io/MWICombatSimulatorTest/*
-// @match        https://will-shy.github.io/MWICombatSimulatorTest/
-// @match        https://will-shy.github.io/MWICombatSimulatorTest/index.html*
+// @match        *.github.io/MWICombatSimulator*
 // @icon         https://www.milkywayidle.com/favicon.svg
 // @grant        GM_addStyle
 // @grant        GM_setValue
@@ -47,6 +46,9 @@ const HOST = location.hostname;
 // 油猴里自行加一条用户匹配规则。
 const IS_LOCAL_SIM = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(HOST);
 const IS_SIM = HOST.includes(".github.io") || IS_LOCAL_SIM;
+// 模拟器站点上只有主页（index.html）放配装按钮和面板；optimization.html 等其他页面
+// 只需要数据镜像，不画界面。
+const IS_SIM_MAIN_PAGE = IS_SIM && /\/(index\.html)?$/.test(location.pathname);
 const IS_MILKY = HOST.includes("milkywayidle");
 const IS_TEST = HOST.includes("test.milkywayidle");
 const $ = s => document.querySelector(s);
@@ -1951,6 +1953,7 @@ async function main() {
     // 先镜像再建面板：模拟器上的页面（比如 optimization.html）一加载就会读这个键，
     // 等面板首次渲染（约 800ms 后）再写就太晚了。
     await mirrorStoreToPage();
+    if (IS_SIM && !IS_SIM_MAIN_PAGE) return;
     const s = await getSettings();
     window.__mwi_settings_cache = Object.assign({}, DEFAULT_SETTINGS, s);
     await createFloatingUI();

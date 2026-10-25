@@ -16,6 +16,10 @@ every selected tier and ranks them by fragments per hour.
 
 ## Rules
 
+- **Plugin data:** the userscript (`plugin/import.user.js`) must still run on this page. It writes
+  the captured loadouts into the `#mwi-plugin-data` node (and `localStorage` `mwiPluginCharacters`)
+  on every page of the sim site, but draws its loadout button and panel only on `index.html`. Don't
+  narrow its `@match` to the index page, or this page loses its data.
 - **Tiers:** T2–T5 are selectable. The default, and what every zone switch resets to, is **T4 and
   T5 only**; T2 and T3 are opt-in. A saved setup restores its own tier choice on reload.
 - **Sweep size** = (variants of player 1 × player 2 × player 3) × selected tiers. A player's
