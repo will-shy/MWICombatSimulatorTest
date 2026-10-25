@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         [战斗模拟器]配装导入
-// @version      1.8.2
+// @version      1.8.3
 // @description  配装导入模拟器
 // @author       AstroV GPT DiamondMoo willshy
 // @match        https://www.milkywayidle.com/*
@@ -9,7 +9,6 @@
 // @match        https://test.milkywayidlecn.com/*
 // @match        https://shykai.github.io/MWICombatSimulatorTest/*
 // @match        https://will-shy.github.io/MWICombatSimulatorTest/
-// @match        https://will-shy.github.io/MWICombatSimulatorTest/?*
 // @match        https://will-shy.github.io/MWICombatSimulatorTest/index.html*
 // @icon         https://www.milkywayidle.com/favicon.svg
 // @grant        GM_addStyle
