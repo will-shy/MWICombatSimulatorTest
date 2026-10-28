@@ -11,7 +11,7 @@ every selected tier and ranks them by the selected goal.
 | --- | --- |
 | `optimization.html` | Markup + CSS. |
 | `src/optimization.js` | Plugin data, player slots, kits, preview, condition building, results table, CSV. |
-| `src/optimizationWorker.js` | Pool of simulation workers (`min(cores, 16)`); one condition per task, results streamed back. |
+| `src/optimizationWorker.js` | Pool of simulation workers (`min(cores, 16)`); one condition per task, results streamed back. With `keepOpen` the queue stays open for `add_conditions` (optionally `priority`) until `close_queue`; a task's own `simulationTimeLimit` wins over the run's. |
 | `src/optimizationI18n.js` | zh/en strings. |
 
 ## Rules
@@ -30,16 +30,22 @@ every selected tier and ranks them by the selected goal.
 - **Sweep size** = (variants of player 1 × player 2 × player 3) × selected tiers. A player's
   variants are the baseline plus one per candidate kit (`playerVariants`). Every condition is an
   independent simulation of the chosen zone.
-- **Two phases** (`sweepTwoPhase`, `runPhase`). **Fast sim** (`fastHours`, default 24h): every
+- **Two phases per zone** (`runPipeline`). **Fast sim** (`fastHours`, default 24h): every
   condition of the zone. Then its best `FINALISTS` = 5 (by the goal at the moment the fast phase
   ends; failed rows never qualify) run again as the **full sim** (`fullHours`, default 200h). The fast
   phase is skipped, and every condition goes straight to the full sim, when the zone has 5 or fewer
   conditions or the fast length is not shorter than the full one (`hasFastPhase`). Both lengths are
   saved with the setup.
-- **Sim all zones** (`run("all")`, the "Sim all zones" button) sweeps every enabled zone **one zone
-  at a time**: fast sweep then full confirm for zone 1, then zone 2, and so on. The progress line
-  names the zone (`zoneProgress`). A zone's row appears only once its full confirm is done
-  (`zonesDone`); nothing from a fast sim is shown in this mode. A stop keeps the zones already done. The **zone settings** panel
+- **One shared pool, zones in parallel.** Every zone's fast sims are queued up front in one
+  `run_optimization` with `keepOpen`. When a zone's last fast sim lands, its finalists are pushed with
+  `add_conditions` + `priority` (front of the queue), so each zone confirms as early as it can while
+  the other zones' fast sims keep the pool full. When every zone is done the page sends
+  `close_queue` and the pool ends with `optimization_done`. Tasks are copies of the condition with a
+  `fast#`/`full#` id prefix (the same condition can run in both phases) and their own
+  `simulationTimeLimit`. The progress line counts fast and full sims and zones done.
+- **Sim all zones** (`run("all")`, the "Sim all zones" button) sweeps every enabled zone that way. A
+  zone's row appears only once its full confirm is done (`zonesDone`); nothing from a fast sim is
+  shown in this mode. A stop keeps the zones already done. The **zone settings** panel
   (`renderZonePanel`) shows one card per planet: an on/off box with the zone name, its key fragment,
   and T2–T5 chips. `zoneTiers` maps a zone to its tiers (never touched = `DEFAULT_TIERS`, T4+T5) and
   `zoneDisabled` marks zones switched off; both are saved in the setup. A zone is swept when it is on

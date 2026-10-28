@@ -3,10 +3,11 @@
 // difficulty tier, and rank the results by fragments per hour.
 //
 // Every condition is one independent simulation, so the sweep is fanned out across a pool of
-// workers (see optimizationWorker.js). It runs in two phases: every condition at the short "fast"
-// length, then only the best FINALISTS (per zone) again at the long "full" length, and the table
-// shows the best SHOWN of whichever phase finished last. "Sim all zones" runs the same sweep over
-// every zone ticked in the zone settings panel and shows one best row per zone.
+// workers (see optimizationWorker.js). Each zone runs in two phases: every condition at the short
+// "fast" length, then only its best FINALISTS again at the long "full" length. All zones share one
+// pool: every fast sim is queued up front, and a zone's full confirm jumps the queue the moment its
+// fast sims are in. A single zone shows the best SHOWN of whichever phase finished last; "Sim all
+// zones" shows one best row per zone, and only once that zone's full confirm is done.
 
 import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
@@ -45,9 +46,8 @@ let rows = [];         // fast-sim results: { condition, metrics | error, hours 
 let fullRows = [];     // full-sim results of the finalists, same shape
 let fullDone = false;  // the full phase ran to the end, so fullRows is the ranking
 let zonesDone = new Set(); // all-zones run: zones whose full sim has finished (only these are shown)
-let zoneProgress = null;   // all-zones run: { zoneHrid, index, count } of the zone being simulated
+let progress = null;       // while running: { fast: {done, total}, full: {done, total}, zones, zonesDone, expected }
 let conditions = [];   // what the current run is simulating, by id
-let phase = null;      // "fast" | "full" while running
 let runMode = "single"; // "single" (the Target zone) | "all" (every zone in the zone settings panel)
 // Zone settings panel for "Sim all zones": zone hrid -> the tiers to sweep there. A zone with no
 // tier ticked is skipped. Zones never touched start on DEFAULT_TIERS.
@@ -868,7 +868,6 @@ function run(mode = "single") {
     fullRows = [];
     fullDone = false;
     zonesDone = new Set();
-    zoneProgress = null;
     running = true;
     runHours = sweepHours();
     renderResults();
@@ -876,77 +875,86 @@ function run(mode = "single") {
     el("runAllBtn").disabled = true;
     el("stopBtn").disabled = false;
 
-    if (mode === "all") {
-        // One zone at a time, each through its own fast sweep and full confirm, so a zone's result
-        // is final when it appears and a stop keeps every zone finished so far.
-        const zones = [...new Set(conditions.map((c) => c.zoneHrid))];
-        const next = (index) => {
-            if (index >= zones.length) {
-                fullDone = true;
-                zoneProgress = null;
-                finish(t("done"));
-                return;
-            }
-            zoneProgress = { zoneHrid: zones[index], index, count: zones.length };
-            sweepTwoPhase(conditions.filter((c) => c.zoneHrid === zones[index]), () => {
-                zonesDone.add(zones[index]);
-                renderResults();
-                next(index + 1);
-            });
-        };
-        next(0);
-    } else {
-        sweepTwoPhase(conditions, () => {
-            fullDone = true;
-            finish(t("done"));
-        });
-    }
+    runPipeline();
 }
 
-// The fast sweep over `list`, then the full confirm of its best FINALISTS (or straight to the full
-// sim when the fast pass would not cut anything). `onDone` runs once the full sim has finished.
-function sweepTwoPhase(list, onDone) {
-    if (!hasFastPhase([list.length])) {
-        runPhase("full", list, onDone);
-        return;
+// Every zone's sweep in one pool. Tasks are sent as copies with a "fast#"/"full#" id prefix and their
+// own time limit, since the same condition can run in both phases.
+function runPipeline() {
+    const byZone = new Map();
+    for (const condition of conditions) {
+        if (!byZone.has(condition.zoneHrid)) byZone.set(condition.zoneHrid, []);
+        byZone.get(condition.zoneHrid).push(condition);
     }
-    const ids = new Set(list.map((c) => c.id));
-    runPhase("fast", list, () => {
-        // Finalists are picked on the goal set when the fast phase ended.
-        const finalists = rankByGoal(rows.filter((row) => row.metrics && ids.has(row.condition.id)))
-            .slice(0, FINALISTS).map((row) => row.condition);
-        if (finalists.length === 0) {
-            onDone();
-            return;
-        }
-        runPhase("full", finalists, onDone);
+    const byId = new Map(conditions.map((c) => [c.id, c]));
+    const task = (condition, phaseName) => ({
+        ...condition,
+        id: `${phaseName}#${condition.id}`,
+        simulationTimeLimit: runHours[phaseName] * ONE_HOUR,
     });
-}
 
-// One pass of the sweep over `list` at that phase's length; `onDone` runs only if it was not stopped.
-function runPhase(name, list, onDone) {
-    phase = name;
-    const target = name === "fast" ? rows : fullRows;
-    const hours = runHours[name];
-    setProgress(0, list.length);
+    // Per zone: whether it has a fast phase, and how many sims of the current phase are outstanding.
+    const zoneState = new Map();
+    let initial = [];
+    progress = { fast: { done: 0, total: 0 }, full: { done: 0, total: 0 }, zones: byZone.size, zonesDone: 0, expected: 0 };
+    for (const [zoneHrid, list] of byZone) {
+        const fast = hasFastPhase([list.length]);
+        zoneState.set(zoneHrid, { fast, left: list.length });
+        initial.push(...list.map((c) => task(c, fast ? "fast" : "full")));
+        progress[fast ? "fast" : "full"].total += list.length;
+        progress.expected += list.length + (fast ? Math.min(FINALISTS, list.length) : 0);
+    }
 
+    const zoneDone = (zoneHrid) => {
+        zonesDone.add(zoneHrid);
+        progress.zonesDone++;
+        if (progress.zonesDone === progress.zones) {
+            fullDone = true;
+            worker.postMessage({ type: "close_queue" });
+        }
+    };
+
+    const onTask = (data, result) => {
+        const [phaseName, conditionId] = [data.conditionId.slice(0, 4), data.conditionId.slice(5)];
+        const condition = byId.get(conditionId);
+        const row = { condition, hours: runHours[phaseName], ...result };
+        (phaseName === "fast" ? rows : fullRows).push(row);
+        progress[phaseName].done++;
+
+        const state = zoneState.get(condition.zoneHrid);
+        if (--state.left === 0) {
+            if (phaseName === "fast") {
+                // The zone's fast sims are all in: queue its finalists, picked on the goal set now,
+                // ahead of the other zones' fast sims so the zone finishes as soon as it can.
+                const finalists = rankByGoal(rows.filter((r) => r.metrics && r.condition.zoneHrid === condition.zoneHrid))
+                    .slice(0, FINALISTS).map((r) => r.condition);
+                progress.expected -= Math.min(FINALISTS, byZone.get(condition.zoneHrid).length) - finalists.length;
+                if (finalists.length === 0) {
+                    zoneDone(condition.zoneHrid);
+                } else {
+                    state.left = finalists.length;
+                    progress.full.total += finalists.length;
+                    worker.postMessage({ type: "add_conditions", priority: true, conditions: finalists.map((c) => task(c, "full")) });
+                }
+            } else {
+                zoneDone(condition.zoneHrid);
+            }
+        }
+        setProgress();
+        renderResults();
+    };
+
+    setProgress();
     worker = new Worker(new URL("optimizationWorker.js", import.meta.url));
     worker.onmessage = (event) => {
         const data = event.data;
         if (data.type === "optimization_condition_result") {
-            const condition = conditions.find((c) => c.id === data.conditionId);
-            target.push({ condition, hours, metrics: metricsFor(data.simResult, condition.itemHrid, PLAYER_HRIDS) });
-            setProgress(data.completed, data.total);
-            renderResults();
+            const condition = byId.get(data.conditionId.slice(5));
+            onTask(data, { metrics: metricsFor(data.simResult, condition.itemHrid, PLAYER_HRIDS) });
         } else if (data.type === "optimization_condition_error") {
-            const condition = conditions.find((c) => c.id === data.conditionId);
-            target.push({ condition, hours, error: data.error });
-            setProgress(data.completed, data.total);
-            renderResults();
+            onTask(data, { error: data.error });
         } else if (data.type === "optimization_done") {
-            worker.terminate();
-            worker = null;
-            if (running) onDone();
+            finish(t("done"));
         } else if (data.type === "optimization_cancelled") {
             finish(t("stopped"));
         } else if (data.type === "optimization_error") {
@@ -957,13 +965,13 @@ function runPhase(name, list, onDone) {
 
     worker.postMessage({
         type: "run_optimization",
-        conditions: list,
+        conditions: initial,
+        keepOpen: true,
         extra: {
             mooPass: el("mooPass").checked,
             comExp: Number(el("comExp").value) || 0,
             comDrop: Number(el("comDrop").value) || 0,
         },
-        simulationTimeLimit: hours * ONE_HOUR,
     });
 }
 
@@ -993,22 +1001,20 @@ function finish(message) {
     }
     el("stopBtn").disabled = true;
     el("progressText").textContent = t("finished", { message, done: rows.length + fullRows.length });
-    phase = null;
+    progress = null;
     updateConditionCount();
     renderResults();
 }
 
-function setProgress(done, total) {
-    const percent = total > 0 ? (100 * done) / total : 0;
-    el("progressFill").style.width = percent.toFixed(1) + "%";
-    const text = t(phase === "fast" ? "progressFast" : "progressFull",
-        { done, total, hours: runHours[phase], pool: poolSizeFor(total) });
-    el("progressText").textContent = zoneProgress
-        ? t("progressZone", {
-            zone: gameName("actionNames", zoneProgress.zoneHrid, zoneProgress.zoneHrid),
-            k: zoneProgress.index + 1, n: zoneProgress.count,
-        }) + text
-        : text;
+function setProgress() {
+    const done = progress.fast.done + progress.full.done;
+    const percent = progress.expected > 0 ? (100 * done) / progress.expected : 0;
+    el("progressFill").style.width = Math.min(100, percent).toFixed(1) + "%";
+    el("progressText").textContent = t("progressPipeline", {
+        fastDone: progress.fast.done, fastTotal: progress.fast.total, fast: runHours.fast,
+        fullDone: progress.full.done, fullTotal: progress.full.total, full: runHours.full,
+        zonesDone: progress.zonesDone, zones: progress.zones, pool: poolSizeFor(progress.expected),
+    });
 }
 
 // ------------------------------------------------------------------ results
