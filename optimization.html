@@ -271,19 +271,18 @@
         .ability-text { font-size: 11px; padding: 0 3px; border: 1px solid var(--border); border-radius: 4px; }
         /* The aura leads the kit, set off by a gold border and a little extra space. */
         .ability-icon.aura, .ability-text.aura { border-color: var(--warn); margin-right: 4px; }
-        tr.summary { cursor: pointer; }
-        tr.summary:hover td { background: rgba(255, 255, 255, 0.03); }
+        tr.expandable { cursor: pointer; }
+        tr.expandable:hover td { background: rgba(255, 255, 255, 0.03); }
         td.row-head { white-space: nowrap; width: 1%; }
         td.row-end { text-align: right; white-space: nowrap; }
         .chevron { display: inline-block; width: 14px; color: var(--dim); }
-        tr.detail > td { background: rgba(0, 0, 0, 0.18); padding: 4px 8px 10px; }
-        table.sub { width: auto; min-width: 60%; }
-        table.sub th { position: static; background: transparent; font-size: 11px; }
-        table.sub td, table.sub th { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
-        td.player-name { font-weight: 600; text-align: left; }
-        td.share-cell { min-width: 150px; }
-        .share-bar { display: inline-block; vertical-align: middle; width: 100px; height: 8px; margin-right: 6px; background: var(--panel2); border-radius: 4px; overflow: hidden; }
-        .share-bar > span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+        /* A zone's 2nd and 3rd best: same columns as its lead row, indented under it. */
+        tr.runner-up td { background: rgba(0, 0, 0, 0.15); }
+        td.indent { padding-left: 22px; color: var(--dim); }
+        .rank { display: inline-block; min-width: 22px; color: var(--dim); font-weight: 600; }
+        .diff { font-size: 11px; color: var(--dim); }
+        .diff.up { color: var(--good); }
+        .diff.down { color: var(--bad); }
         th.sep, td.sep { border-left: 2px solid var(--accent); }
         td.strong { font-weight: 700; }
         td.warnCell { color: var(--warn); }

@@ -117,8 +117,9 @@ column in each player group, and in the CSV.
 
 ## Results table
 
-**Top 3 only** (`SHOWN`) for a single-zone run; an all-zones run shows **one row per zone**, its
-best, in the game's zone order. Zones are never compared with each other (each is scored on its own
+**Top 3 only** (`SHOWN`) for a single-zone run, as three rows. An all-zones run shows **one row per
+zone**, its best, in the game's zone order; clicking it opens that zone's 2nd and 3rd best (see
+"Rows" below). Zones are never compared with each other (each is scored on its own
 fragment): no best-zone highlight and no best zone in the summary. In a single-zone run the table shows
 the rows of one phase (`rankedSource`): the fast sim while it is the latest finished data (fast phase running, full phase
 running, or the run stopped before the full phase ended), the full sim once it has finished. A
@@ -128,9 +129,8 @@ first, with `sim hours` and `zone` columns. The Triggers button hands the fast l
 as its search length.
 
 Each kit cell ends with that player's DPS and its share of the party's DPS, e.g. `235 · 34%` (rounded,
-out of the three players' total; `.kit-dps`, after its own divider). The expanded detail row has the
-same numbers as columns, the share drawn as a bar (`.share-bar`) with its percentage. The bar is scaled to the row's highest
-DPS (that player's bar is full, the others are DPS ÷ top DPS); the label stays the share of the party. Failed rows show no DPS.
+out of the three players' total; `.kit-dps`, after its own divider). Failed rows show no DPS. There is
+no per-player detail view: per-player frags/h, deaths/h, XP/h and charms/h are only in the CSV.
 
 **Weapon icon.** Each kit cell starts with the weapon that player carries in that row
 (`weaponIconHtml`): the two-hand slot, else the main hand, read from the row's own DTO, so a candidate
@@ -157,17 +157,25 @@ everything else still use kit names.
 
 The tier cell's tooltip lists the best goal value reached at each tier of that zone (`tierSummary`).
 
-**Summary rows, expandable.** Each result row is a summary: the expand arrow, zone, tier, the
-three players' kits (weapon + ability icons) and the team group (avg frags/h, **EPH** =
-encounters/h, avg **DPH** = deaths/h per player, warn colour above 0, avg XP/h, avg charms/h); the headers carry no "avg" (the team group header and the column tooltip say they are
-per-player averages), then the Triggers button at the row end. Clicking the row (anywhere but the Triggers button) opens a
-detail row under it (`expandedRows`, kept across re-renders, reset on a new run) with one row per
-player: name, kit, then DPS, DPS share of the party, **DPH** = deaths/h (combat first), then
-frags/h, XP/h, charms/h. The
-English headers are EPH and DPH (zh stays 遭遇/时 and 死亡/时). The first column of the team group
-carries the `sep` class, a 2px accent left border on both header and body cells, so the groups read
-apart; the detail table marks its DPS column the same way. A new column group needs `sep` on its
-first header and body cell.
+**No flashing.** `renderResults` runs on every finished sim, so it never replaces the whole tbody:
+`patchRows` keys each row (`hours|condition id`), keeps the DOM node of a row whose markup is
+unchanged and only parses new or changed rows. Rebuilding a row recreates its sprite `<use>` icons,
+which flash (the weapon icon most). Keep any new per-render text (e.g. a live counter) out of row
+markup, or every row changes and flashes again.
+
+**Rows.** Each row: the expand arrow column, zone, tier, the three players' kits (weapon + ability
+icons + DPS) and the team group (frags/h, **EPH** = encounters/h, **DPH** = deaths/h, warn colour
+above 0, XP/h, charms/h; all per-player averages, the headers carry no "avg"), then the Triggers
+button at the row end. In an all-zones run a zone's best row is its **lead row**: clicking it
+(anywhere but the Triggers button) opens or closes its 2nd and 3rd best (`expandedZones`, keyed by
+zone, kept across re-renders, reset on a new run). Those **runner-up rows** use the same columns,
+sit under the lead row with a darker background, and are indented with their rank (`#2`, `#3`) in
+the zone cell; they have no arrow and no Triggers button. Their EPH, XP/h and charms/h cells add the change
+against the lead row, e.g. `(+2.3%)` (green up, red down, `diff` in `renderResults`). A zone with only one full-sim result has
+no arrow. Single-zone runs show their top 3 as plain rows, nothing to expand. The English headers
+are EPH and DPH (zh stays 遭遇/时 and 死亡/时). The first column of the team group carries the `sep`
+class, a 2px accent left border on both header and body cells, so the groups read apart. A new
+column group needs `sep` on its first header and body cell.
 
 The three variant column headers show the player's character name (`updateVariantHeaders`), falling
 back to "P1 variant" etc. until a character is picked. They follow the current slot selection, so

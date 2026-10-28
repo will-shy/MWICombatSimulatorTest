@@ -48,7 +48,7 @@ let fullDone = false;  // the full phase ran to the end, so fullRows is the rank
 let zonesDone = new Set(); // all-zones run: zones whose full sim has finished (only these are shown)
 let progress = null;       // while running: { fast: {done, total}, full: {done, total}, zones, zonesDone, expected }
 let conditions = [];   // what the current run is simulating, by id
-let expandedRows = new Set(); // condition ids whose per-player detail row is open
+let expandedZones = new Set(); // all-zones run: zones whose 2nd and 3rd best rows are open
 let runMode = "single"; // "single" (the Target zone) | "all" (every zone in the zone settings panel)
 // Zone settings panel for "Sim all zones": zone hrid -> the tiers to sweep there. A zone with no
 // tier ticked is skipped. Zones never touched start on DEFAULT_TIERS.
@@ -901,7 +901,7 @@ function run(mode = "single") {
     fullRows = [];
     fullDone = false;
     zonesDone = new Set();
-    expandedRows = new Set();
+    expandedZones = new Set();
     running = true;
     runHours = sweepHours();
     renderResults();
@@ -1100,16 +1100,43 @@ function average(row, field) {
     return values.reduce((prev, cur) => prev + cur, 0) / values.length;
 }
 
+// Results re-render on every finished sim. Replacing the whole tbody would rebuild every row's
+// sprite <use> icons each time, which makes them flash, so rows are keyed (phase length + condition)
+// and a row whose markup is unchanged keeps its DOM node; only new or changed rows are parsed.
+let rowCache = new Map(); // key -> { html, node }
+
+function patchRows(body, items) {
+    const next = new Map();
+    const nodes = items.map(({ key, html }) => {
+        let cached = rowCache.get(key);
+        if (!cached || cached.html !== html) {
+            const template = document.createElement("template");
+            template.innerHTML = html;
+            cached = { html, node: template.content.firstElementChild };
+        }
+        next.set(key, cached);
+        return cached.node;
+    });
+    nodes.forEach((node, i) => {
+        if (body.children[i] !== node) body.insertBefore(node, body.children[i] ?? null);
+    });
+    while (body.children.length > nodes.length) body.lastElementChild.remove();
+    rowCache = next;
+}
+
 function renderResults() {
     updateVariantHeaders();
     const body = el("resultsBody");
     const source = rankedSource();
-    // One zone: its top SHOWN. All zones: the best row of each zone, in the game's zone order. Zones
-    // are not compared with each other (each scores its own fragment), so none is marked best.
+    // One zone: its top SHOWN as rows. All zones: each zone's top SHOWN as a group, in the game's
+    // zone order; the best is the row, the others open under it. Zones are not compared with each
+    // other (each scores its own fragment), so none is marked best.
     const zoneOrder = combatZones({ multiSpawnOnly: true }).map((zone) => zone.hrid);
-    const ordered = runMode === "all"
-        ? bestPerZone(source, 1).sort((a, b) => zoneOrder.indexOf(a.condition.zoneHrid) - zoneOrder.indexOf(b.condition.zoneHrid))
-        : rankByGoal(source).slice(0, SHOWN);
+    const groups = runMode === "all"
+        ? zoneOrder.map((zoneHrid) => rankByGoal(source.filter((row) => row.condition.zoneHrid === zoneHrid)).slice(0, SHOWN))
+            .filter((group) => group.length > 0)
+        : rankByGoal(source).slice(0, SHOWN).map((row) => [row]);
+    const ordered = groups.map((group) => group[0]);
     const goal = el("goalSelect").value;
     const best = ordered.find((row) => row.metrics);
 
@@ -1130,11 +1157,14 @@ function renderResults() {
             tier: best.condition.difficultyTier,
         });
 
-    body.innerHTML = ordered.map((row) => {
+    // A result row: Triggers button and expand arrow only on a group's lead row; a runner-up (rank > 1)
+    // is indented under it with its rank.
+    const rowHtml = (row, rank, group) => {
         const condition = row.condition;
-        const expanded = expandedRows.has(condition.id);
-        // The row is the summary: each player's kit (weapon + ability icons) and the team averages.
-        // Per-player numbers are in the detail row a click opens.
+        const zoneHrid = condition.zoneHrid;
+        const lead = rank === 1;
+        const expandable = lead && group.length > 1;
+        const expanded = expandable && expandedZones.has(zoneHrid);
         // That player's DPS and its share of the party's DPS, e.g. "235 · 34%", shown after the kit.
         const totalDps = row.metrics ? PLAYER_HRIDS.reduce((sum, hrid) => sum + row.metrics.players[hrid].dps, 0) : 0;
         const dpsHtml = (i) => {
@@ -1143,66 +1173,68 @@ function renderResults() {
             const share = totalDps > 0 ? Math.round((dps / totalDps) * 100) : 0;
             return `<span class="kit-dps" title="${esc(t("dpsShareTitle"))}">${Math.round(dps)} · ${share}%</span>`;
         };
-        // The detail rows have DPS columns, so they leave it out (withDps = false).
-        const kitCell = (label, i, withDps = true) => {
+        const kitCell = (label, i) => {
             const title = `${label}\n${conditionDetail(condition, i)}`;
             const kit = condition.kits ? kitIconsHtml(condition.kits[i]) : esc(label);
             // Weapon and abilities are two groups, split by a divider, so the weapon never reads as a skill.
             const weapon = weaponIconHtml(condition.players?.[i]);
             return `<span class="kit-cell" title="${esc(title)}">` +
                 (weapon ? `<span class="kit-weapon">${weapon}</span>` : "") +
-                `<span class="kit-abilities">${kit}</span>${withDps ? dpsHtml(i) : ""}</span>`;
+                `<span class="kit-abilities">${kit}</span>${dpsHtml(i)}</span>`;
         };
-        const labels = conditionLabels(condition);
-        const variantCells = labels.map((label, i) => `<td class="variant">${kitCell(label, i)}</td>`).join("");
-        const zoneCell = `<td>${esc(gameName("actionNames", condition.zoneHrid, condition.zoneHrid))}</td>`;
-        const tierCell = `<td title="${esc(tierSummary(source, condition.zoneHrid))}">T${condition.difficultyTier}</td>`;
+        const variantCells = conditionLabels(condition)
+            .map((label, i) => `<td class="variant">${kitCell(label, i)}</td>`).join("");
+        const zoneLabel = esc(gameName("actionNames", zoneHrid, zoneHrid));
+        const zoneCell = lead
+            ? `<td>${zoneLabel}</td>`
+            : `<td class="indent"><span class="rank">#${rank}</span>${zoneLabel}</td>`;
+        // The tooltip summarises the whole zone and changes with every result, so it is set after
+        // patching rather than baked into the row (which would rebuild the row and flash its icons).
+        const tierCell = `<td data-tier-zone="${esc(zoneHrid)}">T${condition.difficultyTier}</td>`;
+        const headCell = expandable
+            ? `<td class="row-head"><span class="chevron">${expanded ? "▾" : "▸"}</span></td>`
+            : `<td class="row-head"></td>`;
 
         if (row.error) {
-            return `<tr class="failed"><td></td>${zoneCell}${tierCell}${variantCells}` +
+            return `<tr class="failed${lead ? "" : " runner-up"}">${headCell}${zoneCell}${tierCell}${variantCells}` +
                 `<td colspan="6">${esc(row.error)}</td></tr>`;
         }
 
         const metrics = row.metrics;
         const avgDeaths = average(row, "deathsPerHour");
-        const classes = ["summary", condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""]
+        // A runner-up's EPH, XP/h and charms/h also show their change against the zone's lead row,
+        // e.g. "(+2.3%)".
+        const leadRow = group[0];
+        const diff = (value, leadValue) => {
+            if (lead || !leadRow.metrics || !(leadValue > 0) || !Number.isFinite(value)) return "";
+            const pct = ((value - leadValue) / leadValue) * 100;
+            const sign = pct > 0 ? "+" : pct < 0 ? "−" : "±";
+            return ` <span class="diff ${pct > 0 ? "up" : pct < 0 ? "down" : ""}" title="${esc(t("diffTitle"))}">(${sign}${Math.abs(pct).toFixed(1)}%)</span>`;
+        };
+        const xp = average(row, "xpPerHour");
+        const classes = [lead ? "" : "runner-up", expandable ? "expandable" : "",
+            condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""]
             .filter(Boolean).join(" ");
-        const summary = `<tr class="${classes}" data-expand="${esc(condition.id)}" title="${esc(t("expandTitle"))}">` +
-            `<td class="row-head"><span class="chevron">${expanded ? "▾" : "▸"}</span></td>` +
-            `${zoneCell}${tierCell}${variantCells}` +
+        const attrs = expandable ? ` data-expand="${esc(zoneHrid)}" title="${esc(t("expandTitle"))}"` : "";
+        return `<tr class="${classes}"${attrs}>${headCell}${zoneCell}${tierCell}${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
-            `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
+            `<td>${fmt(metrics.encountersPerHour, 1)}${diff(metrics.encountersPerHour, leadRow.metrics?.encountersPerHour)}</td>` +
             `<td class="${avgDeaths > 0 ? "warnCell" : ""}">${fmt(avgDeaths, 2)}</td>` +
-            `<td>${fmtK(average(row, "xpPerHour"))}</td>` +
-            `<td>${fmt(metrics.avgCharmsPerHour, 2)}</td>` +
-            `<td class="row-end"><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td></tr>`;
-        if (!expanded) {
-            return summary;
-        }
+            `<td>${fmtK(xp)}${lead ? "" : diff(xp, leadRow.metrics && average(leadRow, "xpPerHour"))}</td>` +
+            `<td>${fmt(metrics.avgCharmsPerHour, 2)}${diff(metrics.avgCharmsPerHour, leadRow.metrics?.avgCharmsPerHour)}</td>` +
+            `<td class="row-end">${lead ? `<button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button>` : ""}</td></tr>`;
+    };
 
-        // One row per player, in a nested table spanning the summary's columns.
-        const maxDps = Math.max(...PLAYER_HRIDS.map((hrid) => metrics.players[hrid].dps));
-        const playerRows = PLAYER_HRIDS.map((hrid, i) => {
-            const player = metrics.players[hrid];
-            const name = pluginData.characters[slots[i]?.characterId]?.characterMeta?.name || t("player", { n: i + 1 });
-            const share = totalDps > 0 ? Math.round((player.dps / totalDps) * 100) : 0;
-            return `<tr><td class="player-name">${esc(name)}</td><td class="variant">${kitCell(labels[i], i, false)}</td>` +
-                // Combat first (DPS, share, deaths), then the yields.
-                `<td class="sep">${fmt(player.dps, 1)}</td>` +
-                // The share as a bar, scaled so the top DPS fills it; the label stays the real share.
-                `<td class="share-cell"><span class="share-bar"><span style="width:${maxDps > 0 ? ((player.dps / maxDps) * 100).toFixed(1) : 0}%"></span></span>${share}%</td>` +
-                `<td class="${player.deathsPerHour > 0 ? "warnCell" : ""}">${fmt(player.deathsPerHour, 2)}</td>` +
-                `<td>${fmt(player.fragsPerHour, 2)}</td>` +
-                `<td>${fmtK(player.xpPerHour)}</td>` +
-                `<td>${fmt(player.charmsPerHour, 2)}</td></tr>`;
-        }).join("");
-        return summary +
-            `<tr class="detail"><td></td><td colspan="11"><table class="sub"><thead><tr>` +
-            `<th>${esc(t("thPlayerCol"))}</th><th class="variant">${esc(t("thKit"))}</th>` +
-            `<th class="sep">${esc(t("thDps"))}</th><th>${esc(t("thShare"))}</th><th>${esc(t("thDeaths"))}</th>` +
-            `<th>${esc(t("thFrags"))}</th><th>${esc(t("thXp"))}</th><th title="${esc(t("charmTitle"))}">${esc(t("thCharm"))}</th>` +
-            `</tr></thead><tbody>${playerRows}</tbody></table></td></tr>`;
-    }).join("");
+    patchRows(body, groups.flatMap((group) => {
+        const open = runMode === "all" && expandedZones.has(group[0].condition.zoneHrid);
+        return (runMode === "all" && !open ? group.slice(0, 1) : group).map((row, i) => ({
+            key: `${row.hours}|${row.condition.id}`,
+            html: rowHtml(row, runMode === "all" ? i + 1 : 1, runMode === "all" ? group : [row]),
+        }));
+    }));
+    for (const cell of body.querySelectorAll("td[data-tier-zone]")) {
+        cell.title = tierSummary(source, cell.dataset.tierZone);
+    }
 }
 
 // Hands one result row's party to the Trigger Optimization page (docs/optimization.md) through
@@ -1334,11 +1366,11 @@ function init() {
             openTriggerOptimization(button.dataset.id);
             return;
         }
-        // A click anywhere else on a summary row opens or closes its per-player detail.
-        const summary = event.target.closest("tr[data-expand]");
-        if (summary) {
-            const id = summary.dataset.expand;
-            if (expandedRows.has(id)) expandedRows.delete(id); else expandedRows.add(id);
+        // A click anywhere else on a zone's lead row opens or closes its 2nd and 3rd best.
+        const lead = event.target.closest("tr[data-expand]");
+        if (lead) {
+            const zoneHrid = lead.dataset.expand;
+            if (expandedZones.has(zoneHrid)) expandedZones.delete(zoneHrid); else expandedZones.add(zoneHrid);
             renderResults();
         }
     });
