@@ -1160,10 +1160,11 @@ function renderResults() {
 
         if (row.error) {
             return `<tr class="failed"><td></td>${zoneCell}${tierCell}${variantCells}` +
-                `<td colspan="5">${esc(row.error)}</td></tr>`;
+                `<td colspan="6">${esc(row.error)}</td></tr>`;
         }
 
         const metrics = row.metrics;
+        const avgDeaths = average(row, "deathsPerHour");
         const classes = ["summary", condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""]
             .filter(Boolean).join(" ");
         const summary = `<tr class="${classes}" data-expand="${esc(condition.id)}" title="${esc(t("expandTitle"))}">` +
@@ -1171,6 +1172,7 @@ function renderResults() {
             `${zoneCell}${tierCell}${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
             `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
+            `<td class="${avgDeaths > 0 ? "warnCell" : ""}">${fmt(avgDeaths, 2)}</td>` +
             `<td>${fmtK(average(row, "xpPerHour"))}</td>` +
             `<td>${fmt(metrics.avgCharmsPerHour, 2)}</td>` +
             `<td class="row-end"><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td></tr>`;
@@ -1195,7 +1197,7 @@ function renderResults() {
                 `<td>${fmt(player.charmsPerHour, 2)}</td></tr>`;
         }).join("");
         return summary +
-            `<tr class="detail"><td></td><td colspan="10"><table class="sub"><thead><tr>` +
+            `<tr class="detail"><td></td><td colspan="11"><table class="sub"><thead><tr>` +
             `<th>${esc(t("thPlayerCol"))}</th><th class="variant">${esc(t("thKit"))}</th>` +
             `<th class="sep">${esc(t("thDps"))}</th><th>${esc(t("thShare"))}</th><th>${esc(t("thDeaths"))}</th>` +
             `<th>${esc(t("thFrags"))}</th><th>${esc(t("thXp"))}</th><th title="${esc(t("charmTitle"))}">${esc(t("thCharm"))}</th>` +
@@ -1236,7 +1238,7 @@ function openTriggerOptimization(conditionId) {
 
 function exportCsv() {
     const header = ["sim hours", "zone", "tier", "player1 variant", "player2 variant", "player3 variant",
-        "avg frags/h", "encounters/h", "avg xp/h", "avg charm score/h"];
+        "avg frags/h", "encounters/h", "avg deaths/h", "avg xp/h", "avg charm score/h"];
     for (const hrid of PLAYER_HRIDS) {
         header.push(`${hrid} frags/h`, `${hrid} dps`, `${hrid} deaths/h`, `${hrid} xp/h`, `${hrid} charm score/h`);
     }
@@ -1250,6 +1252,7 @@ function exportCsv() {
         let cells = [row.hours, `"${gameName("actionNames", row.condition.zoneHrid, row.condition.zoneHrid).replace(/"/g, '""')}"`,
             row.condition.difficultyTier, ...conditionLabels(row.condition).map((l) => `"${l.replace(/"/g, '""')}"`),
             row.metrics.avgFragsPerHour.toFixed(4), row.metrics.encountersPerHour.toFixed(2),
+            average(row, "deathsPerHour").toFixed(4),
             average(row, "xpPerHour").toFixed(0), row.metrics.avgCharmsPerHour.toFixed(4)];
         for (const hrid of PLAYER_HRIDS) {
             const player = row.metrics.players[hrid];

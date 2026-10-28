@@ -159,7 +159,8 @@ The tier cell's tooltip lists the best goal value reached at each tier of that z
 
 **Summary rows, expandable.** Each result row is a summary: the expand arrow, zone, tier, the
 three players' kits (weapon + ability icons) and the team group (avg frags/h, **EPH** =
-encounters/h, avg XP/h, avg charms/h), then the Triggers button at the row end. Clicking the row (anywhere but the Triggers button) opens a
+encounters/h, avg **DPH** = deaths/h per player, warn colour above 0, avg XP/h, avg charms/h); the headers carry no "avg" (the team group header and the column tooltip say they are
+per-player averages), then the Triggers button at the row end. Clicking the row (anywhere but the Triggers button) opens a
 detail row under it (`expandedRows`, kept across re-renders, reset on a new run) with one row per
 player: name, kit, then DPS, DPS share of the party, **DPH** = deaths/h (combat first), then
 frags/h, XP/h, charms/h. The
