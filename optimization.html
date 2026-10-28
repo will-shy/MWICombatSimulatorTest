@@ -268,6 +268,39 @@
         tr.baseline td { background: rgba(91, 155, 213, 0.08); }
         tr.best td { background: rgba(76, 175, 80, 0.12); }
         tr.failed td { color: var(--bad); }
+
+        #zonePanel { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+        .zone-card {
+            background: var(--panel2);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            transition: opacity .15s;
+        }
+        .zone-card.off { opacity: 0.4; border-left-color: var(--border); filter: grayscale(1); }
+        .zone-card.off:hover { opacity: 0.7; }
+        .zone-head { flex-direction: row; align-items: center; gap: 6px; color: var(--text); cursor: pointer; }
+        .zone-name { font-size: 13px; font-weight: 600; }
+        .zone-item { font-size: 11px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .zone-tiers { display: flex; gap: 4px; }
+        .tier-chip {
+            flex: 1;
+            flex-direction: row;
+            justify-content: center;
+            padding: 3px 0;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 12px;
+            color: var(--dim);
+            cursor: pointer;
+            user-select: none;
+        }
+        .tier-chip input { display: none; }
+        .tier-chip:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #10131a; font-weight: 600; }
     </style>
 </head>
 
@@ -288,11 +321,8 @@
 
     <main>
         <section>
-            <h2 data-i18n-opt="secTarget">目标</h2>
+            <h2 data-i18n-opt="secTarget">模拟设置</h2>
             <div class="grid">
-                <label><span data-i18n-opt="labelZone">地区</span>
-                    <select id="zoneSelect"></select>
-                </label>
                 <label><span data-i18n-opt="labelGoal">优化目标</span>
                     <select id="goalSelect">
                         <option value="fragments" data-i18n-opt="goalFragments">每小时碎片数</option>
@@ -300,19 +330,11 @@
                         <option value="charms" data-i18n-opt="goalCharms">每小时护符</option>
                     </select>
                 </label>
-                <label id="fragmentField" class="hidden"><span data-i18n-opt="labelItem">物品</span>
-                    <select id="fragmentSelect"></select>
+                <label><span data-i18n-opt="labelFastHours">快速模拟时长（小时）</span>
+                    <input type="number" id="fastHours" value="24" min="1" max="2500" data-i18n-opt-title="fastHoursTitle">
                 </label>
-                <span class="hint" id="fragmentNote"></span>
-                <div class="tiers">
-                    <span data-i18n-opt="labelTiers">难度</span>
-                    <label class="inline"><input type="checkbox" id="tier2"> T2</label>
-                    <label class="inline"><input type="checkbox" id="tier3"> T3</label>
-                    <label class="inline"><input type="checkbox" id="tier4" checked> T4</label>
-                    <label class="inline"><input type="checkbox" id="tier5" checked> T5</label>
-                </div>
-                <label><span data-i18n-opt="labelHours">每次模拟时长（小时）</span>
-                    <input type="number" id="simHours" value="10" min="1" max="2500">
+                <label><span data-i18n-opt="labelFullHours">完整模拟时长（小时）</span>
+                    <input type="number" id="fullHours" value="200" min="1" max="2500" data-i18n-opt-title="fullHoursTitle">
                 </label>
             </div>
             <div class="grid" style="margin-top:12px">
@@ -328,6 +350,16 @@
         </section>
 
         <section>
+            <h2 data-i18n-opt="secZones">地区设置</h2>
+            <div class="grid" style="margin-bottom:10px">
+                <button type="button" class="btn small ghost" id="zonesDefault" data-i18n-opt="zonesDefault">全部 T4+T5</button>
+                <button type="button" class="btn small ghost" id="zonesClear" data-i18n-opt="zonesClear">全部关闭</button>
+                <span class="hint" data-i18n-opt="zonesHint">两种模拟都用这里的难度。“模拟全部地区”扫描所有开启的地区；关闭的地区（灰色）跳过，也不出现在单个地区的列表里，难度设置会保留。</span>
+            </div>
+            <div id="zonePanel"></div>
+        </section>
+
+        <section>
             <h2 data-i18n-opt="secGroup">队伍</h2>
             <div class="grid" style="margin-bottom:12px">
                 <span class="status" id="pluginStatus"></span>
@@ -339,9 +371,14 @@
         <section>
             <h2 data-i18n-opt="secRun">运行</h2>
             <div class="grid">
-                <button type="button" class="btn" id="runBtn" data-i18n-opt="runBtn">开始扫描</button>
+                <label><span data-i18n-opt="labelZone">地区</span>
+                    <select id="zoneSelect"></select>
+                </label>
+                <button type="button" class="btn" id="runBtn" data-i18n-opt="runBtn">模拟单个地区</button>
+                <button type="button" class="btn" id="runAllBtn" data-i18n-opt="runAllBtn">模拟全部地区</button>
                 <button type="button" class="btn ghost" id="stopBtn" disabled data-i18n-opt="stopBtn">停止</button>
                 <span class="status" id="conditionCount"></span>
+                <span class="status" id="allZonesCount"></span>
                 <span class="status" id="parallelism"></span>
             </div>
             <div class="progress"><div id="progressFill"></div></div>
@@ -351,16 +388,6 @@
         <section>
             <h2 data-i18n-opt="secResults">结果</h2>
             <div class="grid" style="margin-bottom:10px">
-                <label><span data-i18n-opt="sortBy">排序</span>
-                    <select id="sortSelect">
-                        <option value="frags" data-i18n-opt="sortFrags">碎片/时（每人）</option>
-                        <option value="charms" data-i18n-opt="sortCharms">护符/时（人均）</option>
-                        <option value="eph" data-i18n-opt="sortEph">遭遇/时</option>
-                        <option value="xp" data-i18n-opt="sortXp">经验/时（人均）</option>
-                        <option value="dps" data-i18n-opt="sortDps">DPS（人均）</option>
-                        <option value="deaths" data-i18n-opt="sortDeaths">死亡/时最少</option>
-                    </select>
-                </label>
                 <button type="button" class="btn small ghost" id="exportBtn" data-i18n-opt="exportCsv">导出 CSV</button>
                 <span class="status" id="resultsSummary"></span>
             </div>
@@ -368,7 +395,7 @@
                 <table>
                     <thead>
                         <tr class="group">
-                            <th colspan="5"></th>
+                            <th colspan="6"></th>
                             <th class="sep" colspan="4" data-i18n-opt="thGroup">团队</th>
                             <th class="sep" colspan="5" data-i18n-opt="thPlayer1">玩家1</th>
                             <th class="sep" colspan="5" data-i18n-opt="thPlayer2">玩家2</th>
@@ -376,6 +403,7 @@
                         </tr>
                         <tr>
                             <th></th>
+                            <th data-i18n-opt="thZone">地区</th>
                             <th data-i18n-opt="thTier">难度</th>
                             <th class="variant" data-i18n-opt="thP1">P1 方案</th>
                             <th class="variant" data-i18n-opt="thP2">P2 方案</th>

@@ -3,7 +3,7 @@
 Reference for `optimization.html` / `src/optimization.js`: a fragment-farming sweep for a
 **three-player group** built from loadouts the loadout plugin captured. Each player has a baseline
 and any number of candidate kits; the page simulates every combination across the three players at
-every selected tier and ranks them by fragments per hour.
+every selected tier and ranks them by the selected goal.
 
 ## Files
 
@@ -20,11 +20,30 @@ every selected tier and ranks them by fragments per hour.
   the captured loadouts into the `#mwi-plugin-data` node (and `localStorage` `mwiPluginCharacters`)
   on every page of the sim site, but draws its loadout button and panel only on `index.html`. Don't
   narrow its `@match` to the index page, or this page loses its data.
-- **Tiers:** T2–T5 are selectable. The default, and what every zone switch resets to, is **T4 and
-  T5 only**; T2 and T3 are opt-in. A saved setup restores its own tier choice on reload.
+- **Zones and tiers live only in the zone settings panel** (below). The settings section (goal, sim
+  lengths, buffs) has no zone or tier picker and no item picker: every zone is scored on its own key
+  fragment (`zoneItemHrid`; every planet drops exactly one). T2–T5 are selectable per zone, default
+  **T4 and T5**.
+- **Sim single zone** (`run("single")`): the zone select in the Run section lists only the zones
+  enabled in the panel (`refreshZoneSelect`, rebuilt on every panel change; it keeps its pick while
+  that zone stays enabled) and sweeps that zone at its panel tiers.
 - **Sweep size** = (variants of player 1 × player 2 × player 3) × selected tiers. A player's
   variants are the baseline plus one per candidate kit (`playerVariants`). Every condition is an
-  independent simulation of the chosen zone for N hours (`simHours`).
+  independent simulation of the chosen zone.
+- **Two phases** (`run`, `runPhase`). **Fast sim** (`fastHours`, default 24h): every condition. Then
+  the best `FINALISTS` = 5 **of each zone** (`bestPerZone`; by the goal at the moment the fast phase
+  ends; failed rows never qualify) run again as the **full sim** (`fullHours`, default 200h). The fast
+  phase is skipped, and every condition goes straight to the full sim, when no zone has more than 5
+  conditions or the fast length is not shorter than the full one (`hasFastPhase`). Both lengths are
+  saved with the setup.
+- **Sim all zones** (`run("all")`, the "Sim all zones" button) sweeps every enabled zone. The **zone settings** panel
+  (`renderZonePanel`) shows one card per planet: an on/off box with the zone name, its key fragment,
+  and T2–T5 chips. `zoneTiers` maps a zone to its tiers (never touched = `DEFAULT_TIERS`, T4+T5) and
+  `zoneDisabled` marks zones switched off; both are saved in the setup. A zone is swept when it is on
+  and has a tier (`zoneEnabled`); otherwise its card is greyed out (`.off`) but stays clickable.
+  Switching a zone off keeps its tiers; ticking a tier switches it back on; switching on a zone with
+  no tier gives it T4+T5. Bulk buttons: all zones on at T4+T5, or all off. Every condition carries
+  its zone and the item it is scored on (`condition.itemHrid`, from `sweepZones`). Condition ids are `zone|i-j-k@Ttier`.
 - **A candidate kit is a full five-slot setup** seeded from the baseline (`newCandidate`). Slot 0
   takes special abilities only; slots 1–4 take non-special ones. Picking an ability takes the
   character's real level when they have trained it, else keeps the level in the box. A candidate may
@@ -70,12 +89,11 @@ The same rule is used on Skill Lab (`docs/skill_lab.md`).
 
 ## Goals and charms
 
-The **Goal** select has three choices: fragments/h (default, with the fragment item picker, shown only
-for this goal), XP/h and charms/h. The goal decides (`SORT_FOR_GOAL`, `goalValue`):
-
-- what the **best-row highlight** and the results summary judge on, whatever the table is sorted by;
-- the sort the table starts on. Picking a goal also sets the sort select to it (frags / xp / charms),
-  which can then be changed freely.
+The **Goal** select has three choices: fragments/h (default; the zone's own key fragment),
+XP/h and charms/h. The goal (`goalValue`) is the only ranking: it picks the finalists
+for the full sim, orders the results table, and decides the best-row highlight and the summary. There
+is no sort select. Changing the goal after a run re-ranks the rows already simulated; it does not
+re-pick the finalists.
 
 The goal is saved with the setup (`mwiOptimizationSetup.goal`).
 
@@ -89,6 +107,15 @@ difficulty tiers (a rate ≤ 0 is skipped, as for every item). The score is per 
 column in each player group, and in the CSV.
 
 ## Results table
+
+**Top 3 only** (`SHOWN`) for a single-zone run; an all-zones run shows **one row per zone**, its
+best, zones ordered by the goal. The table shows those rows by the goal (`rankByGoal`) of one phase
+(`rankedSource`): the fast sim while it is the latest finished data (fast phase running, full phase
+running, or the run stopped before the full phase ended), the full sim once it has finished. A
+partly finished full phase is only ranked when the fast phase was skipped. The summary says which phase is shown. The baseline row
+appears only if it is in the top 3. The CSV keeps everything: every row of both phases, full sim
+first, with `sim hours` and `zone` columns. The Triggers button hands the fast length to Trigger Optimization
+as its search length.
 
 Each kit name is followed by that player's DPS and its share of the party's DPS, e.g. `(235, 34%)`
 (rounded; DPS is the same number as the player's DPS column, the share is out of the three players'
@@ -104,7 +131,9 @@ hosted here, not hot-linked. Unarmed players, or an item the sprite lacks, show 
 checked before adding it: only drawing elements (`symbol`, `path`, `circle`, ...), no script, style,
 handler or external link. It is about 3.9 MB, loaded once and cached.
 
-Columns: tier, the three players' kit names, then the team group (avg frags/h, **EPH** =
+The tier cell's tooltip lists the best goal value reached at each tier of that zone (`tierSummary`).
+
+Columns: zone, tier, the three players' kit names, then the team group (avg frags/h, **EPH** =
 encounters/h, avg XP/h, avg charms/h) and one group per player (frags/h, DPS, **DPH** = deaths/h, XP/h,
 charms/h). The
 English headers are EPH and DPH (zh stays 遭遇/时 and 死亡/时). The first column of the team group

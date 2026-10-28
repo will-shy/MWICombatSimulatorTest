@@ -3,7 +3,10 @@
 // difficulty tier, and rank the results by fragments per hour.
 //
 // Every condition is one independent simulation, so the sweep is fanned out across a pool of
-// workers (see optimizationWorker.js) and the table fills in as results land.
+// workers (see optimizationWorker.js). It runs in two phases: every condition at the short "fast"
+// length, then only the best FINALISTS (per zone) again at the long "full" length, and the table
+// shows the best SHOWN of whichever phase finished last. "Sim all zones" runs the same sweep over
+// every zone ticked in the zone settings panel and shows one best row per zone.
 
 import abilityDetailMap from "./combatsimulator/data/abilityDetailMap.json";
 import houseRoomDetailMap from "./combatsimulator/data/houseRoomDetailMap.json";
@@ -11,7 +14,7 @@ import itemDetailMap from "./combatsimulator/data/itemDetailMap.json";
 import shrineDetailMap from "./combatsimulator/data/shrineDetailMap.json";
 import Player from "./combatsimulator/player.js";
 import { applyLevelGapDebuff, baselineAbilitySlots, importSetToPlayerDTO } from "./combatsimulator/importSet.js";
-import { combatZones, metricsFor, zoneDropItems, zoneFragmentItems } from "./combatsimulator/zoneDrops.js";
+import { combatZones, metricsFor, zoneFragmentItems } from "./combatsimulator/zoneDrops.js";
 import { kitName } from "./kitName.js";
 import { gameName, initLanguage, language, onSharedI18nReady, setLanguage, t } from "./optimizationI18n.js";
 
@@ -26,8 +29,9 @@ const PLUGIN_MIRROR_KEY = "mwiPluginCharacters";
 const PLUGIN_MIRROR_NODE_ID = "mwi-plugin-data";
 const PLUGIN_MIRROR_EVENT = "mwi-plugin-data";
 const SETUP_KEY = "mwiOptimizationSetup";
-// What each goal ranks by: the sort the table starts on, and the number the best row is judged on.
-const SORT_FOR_GOAL = { fragments: "frags", xp: "xp", charms: "charms" };
+// How many fast-sim conditions go on to the full sim, and how many results the table shows.
+const FINALISTS = 5;
+const SHOWN = 3;
 // T2-T5 can be swept. T4 and T5 are the interesting ones for fragments, so they are what a zone
 // starts with (DEFAULT_TIERS); T2 and T3 are opt-in.
 const TIERS = [2, 3, 4, 5];
@@ -37,8 +41,17 @@ const MAX_POOL_SIZE = 16;
 
 let pluginData = { characters: {} };
 let slots = [];        // per player: { characterId, loadoutId, candidates: [{ name, slots: [5 x {hrid,level}|null] }] }
-let rows = [];         // finished conditions, in completion order
+let rows = [];         // fast-sim results: { condition, metrics | error, hours }
+let fullRows = [];     // full-sim results of the finalists, same shape
+let fullDone = false;  // the full phase ran to the end, so fullRows is the ranking
 let conditions = [];   // what the current run is simulating, by id
+let phase = null;      // "fast" | "full" while running
+let runMode = "single"; // "single" (the Target zone) | "all" (every zone in the zone settings panel)
+// Zone settings panel for "Sim all zones": zone hrid -> the tiers to sweep there. A zone with no
+// tier ticked is skipped. Zones never touched start on DEFAULT_TIERS.
+let zoneTiers = {};
+let zoneDisabled = {}; // zone hrid -> true when switched off in the panel
+let runHours = { fast: 0, full: 0 };
 let worker = null;
 let running = false;
 
@@ -170,12 +183,13 @@ function saveSetup() {
         localStorage.setItem(SETUP_KEY, JSON.stringify({
             zone: el("zoneSelect").value,
             goal: el("goalSelect").value,
-            fragment: el("fragmentSelect").value,
-            tiers: TIERS.filter((tier) => el("tier" + tier).checked),
-            hours: el("simHours").value,
+            fastHours: el("fastHours").value,
+            fullHours: el("fullHours").value,
             mooPass: el("mooPass").checked,
             comExp: el("comExp").value,
             comDrop: el("comDrop").value,
+            zoneTiers,
+            zoneDisabled,
             slots,
         }));
     } catch (e) { /* setup persistence is a convenience, not a requirement */ }
@@ -192,20 +206,18 @@ function loadSetup() {
         return;
     }
 
-    if (saved.zone) el("zoneSelect").value = saved.zone;
+    // The single-zone list holds only enabled zones, so the saved pick is applied once it is built.
+    pendingZone = saved.zone ?? "";
     if (saved.goal && [...el("goalSelect").options].some((o) => o.value === saved.goal)) {
         el("goalSelect").value = saved.goal;
-        el("sortSelect").value = SORT_FOR_GOAL[saved.goal];
     }
-    if (Array.isArray(saved.tiers)) {
-        for (const tier of TIERS) {
-            el("tier" + tier).checked = saved.tiers.includes(tier);
-        }
-    }
-    if (saved.hours) el("simHours").value = saved.hours;
+    if (saved.fastHours) el("fastHours").value = saved.fastHours;
+    if (saved.fullHours) el("fullHours").value = saved.fullHours;
     el("mooPass").checked = !!saved.mooPass;
     if (saved.comExp != null) el("comExp").value = saved.comExp;
     if (saved.comDrop != null) el("comDrop").value = saved.comDrop;
+    if (saved.zoneTiers && typeof saved.zoneTiers === "object") zoneTiers = saved.zoneTiers;
+    if (saved.zoneDisabled && typeof saved.zoneDisabled === "object") zoneDisabled = saved.zoneDisabled;
     if (Array.isArray(saved.slots) && saved.slots.length === PLAYER_COUNT) {
         slots = saved.slots.map((slot) => ({
             characterId: slot.characterId ?? "",
@@ -213,74 +225,100 @@ function loadSetup() {
             candidates: Array.isArray(slot.candidates) ? slot.candidates : [],
         }));
     }
-    // The fragment list depends on the zone, so it is restored after the zone is applied.
-    pendingFragment = saved.fragment ?? "";
 }
 
-let pendingFragment = "";
+let pendingZone = "";
 
-// ------------------------------------------------------------------ zone & goal
+// ------------------------------------------------------------------ zone settings
 
-function initZones() {
-    const select = el("zoneSelect");
-    // Planets only: a three-player group farms group spawns, and single-monster actions drop no
-    // key fragments anyway.
+const tiersForZone = (zoneHrid) => (zoneTiers[zoneHrid] ?? DEFAULT_TIERS).filter((tier) => TIERS.includes(tier));
+// A zone is in the sweep when it is switched on and has at least one tier. Switching it off keeps its
+// tiers, so switching it back on restores them.
+const zoneEnabled = (zoneHrid) => !zoneDisabled[zoneHrid] && tiersForZone(zoneHrid).length > 0;
+
+// One card per zone: an on/off box with the name, the key fragment it is scored on, and tier chips.
+// A zone that is off (or has no tier) is greyed out but stays clickable.
+function renderZonePanel() {
+    el("zonePanel").innerHTML = combatZones({ multiSpawnOnly: true }).map((zone) => {
+        const tiers = tiersForZone(zone.hrid);
+        const fragment = zoneFragmentItems(zone.hrid, Math.max(...TIERS))[0];
+        const hrid = esc(zone.hrid);
+        return `<div class="zone-card${zoneEnabled(zone.hrid) ? "" : " off"}" data-card="${hrid}">` +
+            `<label class="zone-head"><input type="checkbox" data-zone="${hrid}" data-field="zoneOn"` +
+            `${zoneDisabled[zone.hrid] ? "" : " checked"}><span class="zone-name">${esc(zoneName(zone))}</span></label>` +
+            `<div class="zone-item">${fragment ? esc(itemLabel(fragment.hrid, fragment.name)) : "&nbsp;"}</div>` +
+            `<div class="zone-tiers">` +
+            TIERS.map((tier) => `<label class="tier-chip"><input type="checkbox" data-zone="${hrid}" data-tier="${tier}"` +
+                `${tiers.includes(tier) ? " checked" : ""}>T${tier}</label>`).join("") +
+            `</div></div>`;
+    }).join("");
+}
+
+function onZonePanelChange(event) {
+    const input = event.target;
+    const zoneHrid = input.dataset.zone;
+    if (!zoneHrid) return;
+    if (input.dataset.field === "zoneOn") {
+        if (input.checked) delete zoneDisabled[zoneHrid]; else zoneDisabled[zoneHrid] = true;
+        // Switching on a zone with no tier left gives it the default ones, so "on" always means swept.
+        if (input.checked && tiersForZone(zoneHrid).length === 0) zoneTiers[zoneHrid] = DEFAULT_TIERS.slice();
+    } else {
+        const tier = Number(input.dataset.tier);
+        const tiers = new Set(tiersForZone(zoneHrid));
+        if (input.checked) tiers.add(tier); else tiers.delete(tier);
+        zoneTiers[zoneHrid] = TIERS.filter((t) => tiers.has(t));
+        // Ticking a tier of a zone that is off switches the zone on.
+        if (input.checked) delete zoneDisabled[zoneHrid];
+    }
+    renderZonePanel();
+    refreshZoneSelect();
+    updateConditionCount();
+    saveSetup();
+}
+
+// Bulk buttons: every zone on at T4+T5, or every zone off (their tiers are kept).
+function setAllZones(on) {
     for (const zone of combatZones({ multiSpawnOnly: true })) {
+        if (on) {
+            delete zoneDisabled[zone.hrid];
+            zoneTiers[zone.hrid] = DEFAULT_TIERS.slice();
+        } else {
+            zoneDisabled[zone.hrid] = true;
+        }
+    }
+    renderZonePanel();
+    refreshZoneSelect();
+    updateConditionCount();
+    saveSetup();
+}
+
+// The Run section's zone list for "Sim single zone": only the zones enabled in the settings panel.
+// Keeps the current pick while it stays enabled, else falls back to the first enabled zone.
+function refreshZoneSelect() {
+    const select = el("zoneSelect");
+    const previous = pendingZone || select.value;
+    pendingZone = "";
+    select.innerHTML = "";
+    for (const zone of combatZones({ multiSpawnOnly: true }).filter((z) => zoneEnabled(z.hrid))) {
         select.add(new Option(zoneName(zone), zone.hrid));
     }
-    select.addEventListener("change", () => {
-        // Switching zones starts over from the default tiers.
-        for (const tier of TIERS) {
-            el("tier" + tier).checked = DEFAULT_TIERS.includes(tier);
-        }
-        refreshFragmentOptions();
-        updateConditionCount();
-        saveSetup();
-    });
+    if ([...select.options].some((option) => option.value === previous)) {
+        select.value = previous;
+    }
+    select.disabled = select.options.length === 0;
 }
 
-// Every planet drops exactly one key fragment, so there is normally no choice to make and the
-// picker stays hidden — the readout just names the target. It only appears when the zone gives a
-// real choice: several fragments, or none at all (then every droppable item is offered instead).
-function refreshFragmentOptions() {
-    const zoneHrid = el("zoneSelect").value;
-    const highestTier = Math.max(...TIERS);
-    const fragments = zoneFragmentItems(zoneHrid, highestTier);
-    const needsChoice = fragments.length !== 1;
-    const offered = fragments.length > 0 ? fragments : zoneDropItems(zoneHrid, highestTier);
+// The key fragment a zone is scored on. Every planet drops exactly one.
+const zoneItemHrid = (zoneHrid) => zoneFragmentItems(zoneHrid, Math.max(...TIERS))[0]?.hrid ?? null;
 
-    const select = el("fragmentSelect");
-    const previous = pendingFragment || select.value;
-    pendingFragment = "";
-    select.innerHTML = "";
-
-    for (const item of offered) {
-        const label = itemLabel(item.hrid, item.name);
-        select.add(new Option(fragments.length > 0 ? `${label}  (${t("keyFragment")})` : label, item.hrid));
-    }
-
-    if (previous && [...select.options].some((option) => option.value === previous)) {
-        select.value = previous;
-    } else if (offered.length > 0) {
-        select.value = offered[0].hrid;
-    }
-
-    const fragmentGoal = el("goalSelect").value === "fragments";
-    el("fragmentField").classList.toggle("hidden", !needsChoice || !fragmentGoal);
-
-    const note = el("fragmentNote");
-    note.style.display = fragmentGoal ? "" : "none";
-    const item = itemName();
-    if (fragments.length === 0) {
-        note.textContent = t("fragNoteNone");
-        note.className = "hint warn";
-    } else if (fragments.length > 1) {
-        note.textContent = t("fragNoteMulti", { n: fragments.length, item });
-        note.className = "hint";
-    } else {
-        note.textContent = t("fragNoteAuto", { item });
-        note.className = "hint";
-    }
+// What a run sweeps: [{ zoneHrid, tiers, itemHrid }]. Tiers always come from the settings panel; a
+// single run takes the zone picked in the Run section, an all-zones run every enabled zone. Each zone
+// is scored on its own key fragment.
+function sweepZones(mode) {
+    const zones = mode === "single"
+        ? [el("zoneSelect").value].filter((hrid) => hrid && zoneEnabled(hrid))
+        : combatZones({ multiSpawnOnly: true }).map((zone) => zone.hrid).filter(zoneEnabled);
+    return zones.map((zoneHrid) => ({ zoneHrid, tiers: tiersForZone(zoneHrid), itemHrid: zoneItemHrid(zoneHrid) }));
 }
 
 // ------------------------------------------------------------------ player slots
@@ -656,10 +694,6 @@ function describeParallelism(conditionCount) {
     return t("parallel", { pool, cores: coreText, capped, limited: limitedByWork });
 }
 
-function selectedTiers() {
-    return TIERS.filter((tier) => el("tier" + tier).checked);
-}
-
 // Each player contributes its baseline plus one variant per candidate; the sweep is every
 // combination of those across the three players, at every selected tier.
 function playerVariants(slotIndex) {
@@ -725,35 +759,36 @@ const conditionLabels = (condition) => condition.kits
     ? condition.kits.map((kit) => kitName(kit))
     : condition.labels;
 
-function buildConditions() {
-    const zoneHrid = el("zoneSelect").value;
-    const tiers = selectedTiers();
+function buildConditions(mode) {
     const variantsPerPlayer = [0, 1, 2].map(playerVariants);
-    if (variantsPerPlayer.some((variants) => variants.length === 0) || tiers.length === 0) {
+    if (variantsPerPlayer.some((variants) => variants.length === 0)) {
         return [];
     }
 
     let built = [];
-    for (const tier of tiers) {
-        for (const [i, first] of variantsPerPlayer[0].entries()) {
-            for (const [j, second] of variantsPerPlayer[1].entries()) {
-                for (const [k, third] of variantsPerPlayer[2].entries()) {
-                    const picked = [first, second, third];
-                    built.push({
-                        id: `${i}-${j}-${k}@T${tier}`,
-                        zoneHrid,
-                        difficultyTier: tier,
-                        labels: picked.map((variant) => variant.label),
-                        kits: picked.map((variant) => variant.abilities),
-                        infos: picked.map((variant) => ({
-                            isBase: variant.isBase, baseline: variant.baseline,
-                            abilities: variant.abilities, gearFrom: variant.gearFrom ?? null,
-                        })),
-                        details: picked.map((variant) => variant.detail ?? t("baselineDetail")),
-                        isBaseline: i === 0 && j === 0 && k === 0,
-                        players: applyLevelGapDebuff(picked.map((variant, index) =>
-                            importSetToPlayerDTO(variant.set, PLAYER_HRIDS[index], variant.abilities))),
-                    });
+    for (const { zoneHrid, tiers, itemHrid } of sweepZones(mode)) {
+        for (const tier of tiers) {
+            for (const [i, first] of variantsPerPlayer[0].entries()) {
+                for (const [j, second] of variantsPerPlayer[1].entries()) {
+                    for (const [k, third] of variantsPerPlayer[2].entries()) {
+                        const picked = [first, second, third];
+                        built.push({
+                            id: `${zoneHrid}|${i}-${j}-${k}@T${tier}`,
+                            zoneHrid,
+                            itemHrid,
+                            difficultyTier: tier,
+                            labels: picked.map((variant) => variant.label),
+                            kits: picked.map((variant) => variant.abilities),
+                            infos: picked.map((variant) => ({
+                                isBase: variant.isBase, baseline: variant.baseline,
+                                abilities: variant.abilities, gearFrom: variant.gearFrom ?? null,
+                            })),
+                            details: picked.map((variant) => variant.detail ?? t("baselineDetail")),
+                            isBaseline: i === 0 && j === 0 && k === 0,
+                            players: applyLevelGapDebuff(picked.map((variant, index) =>
+                                importSetToPlayerDTO(variant.set, PLAYER_HRIDS[index], variant.abilities))),
+                        });
+                    }
                 }
             }
         }
@@ -763,60 +798,130 @@ function buildConditions() {
 
 function updateConditionCount() {
     const variantCounts = [0, 1, 2].map((index) => playerVariants(index).length);
-    const tiers = selectedTiers().length;
-    const total = variantCounts.every((count) => count > 0)
-        ? variantCounts.reduce((prev, cur) => prev * cur, 1) * tiers
+    const combos = variantCounts.every((count) => count > 0)
+        ? variantCounts.reduce((prev, cur) => prev * cur, 1)
         : 0;
-
-    const hours = Number(el("simHours").value) || 0;
+    const tiers = sweepZones("single")[0]?.tiers.length ?? 0;
+    const total = combos * tiers;
+    const { fast, full } = sweepHours();
     el("conditionCount").textContent = total === 0
         ? t("pickAll")
-        : t("conditionCount", { counts: variantCounts.join(" × "), tiers, total, hours });
-    el("parallelism").textContent = describeParallelism(total);
+        : t(hasFastPhase([total]) ? "conditionCount" : "conditionCountFull",
+            { counts: variantCounts.join(" × "), tiers, total, fast, full, top: FINALISTS });
+
+    const zones = sweepZones("all");
+    const perZone = zones.map((zone) => combos * zone.tiers.length);
+    const allTotal = perZone.reduce((sum, n) => sum + n, 0);
+    el("allZonesCount").textContent = combos === 0 || zones.length === 0
+        ? t("pickAllZones")
+        : t(hasFastPhase(perZone) ? "allZonesCount" : "allZonesCountFull",
+            { zones: zones.length, total: allTotal, fast, full, top: FINALISTS });
+
+    el("parallelism").textContent = describeParallelism(Math.max(total, allTotal));
     el("runBtn").disabled = total === 0 || running;
+    el("runAllBtn").disabled = allTotal === 0 || running;
     return total;
 }
 
 // ------------------------------------------------------------------ running
 
-function run() {
+function sweepHours() {
+    return {
+        fast: Math.max(1, Number(el("fastHours").value) || 24),
+        full: Math.max(1, Number(el("fullHours").value) || 200),
+    };
+}
+
+// The fast pass only pays off when it cuts something: if no zone has more than FINALISTS
+// conditions, or the fast length is not shorter, everything goes straight to the full sim.
+// `perZone` is the condition count of each zone in the sweep.
+function hasFastPhase(perZone) {
+    const { fast, full } = sweepHours();
+    return perZone.some((n) => n > FINALISTS) && fast < full;
+}
+
+// The best `n` rows of each zone, by the goal.
+function bestPerZone(list, n) {
+    const byZone = new Map();
+    for (const row of rankByGoal(list)) {
+        const kept = byZone.get(row.condition.zoneHrid) ?? [];
+        if (kept.length < n) kept.push(row);
+        byZone.set(row.condition.zoneHrid, kept);
+    }
+    return [...byZone.values()].flat();
+}
+
+function run(mode = "single") {
     if (running) {
         return;
     }
 
-    conditions = buildConditions();
+    conditions = buildConditions(mode);
     if (conditions.length === 0) {
         return;
     }
+    runMode = mode;
+    const perZone = [...conditions.reduce((counts, c) =>
+        counts.set(c.zoneHrid, (counts.get(c.zoneHrid) ?? 0) + 1), new Map()).values()];
 
     rows = [];
+    fullRows = [];
+    fullDone = false;
     running = true;
+    runHours = sweepHours();
     renderResults();
     el("runBtn").disabled = true;
+    el("runAllBtn").disabled = true;
     el("stopBtn").disabled = false;
-    setProgress(0, conditions.length);
 
-    const itemHrid = el("fragmentSelect").value;
-    const hours = Math.max(1, Number(el("simHours").value) || 10);
+    if (hasFastPhase(perZone)) {
+        runPhase("fast", conditions, () => {
+            // Finalists, FINALISTS per zone, are picked on the goal set when the fast phase ended.
+            const finalists = bestPerZone(rows.filter((row) => row.metrics), FINALISTS)
+                .map((row) => row.condition);
+            if (finalists.length === 0) {
+                finish(t("done"));
+                return;
+            }
+            runPhase("full", finalists, () => {
+                fullDone = true;
+                finish(t("done"));
+            });
+        });
+    } else {
+        runPhase("full", conditions, () => {
+            fullDone = true;
+            finish(t("done"));
+        });
+    }
+}
+
+// One pass of the sweep over `list` at that phase's length; `onDone` runs only if it was not stopped.
+function runPhase(name, list, onDone) {
+    phase = name;
+    const target = name === "fast" ? rows : fullRows;
+    const hours = runHours[name];
+    setProgress(0, list.length);
 
     worker = new Worker(new URL("optimizationWorker.js", import.meta.url));
     worker.onmessage = (event) => {
         const data = event.data;
         if (data.type === "optimization_condition_result") {
             const condition = conditions.find((c) => c.id === data.conditionId);
-            rows.push({
-                condition,
-                metrics: metricsFor(data.simResult, itemHrid, PLAYER_HRIDS),
-            });
+            target.push({ condition, hours, metrics: metricsFor(data.simResult, condition.itemHrid, PLAYER_HRIDS) });
             setProgress(data.completed, data.total);
             renderResults();
         } else if (data.type === "optimization_condition_error") {
             const condition = conditions.find((c) => c.id === data.conditionId);
-            rows.push({ condition, error: data.error });
+            target.push({ condition, hours, error: data.error });
             setProgress(data.completed, data.total);
             renderResults();
-        } else if (data.type === "optimization_done" || data.type === "optimization_cancelled") {
-            finish(t(data.type === "optimization_cancelled" ? "stopped" : "done"));
+        } else if (data.type === "optimization_done") {
+            worker.terminate();
+            worker = null;
+            if (running) onDone();
+        } else if (data.type === "optimization_cancelled") {
+            finish(t("stopped"));
         } else if (data.type === "optimization_error") {
             finish(t("failed", { message: data.error }));
         }
@@ -825,7 +930,7 @@ function run() {
 
     worker.postMessage({
         type: "run_optimization",
-        conditions,
+        conditions: list,
         extra: {
             mooPass: el("mooPass").checked,
             comExp: Number(el("comExp").value) || 0,
@@ -851,13 +956,17 @@ function stop() {
 }
 
 function finish(message) {
+    if (!running) {
+        return;
+    }
     running = false;
     if (worker) {
         worker.terminate();
         worker = null;
     }
     el("stopBtn").disabled = true;
-    el("progressText").textContent = t("finished", { message, done: rows.length, total: conditions.length });
+    el("progressText").textContent = t("finished", { message, done: rows.length + fullRows.length });
+    phase = null;
     updateConditionCount();
     renderResults();
 }
@@ -865,27 +974,39 @@ function finish(message) {
 function setProgress(done, total) {
     const percent = total > 0 ? (100 * done) / total : 0;
     el("progressFill").style.width = percent.toFixed(1) + "%";
-    el("progressText").textContent = t("progress", { done, total, pool: poolSizeFor(total) });
+    el("progressText").textContent = t(phase === "fast" ? "progressFast" : "progressFull",
+        { done, total, hours: runHours[phase], pool: poolSizeFor(total) });
 }
 
 // ------------------------------------------------------------------ results
 
-function sortedRows() {
-    const key = el("sortSelect").value;
-    const score = (row) => {
-        if (!row.metrics) {
-            return -Infinity;
-        }
-        switch (key) {
-            case "eph": return row.metrics.encountersPerHour;
-            case "xp": return average(row, "xpPerHour");
-            case "charms": return row.metrics.avgCharmsPerHour;
-            case "dps": return average(row, "dps");
-            case "deaths": return -average(row, "deathsPerHour");
-            default: return row.metrics.avgFragsPerHour;
-        }
-    };
-    return rows.slice().sort((a, b) => score(b) - score(a));
+// Best first by the selected goal; failed rows last.
+function rankByGoal(list) {
+    const score = (row) => row.metrics ? goalValue(row.metrics) : -Infinity;
+    return list.slice().sort((a, b) => score(b) - score(a));
+}
+
+// The rows the table ranks: the full sim once it has finished, else the fast sim (still running, or
+// the run was stopped before the full phase ended). The full-phase results arrive in no useful order,
+// so a partial full phase is only ranked when there was no fast phase to fall back on.
+function rankedSource() {
+    return (fullDone && fullRows.length > 0) || rows.length === 0 ? fullRows : rows;
+}
+
+// The tier cell's tooltip: the best goal value reached at each tier of that zone, so a best-per-zone
+// row also tells how far behind the other tiers were.
+function tierSummary(list, zoneHrid) {
+    const goal = el("goalSelect").value;
+    let bestByTier = new Map();
+    for (const row of list) {
+        if (!row.metrics || row.condition.zoneHrid !== zoneHrid) continue;
+        const value = goalValue(row.metrics);
+        const tier = row.condition.difficultyTier;
+        if (!bestByTier.has(tier) || value > bestByTier.get(tier)) bestByTier.set(tier, value);
+    }
+    return [...bestByTier.entries()].sort((a, b) => a[0] - b[0])
+        .map(([tier, value]) => `T${tier}: ${goal === "xp" ? fmtK(value) + "k" : fmt(value, 2)}`)
+        .join(" · ");
 }
 
 // The number the selected goal is judged on, for the best-row highlight and the summary.
@@ -905,19 +1026,26 @@ function average(row, field) {
 function renderResults() {
     updateVariantHeaders();
     const body = el("resultsBody");
-    const ordered = sortedRows();
-    // Always highlight the condition that is best for the goal, whatever the table is sorted by, so
-    // re-sorting to inspect deaths or dps does not move the goal.
+    const source = rankedSource();
+    // One zone: its top SHOWN. All zones: the best row of each zone, best zone first.
+    const ordered = runMode === "all" ? rankByGoal(bestPerZone(source, 1)) : rankByGoal(source).slice(0, SHOWN);
     const goal = el("goalSelect").value;
-    const best = rows.filter((row) => row.metrics)
-        .sort((a, b) => goalValue(b.metrics) - goalValue(a.metrics))[0];
+    const best = ordered.find((row) => row.metrics);
 
-    el("resultsSummary").textContent = rows.length === 0 || !best
+    const stage = source === fullRows
+        ? (rows.length > 0 ? t("stageFull", { hours: runHours.full, top: FINALISTS, fast: runHours.fast }) : t("stageFullOnly", { hours: runHours.full }))
+        : t("stageFast", { hours: runHours.fast });
+    el("resultsSummary").textContent = !best
         ? ""
+        : runMode === "all"
+        ? t("resultsSummaryZones", { zones: ordered.length, n: rows.length || fullRows.length, stage,
+            zone: gameName("actionNames", best.condition.zoneHrid, best.condition.zoneHrid), tier: best.condition.difficultyTier })
         : t(goal === "xp" ? "resultsSummaryXp" : goal === "charms" ? "resultsSummaryCharms" : "resultsSummary", {
-            n: rows.length,
+            n: rows.length || fullRows.length,
+            shown: ordered.length,
+            stage,
             value: goal === "xp" ? fmtK(goalValue(best.metrics)) : fmt(goalValue(best.metrics), 2),
-            item: itemName(),
+            item: itemLabel(best.condition.itemHrid),
             tier: best.condition.difficultyTier,
         });
 
@@ -935,9 +1063,11 @@ function renderResults() {
                     : "";
                 return `<td class="variant" title="${esc(conditionDetail(condition, i))}">${icon}${esc(label)}${share}</td>`;
             }).join("");
+        const zoneCell = `<td>${esc(gameName("actionNames", condition.zoneHrid, condition.zoneHrid))}</td>`;
+        const tierCell = `<td title="${esc(tierSummary(source, condition.zoneHrid))}">T${condition.difficultyTier}</td>`;
 
         if (row.error) {
-            return `<tr class="failed"><td></td><td>T${condition.difficultyTier}</td>${variantCells}` +
+            return `<tr class="failed"><td></td>${zoneCell}${tierCell}${variantCells}` +
                 `<td colspan="19">${esc(row.error)}</td></tr>`;
         }
 
@@ -953,7 +1083,7 @@ function renderResults() {
 
         const classes = [condition.isBaseline ? "baseline" : "", row === best ? "best" : ""].filter(Boolean).join(" ");
         return `<tr class="${classes}"><td><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td>` +
-            `<td>T${condition.difficultyTier}</td>${variantCells}` +
+            `${zoneCell}${tierCell}${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
             `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
             `<td>${fmtK(average(row, "xpPerHour"))}</td>` +
@@ -970,8 +1100,9 @@ function openTriggerOptimization(conditionId) {
         zoneHrid: condition.zoneHrid,
         zoneName: gameName("actionNames", condition.zoneHrid, condition.zoneHrid),
         difficultyTier: condition.difficultyTier,
-        hours: Math.max(1, Number(el("simHours").value) || 10),
-        itemHrid: el("fragmentSelect").value,
+        // The trigger search runs many short sims, so it gets the fast length.
+        hours: runHours.fast || sweepHours().fast,
+        itemHrid: condition.itemHrid,
         extra: {
             mooPass: el("mooPass").checked,
             comExp: Number(el("comExp").value) || 0,
@@ -991,24 +1122,21 @@ function openTriggerOptimization(conditionId) {
     window.open("trigger-optimization.html", "_blank");
 }
 
-function itemName() {
-    const hrid = el("fragmentSelect").value;
-    return itemLabel(hrid);
-}
-
 function exportCsv() {
-    const header = ["tier", "player1 variant", "player2 variant", "player3 variant",
+    const header = ["sim hours", "zone", "tier", "player1 variant", "player2 variant", "player3 variant",
         "avg frags/h", "encounters/h", "avg xp/h", "avg charm score/h"];
     for (const hrid of PLAYER_HRIDS) {
         header.push(`${hrid} frags/h`, `${hrid} dps`, `${hrid} deaths/h`, `${hrid} xp/h`, `${hrid} charm score/h`);
     }
 
     const lines = [header.join(",")];
-    for (const row of sortedRows()) {
+    // Every simulated row of both phases, full sim first, so the CSV keeps what the table trims.
+    for (const row of [...rankByGoal(fullRows), ...rankByGoal(rows)]) {
         if (!row.metrics) {
             continue;
         }
-        let cells = [row.condition.difficultyTier, ...conditionLabels(row.condition).map((l) => `"${l.replace(/"/g, '""')}"`),
+        let cells = [row.hours, `"${gameName("actionNames", row.condition.zoneHrid, row.condition.zoneHrid).replace(/"/g, '""')}"`,
+            row.condition.difficultyTier, ...conditionLabels(row.condition).map((l) => `"${l.replace(/"/g, '""')}"`),
             row.metrics.avgFragsPerHour.toFixed(4), row.metrics.encountersPerHour.toFixed(2),
             average(row, "xpPerHour").toFixed(0), row.metrics.avgCharmsPerHour.toFixed(4)];
         for (const hrid of PLAYER_HRIDS) {
@@ -1059,20 +1187,11 @@ function applyStaticText() {
     updateVariantHeaders();
 }
 
-// Everything that holds generated text, in dependency order: the zone list feeds the fragment list.
+// Everything that holds generated text.
 function renderAll() {
     applyStaticText();
-
-    const zoneSelect = el("zoneSelect");
-    const selectedZone = zoneSelect.value;
-    zoneSelect.innerHTML = "";
-    for (const zone of combatZones({ multiSpawnOnly: true })) {
-        zoneSelect.add(new Option(zoneName(zone), zone.hrid));
-    }
-    zoneSelect.value = selectedZone;
-
-    pendingFragment = el("fragmentSelect").value;
-    refreshFragmentOptions();
+    refreshZoneSelect();
+    renderZonePanel();
     loadPluginData();
     renderSlots();
     renderResults();
@@ -1084,13 +1203,16 @@ function init() {
     initLanguage();
     applyStaticText();
     slots = defaultSlots();
-    initZones();
     loadPluginData();
     loadSetup();
-    refreshFragmentOptions();
+    refreshZoneSelect();
+    renderZonePanel();
     renderSlots();
 
     el("playerSlots").addEventListener("change", onSlotInput);
+    el("zonePanel").addEventListener("change", onZonePanelChange);
+    el("zonesDefault").addEventListener("click", () => setAllZones(true));
+    el("zonesClear").addEventListener("click", () => setAllZones(false));
     el("resultsBody").addEventListener("click", (event) => {
         const button = event.target.closest("button[data-id]");
         if (button) openTriggerOptimization(button.dataset.id);
@@ -1102,23 +1224,15 @@ function init() {
             onSlotInput(event);
         }
     });
-    for (const tier of TIERS) {
-        el("tier" + tier).addEventListener("change", () => { updateConditionCount(); saveSetup(); });
+    el("zoneSelect").addEventListener("change", () => { updateConditionCount(); saveSetup(); });
+    for (const id of ["fastHours", "fullHours"]) {
+        el(id).addEventListener("change", () => { updateConditionCount(); saveSetup(); });
     }
-    el("simHours").addEventListener("change", () => { updateConditionCount(); saveSetup(); });
-    el("fragmentSelect").addEventListener("change", () => {
-        saveSetup();
-        refreshFragmentOptions();
-        renderResults();
-    });
     el("mooPass").addEventListener("change", saveSetup);
     el("comExp").addEventListener("change", saveSetup);
     el("comDrop").addEventListener("change", saveSetup);
-    el("sortSelect").addEventListener("change", renderResults);
-    // Picking a goal also sorts the table by it.
+    // Re-ranks what has already run; the finalists of a finished run stay the ones picked then.
     el("goalSelect").addEventListener("change", () => {
-        el("sortSelect").value = SORT_FOR_GOAL[el("goalSelect").value];
-        refreshFragmentOptions();
         saveSetup();
         renderResults();
     });
@@ -1143,7 +1257,8 @@ function init() {
     });
     // Game names arrive with the shared bundle, which initialises after this script runs.
     onSharedI18nReady(renderAll);
-    el("runBtn").addEventListener("click", run);
+    el("runBtn").addEventListener("click", () => run("single"));
+    el("runAllBtn").addEventListener("click", () => run("all"));
     el("stopBtn").addEventListener("click", stop);
     el("reloadPlugin").addEventListener("click", () => {
         waitingForPlugin = false;
