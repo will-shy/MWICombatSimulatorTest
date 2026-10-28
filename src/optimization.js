@@ -44,6 +44,8 @@ let slots = [];        // per player: { characterId, loadoutId, candidates: [{ n
 let rows = [];         // fast-sim results: { condition, metrics | error, hours }
 let fullRows = [];     // full-sim results of the finalists, same shape
 let fullDone = false;  // the full phase ran to the end, so fullRows is the ranking
+let zonesDone = new Set(); // all-zones run: zones whose full sim has finished (only these are shown)
+let zoneProgress = null;   // all-zones run: { zoneHrid, index, count } of the zone being simulated
 let conditions = [];   // what the current run is simulating, by id
 let phase = null;      // "fast" | "full" while running
 let runMode = "single"; // "single" (the Target zone) | "all" (every zone in the zone settings panel)
@@ -861,12 +863,12 @@ function run(mode = "single") {
         return;
     }
     runMode = mode;
-    const perZone = [...conditions.reduce((counts, c) =>
-        counts.set(c.zoneHrid, (counts.get(c.zoneHrid) ?? 0) + 1), new Map()).values()];
 
     rows = [];
     fullRows = [];
     fullDone = false;
+    zonesDone = new Set();
+    zoneProgress = null;
     running = true;
     runHours = sweepHours();
     renderResults();
@@ -874,26 +876,51 @@ function run(mode = "single") {
     el("runAllBtn").disabled = true;
     el("stopBtn").disabled = false;
 
-    if (hasFastPhase(perZone)) {
-        runPhase("fast", conditions, () => {
-            // Finalists, FINALISTS per zone, are picked on the goal set when the fast phase ended.
-            const finalists = bestPerZone(rows.filter((row) => row.metrics), FINALISTS)
-                .map((row) => row.condition);
-            if (finalists.length === 0) {
+    if (mode === "all") {
+        // One zone at a time, each through its own fast sweep and full confirm, so a zone's result
+        // is final when it appears and a stop keeps every zone finished so far.
+        const zones = [...new Set(conditions.map((c) => c.zoneHrid))];
+        const next = (index) => {
+            if (index >= zones.length) {
+                fullDone = true;
+                zoneProgress = null;
                 finish(t("done"));
                 return;
             }
-            runPhase("full", finalists, () => {
-                fullDone = true;
-                finish(t("done"));
+            zoneProgress = { zoneHrid: zones[index], index, count: zones.length };
+            sweepTwoPhase(conditions.filter((c) => c.zoneHrid === zones[index]), () => {
+                zonesDone.add(zones[index]);
+                renderResults();
+                next(index + 1);
             });
-        });
+        };
+        next(0);
     } else {
-        runPhase("full", conditions, () => {
+        sweepTwoPhase(conditions, () => {
             fullDone = true;
             finish(t("done"));
         });
     }
+}
+
+// The fast sweep over `list`, then the full confirm of its best FINALISTS (or straight to the full
+// sim when the fast pass would not cut anything). `onDone` runs once the full sim has finished.
+function sweepTwoPhase(list, onDone) {
+    if (!hasFastPhase([list.length])) {
+        runPhase("full", list, onDone);
+        return;
+    }
+    const ids = new Set(list.map((c) => c.id));
+    runPhase("fast", list, () => {
+        // Finalists are picked on the goal set when the fast phase ended.
+        const finalists = rankByGoal(rows.filter((row) => row.metrics && ids.has(row.condition.id)))
+            .slice(0, FINALISTS).map((row) => row.condition);
+        if (finalists.length === 0) {
+            onDone();
+            return;
+        }
+        runPhase("full", finalists, onDone);
+    });
 }
 
 // One pass of the sweep over `list` at that phase's length; `onDone` runs only if it was not stopped.
@@ -974,8 +1001,14 @@ function finish(message) {
 function setProgress(done, total) {
     const percent = total > 0 ? (100 * done) / total : 0;
     el("progressFill").style.width = percent.toFixed(1) + "%";
-    el("progressText").textContent = t(phase === "fast" ? "progressFast" : "progressFull",
+    const text = t(phase === "fast" ? "progressFast" : "progressFull",
         { done, total, hours: runHours[phase], pool: poolSizeFor(total) });
+    el("progressText").textContent = zoneProgress
+        ? t("progressZone", {
+            zone: gameName("actionNames", zoneProgress.zoneHrid, zoneProgress.zoneHrid),
+            k: zoneProgress.index + 1, n: zoneProgress.count,
+        }) + text
+        : text;
 }
 
 // ------------------------------------------------------------------ results
@@ -990,6 +1023,10 @@ function rankByGoal(list) {
 // the run was stopped before the full phase ended). The full-phase results arrive in no useful order,
 // so a partial full phase is only ranked when there was no fast phase to fall back on.
 function rankedSource() {
+    // All zones: only the full sims of zones that have finished both phases.
+    if (runMode === "all") {
+        return fullRows.filter((row) => zonesDone.has(row.condition.zoneHrid));
+    }
     return (fullDone && fullRows.length > 0) || rows.length === 0 ? fullRows : rows;
 }
 
@@ -1027,19 +1064,23 @@ function renderResults() {
     updateVariantHeaders();
     const body = el("resultsBody");
     const source = rankedSource();
-    // One zone: its top SHOWN. All zones: the best row of each zone, best zone first.
-    const ordered = runMode === "all" ? rankByGoal(bestPerZone(source, 1)) : rankByGoal(source).slice(0, SHOWN);
+    // One zone: its top SHOWN. All zones: the best row of each zone, in the game's zone order. Zones
+    // are not compared with each other (each scores its own fragment), so none is marked best.
+    const zoneOrder = combatZones({ multiSpawnOnly: true }).map((zone) => zone.hrid);
+    const ordered = runMode === "all"
+        ? bestPerZone(source, 1).sort((a, b) => zoneOrder.indexOf(a.condition.zoneHrid) - zoneOrder.indexOf(b.condition.zoneHrid))
+        : rankByGoal(source).slice(0, SHOWN);
     const goal = el("goalSelect").value;
     const best = ordered.find((row) => row.metrics);
 
-    const stage = source === fullRows
+    const stage = runMode === "all" || source === fullRows
         ? (rows.length > 0 ? t("stageFull", { hours: runHours.full, top: FINALISTS, fast: runHours.fast }) : t("stageFullOnly", { hours: runHours.full }))
         : t("stageFast", { hours: runHours.fast });
     el("resultsSummary").textContent = !best
         ? ""
         : runMode === "all"
-        ? t("resultsSummaryZones", { zones: ordered.length, n: rows.length || fullRows.length, stage,
-            zone: gameName("actionNames", best.condition.zoneHrid, best.condition.zoneHrid), tier: best.condition.difficultyTier })
+        ? t("resultsSummaryZones", { zones: ordered.length, stage,
+            n: conditions.filter((c) => zonesDone.has(c.zoneHrid)).length })
         : t(goal === "xp" ? "resultsSummaryXp" : goal === "charms" ? "resultsSummaryCharms" : "resultsSummary", {
             n: rows.length || fullRows.length,
             shown: ordered.length,
@@ -1081,7 +1122,7 @@ function renderResults() {
                 `<td>${fmt(player.charmsPerHour, 2)}</td>`;
         }).join("");
 
-        const classes = [condition.isBaseline ? "baseline" : "", row === best ? "best" : ""].filter(Boolean).join(" ");
+        const classes = [condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""].filter(Boolean).join(" ");
         return `<tr class="${classes}"><td><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td>` +
             `${zoneCell}${tierCell}${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +

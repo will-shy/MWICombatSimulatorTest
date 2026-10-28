@@ -30,13 +30,16 @@ every selected tier and ranks them by the selected goal.
 - **Sweep size** = (variants of player 1 × player 2 × player 3) × selected tiers. A player's
   variants are the baseline plus one per candidate kit (`playerVariants`). Every condition is an
   independent simulation of the chosen zone.
-- **Two phases** (`run`, `runPhase`). **Fast sim** (`fastHours`, default 24h): every condition. Then
-  the best `FINALISTS` = 5 **of each zone** (`bestPerZone`; by the goal at the moment the fast phase
+- **Two phases** (`sweepTwoPhase`, `runPhase`). **Fast sim** (`fastHours`, default 24h): every
+  condition of the zone. Then its best `FINALISTS` = 5 (by the goal at the moment the fast phase
   ends; failed rows never qualify) run again as the **full sim** (`fullHours`, default 200h). The fast
-  phase is skipped, and every condition goes straight to the full sim, when no zone has more than 5
+  phase is skipped, and every condition goes straight to the full sim, when the zone has 5 or fewer
   conditions or the fast length is not shorter than the full one (`hasFastPhase`). Both lengths are
   saved with the setup.
-- **Sim all zones** (`run("all")`, the "Sim all zones" button) sweeps every enabled zone. The **zone settings** panel
+- **Sim all zones** (`run("all")`, the "Sim all zones" button) sweeps every enabled zone **one zone
+  at a time**: fast sweep then full confirm for zone 1, then zone 2, and so on. The progress line
+  names the zone (`zoneProgress`). A zone's row appears only once its full confirm is done
+  (`zonesDone`); nothing from a fast sim is shown in this mode. A stop keeps the zones already done. The **zone settings** panel
   (`renderZonePanel`) shows one card per planet: an on/off box with the zone name, its key fragment,
   and T2–T5 chips. `zoneTiers` maps a zone to its tiers (never touched = `DEFAULT_TIERS`, T4+T5) and
   `zoneDisabled` marks zones switched off; both are saved in the setup. A zone is swept when it is on
@@ -109,8 +112,9 @@ column in each player group, and in the CSV.
 ## Results table
 
 **Top 3 only** (`SHOWN`) for a single-zone run; an all-zones run shows **one row per zone**, its
-best, zones ordered by the goal. The table shows those rows by the goal (`rankByGoal`) of one phase
-(`rankedSource`): the fast sim while it is the latest finished data (fast phase running, full phase
+best, in the game's zone order. Zones are never compared with each other (each is scored on its own
+fragment): no best-zone highlight and no best zone in the summary. In a single-zone run the table shows
+the rows of one phase (`rankedSource`): the fast sim while it is the latest finished data (fast phase running, full phase
 running, or the run stopped before the full phase ended), the full sim once it has finished. A
 partly finished full phase is only ranked when the fast phase was skipped. The summary says which phase is shown. The baseline row
 appears only if it is in the top 3. The CSV keeps everything: every row of both phases, full sim
