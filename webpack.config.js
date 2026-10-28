@@ -47,6 +47,8 @@ module.exports = {
         { from: path.resolve(__dirname, 'trial-assign.html'), to: 'trial-assign.html' },
         // Item icon sprite (symbol id = item hrid without "/items/"), used with <use href="items_sprite.svg#id">.
         { from: path.resolve(__dirname, 'assets/items_sprite.svg'), to: 'items_sprite.svg' },
+        // Ability icon sprite (symbol id = ability hrid without "/abilities/"), used the same way.
+        { from: path.resolve(__dirname, 'assets/abilities_sprite.svg'), to: 'abilities_sprite.svg' },
       ],
     }),
   ],

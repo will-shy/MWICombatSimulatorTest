@@ -128,9 +128,6 @@ const STRINGS = {
         thDps: "DPS",
         thDeaths: "死亡/时",
         thXp: "经验/时 (k)",
-        thPlayer1: "玩家1",
-        thPlayer2: "玩家2",
-        thPlayer3: "玩家3",
         avgTitle: "三名玩家的平均值",
 
         pluginWaiting: "正在等待配装插件发布数据…",
@@ -141,6 +138,11 @@ const STRINGS = {
         unknownTime: "未知时间",
 
         player: "玩家{n}",
+        thPlayerCol: "玩家",
+        thKit: "配装",
+        thShare: "DPS 占比",
+        dpsShareTitle: "DPS · 占全队 DPS 的比例",
+        expandTitle: "点击展开/收起每名玩家的数据",
         labelCharacter: "角色",
         labelBaseline: "基准配装",
         pick: "— 选择 —",
@@ -342,9 +344,6 @@ const STRINGS = {
         thDps: "DPS",
         thDeaths: "DPH",
         thXp: "XP/h (k)",
-        thPlayer1: "Player 1",
-        thPlayer2: "Player 2",
-        thPlayer3: "Player 3",
         avgTitle: "Average across the three players",
 
         pluginWaiting: "Waiting for the loadout plugin to publish its data…",
@@ -355,6 +354,11 @@ const STRINGS = {
         unknownTime: "unknown time",
 
         player: "Player {n}",
+        thPlayerCol: "Player",
+        thKit: "Kit",
+        thShare: "DPS share",
+        dpsShareTitle: "DPS · share of the party's DPS",
+        expandTitle: "Click to show or hide each player's numbers",
         labelCharacter: "Character",
         labelBaseline: "Baseline loadout",
         pick: "— pick —",

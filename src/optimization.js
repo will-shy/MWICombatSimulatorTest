@@ -48,6 +48,7 @@ let fullDone = false;  // the full phase ran to the end, so fullRows is the rank
 let zonesDone = new Set(); // all-zones run: zones whose full sim has finished (only these are shown)
 let progress = null;       // while running: { fast: {done, total}, full: {done, total}, zones, zonesDone, expected }
 let conditions = [];   // what the current run is simulating, by id
+let expandedRows = new Set(); // condition ids whose per-player detail row is open
 let runMode = "single"; // "single" (the Target zone) | "all" (every zone in the zone settings panel)
 // Zone settings panel for "Sim all zones": zone hrid -> the tiers to sweep there. A zone with no
 // tier ticked is skipped. Zones never touched start on DEFAULT_TIERS.
@@ -748,6 +749,36 @@ function weaponIconHtml(dto) {
         `<use href="items_sprite.svg#${esc(id)}"></use></svg>`;
 }
 
+// Symbol ids in assets/abilities_sprite.svg (the game's abilities sprite), so an ability the sprite
+// lacks falls back to its name instead of drawing an empty box.
+const ABILITY_ICONS = new Set([
+    "aqua_arrow", "aqua_aura", "berserk", "cleave", "crippling_slash", "critical_aura",
+    "elemental_affinity", "elusiveness", "entangle", "fierce_aura", "fireball", "firestorm",
+    "flame_arrow", "flame_aura", "flame_blast", "fracturing_impact", "frenzy", "frost_surge",
+    "guardian_aura", "heal", "ice_spear", "impale", "insanity", "invincible",
+    "life_drain", "maim", "mana_spring", "minor_heal", "mystic_aura", "natures_veil",
+    "penetrating_shot", "penetrating_strike", "pestilent_shot", "poke", "precision", "provoke",
+    "puncture", "quick_aid", "quick_shot", "rain_of_arrows", "rejuvenate", "retribution",
+    "revive", "scratch", "shield_bash", "silencing_shot", "smack", "smoke_burst",
+    "speed_aura", "spike_shell", "steady_shot", "stunning_blow", "sweep", "sylvan_aura",
+    "taunt", "toughness", "toxic_pollen", "vampirism", "water_strike",
+]);
+
+// A kit as ability icons: the non-aura abilities in slot order (the same ones kitName names), each
+// with its name and level as a tooltip. An ability without an icon shows its name.
+function kitIconsHtml(kitSlots) {
+    const entries = (kitSlots || []).filter((entry) => entry?.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility);
+    if (entries.length === 0) return esc(t("noAbilities"));
+    return entries.map((entry) => {
+        const id = entry.hrid.replace("/abilities/", "");
+        const title = `${abilityName(entry.hrid)} Lv ${entry.level}`;
+        return ABILITY_ICONS.has(id)
+            ? `<svg class="ability-icon" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>` +
+              `<use href="abilities_sprite.svg#${esc(id)}"></use></svg>`
+            : `<span class="ability-text" title="${esc(title)}">${esc(abilityName(entry.hrid))}</span>`;
+    }).join("");
+}
+
 function conditionDetail(condition, i) {
     const info = condition.infos?.[i];
     if (!info) return condition.details?.[i] ?? "";
@@ -868,6 +899,7 @@ function run(mode = "single") {
     fullRows = [];
     fullDone = false;
     zonesDone = new Set();
+    expandedRows = new Set();
     running = true;
     runHours = sweepHours();
     renderResults();
@@ -1098,43 +1130,74 @@ function renderResults() {
 
     body.innerHTML = ordered.map((row) => {
         const condition = row.condition;
-        // After each kit name: that player's DPS and its share of the party's DPS, e.g. "(235, 34%)".
-        const dpsOf = (i) => row.metrics?.players[PLAYER_HRIDS[i]]?.dps;
+        const expanded = expandedRows.has(condition.id);
+        // The row is the summary: each player's kit (weapon + ability icons) and the team averages.
+        // Per-player numbers are in the detail row a click opens.
+        // That player's DPS and its share of the party's DPS, e.g. "235 · 34%", shown after the kit.
         const totalDps = row.metrics ? PLAYER_HRIDS.reduce((sum, hrid) => sum + row.metrics.players[hrid].dps, 0) : 0;
-        const variantCells = conditionLabels(condition)
-            .map((label, i) => {
-                const dps = dpsOf(i);
-                const icon = weaponIconHtml(condition.players?.[i]);
-                const share = Number.isFinite(dps)
-                    ? ` <span class="dim">(${Math.round(dps)}, ${totalDps > 0 ? Math.round((dps / totalDps) * 100) : 0}%)</span>`
-                    : "";
-                return `<td class="variant" title="${esc(conditionDetail(condition, i))}">${icon}${esc(label)}${share}</td>`;
-            }).join("");
+        const dpsHtml = (i) => {
+            const dps = row.metrics?.players[PLAYER_HRIDS[i]]?.dps;
+            if (!Number.isFinite(dps)) return "";
+            const share = totalDps > 0 ? Math.round((dps / totalDps) * 100) : 0;
+            return `<span class="kit-dps" title="${esc(t("dpsShareTitle"))}">${Math.round(dps)} · ${share}%</span>`;
+        };
+        // The detail rows have DPS columns, so they leave it out (withDps = false).
+        const kitCell = (label, i, withDps = true) => {
+            const title = `${label}\n${conditionDetail(condition, i)}`;
+            const kit = condition.kits ? kitIconsHtml(condition.kits[i]) : esc(label);
+            // Weapon and abilities are two groups, split by a divider, so the weapon never reads as a skill.
+            const weapon = weaponIconHtml(condition.players?.[i]);
+            return `<span class="kit-cell" title="${esc(title)}">` +
+                (weapon ? `<span class="kit-weapon">${weapon}</span>` : "") +
+                `<span class="kit-abilities">${kit}</span>${withDps ? dpsHtml(i) : ""}</span>`;
+        };
+        const labels = conditionLabels(condition);
+        const variantCells = labels.map((label, i) => `<td class="variant">${kitCell(label, i)}</td>`).join("");
         const zoneCell = `<td>${esc(gameName("actionNames", condition.zoneHrid, condition.zoneHrid))}</td>`;
         const tierCell = `<td title="${esc(tierSummary(source, condition.zoneHrid))}">T${condition.difficultyTier}</td>`;
 
         if (row.error) {
             return `<tr class="failed"><td></td>${zoneCell}${tierCell}${variantCells}` +
-                `<td colspan="19">${esc(row.error)}</td></tr>`;
+                `<td colspan="5">${esc(row.error)}</td></tr>`;
         }
 
         const metrics = row.metrics;
-        const playerCells = PLAYER_HRIDS.map((hrid) => {
-            const player = metrics.players[hrid];
-            return `<td class="sep">${fmt(player.fragsPerHour, 2)}</td>` +
-                `<td>${fmt(player.dps, 1)}</td>` +
-                `<td class="${player.deathsPerHour > 0 ? "warnCell" : ""}">${fmt(player.deathsPerHour, 2)}</td>` +
-                `<td>${fmtK(player.xpPerHour)}</td>` +
-                `<td>${fmt(player.charmsPerHour, 2)}</td>`;
-        }).join("");
-
-        const classes = [condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""].filter(Boolean).join(" ");
-        return `<tr class="${classes}"><td><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td>` +
+        const classes = ["summary", condition.isBaseline ? "baseline" : "", runMode !== "all" && row === best ? "best" : ""]
+            .filter(Boolean).join(" ");
+        const summary = `<tr class="${classes}" data-expand="${esc(condition.id)}" title="${esc(t("expandTitle"))}">` +
+            `<td class="row-head"><span class="chevron">${expanded ? "▾" : "▸"}</span></td>` +
             `${zoneCell}${tierCell}${variantCells}` +
             `<td class="strong sep">${fmt(metrics.avgFragsPerHour, 2)}</td>` +
             `<td>${fmt(metrics.encountersPerHour, 1)}</td>` +
             `<td>${fmtK(average(row, "xpPerHour"))}</td>` +
-            `<td>${fmt(metrics.avgCharmsPerHour, 2)}</td>${playerCells}</tr>`;
+            `<td>${fmt(metrics.avgCharmsPerHour, 2)}</td>` +
+            `<td class="row-end"><button type="button" class="btn small ghost" data-id="${esc(condition.id)}" title="${esc(t("openTriggerOpt"))}">${esc(t("triggerBtn"))}</button></td></tr>`;
+        if (!expanded) {
+            return summary;
+        }
+
+        // One row per player, in a nested table spanning the summary's columns.
+        const maxDps = Math.max(...PLAYER_HRIDS.map((hrid) => metrics.players[hrid].dps));
+        const playerRows = PLAYER_HRIDS.map((hrid, i) => {
+            const player = metrics.players[hrid];
+            const name = pluginData.characters[slots[i]?.characterId]?.characterMeta?.name || t("player", { n: i + 1 });
+            const share = totalDps > 0 ? Math.round((player.dps / totalDps) * 100) : 0;
+            return `<tr><td class="player-name">${esc(name)}</td><td class="variant">${kitCell(labels[i], i, false)}</td>` +
+                // Combat first (DPS, share, deaths), then the yields.
+                `<td class="sep">${fmt(player.dps, 1)}</td>` +
+                // The share as a bar, scaled so the top DPS fills it; the label stays the real share.
+                `<td class="share-cell"><span class="share-bar"><span style="width:${maxDps > 0 ? ((player.dps / maxDps) * 100).toFixed(1) : 0}%"></span></span>${share}%</td>` +
+                `<td class="${player.deathsPerHour > 0 ? "warnCell" : ""}">${fmt(player.deathsPerHour, 2)}</td>` +
+                `<td>${fmt(player.fragsPerHour, 2)}</td>` +
+                `<td>${fmtK(player.xpPerHour)}</td>` +
+                `<td>${fmt(player.charmsPerHour, 2)}</td></tr>`;
+        }).join("");
+        return summary +
+            `<tr class="detail"><td></td><td colspan="10"><table class="sub"><thead><tr>` +
+            `<th>${esc(t("thPlayerCol"))}</th><th class="variant">${esc(t("thKit"))}</th>` +
+            `<th class="sep">${esc(t("thDps"))}</th><th>${esc(t("thShare"))}</th><th>${esc(t("thDeaths"))}</th>` +
+            `<th>${esc(t("thFrags"))}</th><th>${esc(t("thXp"))}</th><th title="${esc(t("charmTitle"))}">${esc(t("thCharm"))}</th>` +
+            `</tr></thead><tbody>${playerRows}</tbody></table></td></tr>`;
     }).join("");
 }
 
@@ -1262,7 +1325,17 @@ function init() {
     el("zonesClear").addEventListener("click", () => setAllZones(false));
     el("resultsBody").addEventListener("click", (event) => {
         const button = event.target.closest("button[data-id]");
-        if (button) openTriggerOptimization(button.dataset.id);
+        if (button) {
+            openTriggerOptimization(button.dataset.id);
+            return;
+        }
+        // A click anywhere else on a summary row opens or closes its per-player detail.
+        const summary = event.target.closest("tr[data-expand]");
+        if (summary) {
+            const id = summary.dataset.expand;
+            if (expandedRows.has(id)) expandedRows.delete(id); else expandedRows.add(id);
+            renderResults();
+        }
     });
     const CLICK_FIELDS = ["addCandidate", "removeCandidate", "copyBaseline",
         "previewBaseline", "previewCandidate"];

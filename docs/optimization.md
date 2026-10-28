@@ -69,8 +69,8 @@ There is no editable kit name and no "baseline" label. Every variant, baseline i
 its setup **without the auras** (`kitName` in `optimization.js`): initials for multi-word abilities,
 the full name for single words, joined with `+`, e.g. `QA+EA+NV+Entangle`. Initials come from the
 English `abilityDetailMap` name in every language so they read the same in zh and en. A kit with only
-auras shows "no abilities". The name feeds the card header, the results table's variant columns, the
-preview title and the CSV.
+auras shows "no abilities". The name feeds the card header, the results cell tooltip (the cell itself shows
+ability icons), the preview title and the CSV.
 
 **Language switching.** Nothing language-dependent is baked into a result row. Each condition stores its
 kits as data (`kits`, `infos`), and the variant names and the cell tooltips (`conditionLabels`,
@@ -127,9 +127,10 @@ appears only if it is in the top 3. The CSV keeps everything: every row of both 
 first, with `sim hours` and `zone` columns. The Triggers button hands the fast length to Trigger Optimization
 as its search length.
 
-Each kit name is followed by that player's DPS and its share of the party's DPS, e.g. `(235, 34%)`
-(rounded; DPS is the same number as the player's DPS column, the share is out of the three players'
-total). Rows that failed show the name only.
+Each kit cell ends with that player's DPS and its share of the party's DPS, e.g. `235 · 34%` (rounded,
+out of the three players' total; `.kit-dps`, after its own divider). The expanded detail row has the
+same numbers as columns, the share drawn as a bar (`.share-bar`) with its percentage. The bar is scaled to the row's highest
+DPS (that player's bar is full, the others are DPS ÷ top DPS); the label stays the share of the party. Failed rows show no DPS.
 
 **Weapon icon.** Each kit cell starts with the weapon that player carries in that row
 (`weaponIconHtml`): the two-hand slot, else the main hand, read from the row's own DTO, so a candidate
@@ -141,14 +142,31 @@ hosted here, not hot-linked. Unarmed players, or an item the sprite lacks, show 
 checked before adding it: only drawing elements (`symbol`, `path`, `circle`, ...), no script, style,
 handler or external link. It is about 3.9 MB, loaded once and cached.
 
+**Ability icons.** After the weapon (its own group, split from the abilities by a divider:
+`.kit-weapon` / `.kit-abilities`), each kit cell draws the kit as **ability icons** instead of its
+name (`kitIconsHtml`): the non-aura abilities in slot order (the same ones `kitName` names), each
+with "name Lv n" as its tooltip. The cell tooltip starts with the kit name, then the diff against
+baseline. The icons come from `assets/abilities_sprite.svg`, the game's `abilities_sprite`
+(`/static/media/abilities_sprite.<hash>.svg` on milkywayidle.com; symbol id = ability hrid without
+`/abilities/`, 0 0 50 50 viewBox), copied to the site root by webpack and used as
+`<use href="abilities_sprite.svg#quick_aid">`. `ABILITY_ICONS` lists the sprite's symbol ids; an
+ability not in it (e.g. Promote) falls back to its name. The sprite was checked like the item sprite:
+drawing elements only, its only references are internal `url(#…)` clip paths. To refresh it, take the
+new hash from the game's main chunk, re-check it, and regenerate `ABILITY_ICONS`. The CSV and
+everything else still use kit names.
+
 The tier cell's tooltip lists the best goal value reached at each tier of that zone (`tierSummary`).
 
-Columns: zone, tier, the three players' kit names, then the team group (avg frags/h, **EPH** =
-encounters/h, avg XP/h, avg charms/h) and one group per player (frags/h, DPS, **DPH** = deaths/h, XP/h,
-charms/h). The
+**Summary rows, expandable.** Each result row is a summary: the expand arrow, zone, tier, the
+three players' kits (weapon + ability icons) and the team group (avg frags/h, **EPH** =
+encounters/h, avg XP/h, avg charms/h), then the Triggers button at the row end. Clicking the row (anywhere but the Triggers button) opens a
+detail row under it (`expandedRows`, kept across re-renders, reset on a new run) with one row per
+player: name, kit, then DPS, DPS share of the party, **DPH** = deaths/h (combat first), then
+frags/h, XP/h, charms/h. The
 English headers are EPH and DPH (zh stays 遭遇/时 and 死亡/时). The first column of the team group
-and of each player group carries the `sep` class, a 2px accent left border on both header and body
-cells, so the groups read apart. A new column group needs `sep` on its first header and body cell.
+carries the `sep` class, a 2px accent left border on both header and body cells, so the groups read
+apart; the detail table marks its DPS column the same way. A new column group needs `sep` on its
+first header and body cell.
 
 The three variant column headers show the player's character name (`updateVariantHeaders`), falling
 back to "P1 variant" etc. until a character is picked. They follow the current slot selection, so
@@ -156,7 +174,7 @@ re-picking a character after a run renames the columns of rows from the earlier 
 
 ## Trigger Optimization (`trigger-optimization.html`, `src/triggerOptimization.js`)
 
-A **Triggers** button at the start of each results row (first column, no header) opens this page in a
+A **Triggers** button at the end of each results row (last column, no header) opens this page in a
 new tab. It tunes **combat triggers** for the three players of that row and ranks by **EPH**
 (encounters per hour), not fragments.
 
