@@ -764,18 +764,20 @@ const ABILITY_ICONS = new Set([
     "taunt", "toughness", "toxic_pollen", "vampirism", "water_strike",
 ]);
 
-// A kit as ability icons: the non-aura abilities in slot order (the same ones kitName names), each
-// with its name and level as a tooltip. An ability without an icon shows its name.
+// A kit as ability icons, in slot order, each with its name and level as a tooltip: the aura
+// (special slot) first in its own tile style, then the other abilities. An ability without an icon
+// shows its name. The kit's name (kitName) still leaves the aura out.
 function kitIconsHtml(kitSlots) {
-    const entries = (kitSlots || []).filter((entry) => entry?.hrid && !abilityDetailMap[entry.hrid]?.isSpecialAbility);
+    const entries = (kitSlots || []).filter((entry) => entry?.hrid);
     if (entries.length === 0) return esc(t("noAbilities"));
     return entries.map((entry) => {
         const id = entry.hrid.replace("/abilities/", "");
         const title = `${abilityName(entry.hrid)} Lv ${entry.level}`;
+        const aura = abilityDetailMap[entry.hrid]?.isSpecialAbility ? " aura" : "";
         return ABILITY_ICONS.has(id)
-            ? `<svg class="ability-icon" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>` +
+            ? `<svg class="ability-icon${aura}" role="img" aria-label="${esc(title)}"><title>${esc(title)}</title>` +
               `<use href="abilities_sprite.svg#${esc(id)}"></use></svg>`
-            : `<span class="ability-text" title="${esc(title)}">${esc(abilityName(entry.hrid))}</span>`;
+            : `<span class="ability-text${aura}" title="${esc(title)}">${esc(abilityName(entry.hrid))}</span>`;
     }).join("");
 }
 

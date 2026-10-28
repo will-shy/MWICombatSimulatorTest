@@ -144,8 +144,8 @@ handler or external link. It is about 3.9 MB, loaded once and cached.
 
 **Ability icons.** After the weapon (its own group, split from the abilities by a divider:
 `.kit-weapon` / `.kit-abilities`), each kit cell draws the kit as **ability icons** instead of its
-name (`kitIconsHtml`): the non-aura abilities in slot order (the same ones `kitName` names), each
-with "name Lv n" as its tooltip. The cell tooltip starts with the kit name, then the diff against
+name (`kitIconsHtml`): every ability in slot order, each with "name Lv n" as its tooltip. The aura
+(special slot) comes first with a gold border (`.aura`); the kit's name still leaves it out. The cell tooltip starts with the kit name, then the diff against
 baseline. The icons come from `assets/abilities_sprite.svg`, the game's `abilities_sprite`
 (`/static/media/abilities_sprite.<hash>.svg` on milkywayidle.com; symbol id = ability hrid without
 `/abilities/`, 0 0 50 50 viewBox), copied to the site root by webpack and used as
